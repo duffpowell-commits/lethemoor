@@ -25,6 +25,13 @@ Owner: Duff. Read this first; it is the handoff between sessions.
 - Web gotcha: no system fonts on web, so symbols like ■ show as boxes. Draw them or ship a font.
 - **Art is placeholder**, drawn in code by `tools/gen_placeholder_art.py` in the locked palette.
   Real art comes next (see below).
+- **Art test (Nov 7, M1 prep):** first 48x48 HD-2D-style sprite, `assets/art/hunter48.png`
+  (+ `_n` normal map, `_glow` unshaded flame), drawn in code by `tools/gen_hunter48.py`.
+  `scenes/art_test.tscn` lights it with a low warm PointLight2D, optional cold moon, vignette;
+  thrall eyes are unshaded red pinpricks. Renders: `docs/renders/m1_art_*.png`
+  (`m1_art_closeup.png` is the one to judge; `_moon` vs `_flat` = normal map on/off, subtle).
+  Render: `xvfb-run -a godot --path . --rendering-driver opengl3 res://scenes/art_test.tscn -- --capture`.
+  Not wired into the room yet. HD-2D idea: sprites stay simple, engine light does the mood.
 - Next: **M1 = vertical slice** (design doc Stage 5): one hunter, one room, lantern + fog,
   one enemy (thrall: slow, walks toward the brightest lantern) that actually takes turns,
   2 AP, real art and sound, plus the top-down vs isometric render test.
@@ -43,9 +50,11 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   the app can't be updated.
 
 ## Open questions for Duff
-- Real art source: SpriteCook (needs its MCP connected + credits), image generation via the
-  Creative Claw connector, or itch.io gothic packs recoloured to the palette. Design doc says
-  a mix; pick a first source for M1.
+- Real art source: SpriteCook is NOT connectable from phone (needs a desktop setup; not in the
+  connector directory). Creative Claw costs ~16 credits/image (Duff had 4 on Nov 7). Free paths:
+  code-drawn sprites (as hunter48) or Duff generates in Grok, we downscale + palette-snap.
+- Character size: 48x48 (HD-2D proportions, overflows the 32px tile) vs the locked 32x32. Duff to
+  decide after seeing `m1_art_closeup.png`.
 - Is the M0 lantern look (warm pool, black beyond, soft edge) the right direction?
 
 ## Layout
