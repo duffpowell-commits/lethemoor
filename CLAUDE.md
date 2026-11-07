@@ -17,7 +17,12 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   REMEMBERED / DARK, round radius, Bresenham line of sight, oil burn, flicker) with tests;
   room `rooms/quay_01.txt`; `scenes/room.tscn` draws it with real Godot 2D light + wall shadows,
   a soft fog layer, tap-to-move (4 tiles, placeholder) and the three lantern buttons.
-  Renders: `docs/renders/m0_*.png`. CI builds a web zip + debug APK on every push.
+  Renders: `docs/renders/m0_*.png` (`m0_sheet.png` = all four lantern states; `m0_web_chrome.png`
+  = the web build running in headless Chrome). CI builds a web zip + debug APK on every push,
+  and every push to `main` refreshes the **`dev` release** (Releases → dev → tap the APK):
+  https://github.com/duffpowell-commits/lethemoor/releases/tag/dev. Web zip is 9.5 MB
+  (engine wasm is most of it; game data is ~30 KB).
+- Web gotcha: no system fonts on web, so symbols like ■ show as boxes. Draw them or ship a font.
 - **Art is placeholder**, drawn in code by `tools/gen_placeholder_art.py` in the locked palette.
   Real art comes next (see below).
 - Next: **M1 = vertical slice** (design doc Stage 5): one hunter, one room, lantern + fog,
@@ -59,7 +64,8 @@ Owner: Duff. Read this first; it is the handoff between sessions.
 - Renders: `xvfb-run -a godot --path . --rendering-driver opengl3 -- --capture`
   → `docs/renders/m0_*.png` (720×1280, 2× the 360×640 base).
 - Placeholder art: `python3 tools/gen_placeholder_art.py`
-- CI: `.github/workflows/build.yml` (tests, then web + debug APK artifacts). Check with
+- CI: `.github/workflows/build.yml` (tests, then web + debug APK artifacts + `dev` release).
+  `gh` GraphQL is blocked in Claude sessions: use `gh run ...` or `gh api repos/...` (REST). Check with
   `gh run list -L 3` before calling a milestone done. Exports run in CI only (templates are big).
 
 ## Tech rules
