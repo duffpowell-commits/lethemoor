@@ -37,9 +37,36 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   palette, cleans speckle, outlines, writes sprite + normal map + flame glow. Hand fixes live in
   `tools/fixes/<name>.py`. First import: `bearer48` / `bearer64` from `grok_art/lantern_bearer.jpg`
   (WIP: not yet rendered in the art test scene; 64 reads far better than 48).
+  See "Art session notes (Nov 7)" below before touching art.
 - Next: **M1 = vertical slice** (design doc Stage 5): one hunter, one room, lantern + fog,
   one enemy (thrall: slow, walks toward the brightest lantern) that actually takes turns,
   2 AP, real art and sound, plus the top-down vs isometric render test.
+
+## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
+Ask Duff first what he's changing; the notes below may be partly out of date after that.
+- **Target look:** Final Fantasy Resonance (Square Enix, HD-2D, out Oct 22 2026). HD-2D =
+  simple pixel sprites + modern engine light (glow, depth, fog, vignette). So: keep sprites
+  clean, put the mood in Godot lights. Duff wants it "overall more creepy".
+- **Roles (Duff's call):** Grok designs characters, Claude is "the head": converts, cleans,
+  lights, integrates, and pushes back on quality. Grok's design >> code-drawn `hunter48`
+  (Duff and Claude agree). Prompt template lives in `grok_art/README.md`.
+- **Importer lessons** (`tools/import_sprite.py`): BOX shrink + palette snap + speckle and 3x3
+  majority cleanup + ink outline works. A min-filter "keep the darks" blend at 0.35 made it
+  muddy; it's at 0.12 now. Bright amber is only allowed in the lower-right lantern zone
+  (else the skull got an amber dot). Faces die in the shrink: hand-fix per sprite in
+  `tools/fixes/`. Grok's own 48px downscale is noisy and off-palette; don't use it.
+- **`tools/fixes/bearer64.py` was applied but never visually checked** (sockets, jaw, teeth on
+  the skull). Look at a zoomed `assets/art/bearer64.png` first and adjust.
+- **Source** `grok_art/lantern_bearer.jpg` is a phone screenshot; crop `50,559,1030,1539`.
+  The original Grok file would be sharper: ask Duff for it.
+- **Next art step:** render `bearer64` in `scenes/art_test.tscn`. `art_test_view.gd` hardcodes
+  `hunter48` and `FLAME_OFFSET (12.5, 11.5)`; make the sprite name a parameter and compute the
+  flame offset from the `_glow` image's centroid. Then capture `docs/renders/m1_bearer_*.png`.
+- **Size decision pending:** 64px looks best but stands ~2 tiles tall on the 32px grid
+  (bigger tiles or a smaller figure inside the 64 frame?). 48 loses the face. 32 (old lock)
+  is too small for horror faces. Get Duff's call with renders side by side.
+- **Paid/blocked options:** SpriteCook needs desktop setup (not possible, phone-only).
+  Creative Claw had 4 credits, ~16 per image. Default to the free Grok → importer path.
 
 ## Decisions (Duff, Nov 7)
 - Visuals first: every milestone ships something Duff can see, rendered to `docs/renders/`.
