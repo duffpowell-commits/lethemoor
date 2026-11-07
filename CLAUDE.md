@@ -8,6 +8,8 @@ Owner: Duff. Read this first; it is the handoff between sessions.
 > saving, 32 px tiles, 360×640 and the slice definition. One survivor, step-based, fixed map that
 > reshuffles each night, revenant = your own corpse, 64 px characters on 48 px tiles at 540×960.
 > Next job: do the resize (see the pivot doc's "Size and screen"), then the new slice.
+> Grok plan (Drive): https://docs.google.com/document/d/1O5_Zuh04_8OyXE7tYRbBtHHvX15tgi36CqbCpnOs-1A/edit — movement test T1–T6 pending; results land in `grok_art/tests/`,
+> score them with a script (pivot doc + plan doc section 4), make GIFs, Duff gives the final yes/no.
 > Two open calls for Duff are listed there (skill tree: rec. no; sound spend: rec. small).
 
 ## Where things stand

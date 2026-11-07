@@ -1,5 +1,8 @@
 # grok_art
 
+**Running plan for all Grok generation (Duff's Google Drive):** [Lethemoor — Grok Generation Plan](https://docs.google.com/document/d/1O5_Zuh04_8OyXE7tYRbBtHHvX15tgi36CqbCpnOs-1A/edit)
+Style rules, prompts, the movement test (T1–T6, scoring), the asset shopping list and the log live there. Keep it updated each session (Google Drive connector).
+
 Duff's character and prop designs from Grok, waiting to become game art. Nothing in this
 folder ships (`.gdignore`). Duff designs, Claude turns designs into sprites.
 
