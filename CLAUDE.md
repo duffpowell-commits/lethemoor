@@ -32,6 +32,11 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   (`m1_art_closeup.png` is the one to judge; `_moon` vs `_flat` = normal map on/off, subtle).
   Render: `xvfb-run -a godot --path . --rendering-driver opengl3 res://scenes/art_test.tscn -- --capture`.
   Not wired into the room yet. HD-2D idea: sprites stay simple, engine light does the mood.
+- **Art pipeline (Nov 7): Grok designs, Claude converts.** Duff drops green-screen designs in
+  `grok_art/` (see its README). `tools/import_sprite.py` keys the green, shrinks, snaps to the
+  palette, cleans speckle, outlines, writes sprite + normal map + flame glow. Hand fixes live in
+  `tools/fixes/<name>.py`. First import: `bearer48` / `bearer64` from `grok_art/lantern_bearer.jpg`
+  (WIP: not yet rendered in the art test scene; 64 reads far better than 48).
 - Next: **M1 = vertical slice** (design doc Stage 5): one hunter, one room, lantern + fog,
   one enemy (thrall: slow, walks toward the brightest lantern) that actually takes turns,
   2 AP, real art and sound, plus the top-down vs isometric render test.
@@ -62,6 +67,7 @@ Owner: Duff. Read this first; it is the handoff between sessions.
 - `scripts/room_view.gd` the playable room (draws rules, takes taps, HUD built in code).
 - `rooms/*.txt` handmade rooms: `#` wall, `.` floor, `H` hunter, `T` thrall, `L` lamp, `E` exit.
   Exported via the presets' include filter (`rooms/*.txt`); new data folders need adding there.
+- `grok_art/` design sources from Duff (never ships). `tools/fixes/` per-sprite hand fixes.
 - `assets/art/` 32×32 tiles. `tools/` scripts that never ship. `docs/` never ships.
 
 ## Commands
