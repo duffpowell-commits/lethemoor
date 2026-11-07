@@ -38,6 +38,8 @@ var fog_image: Image
 var reach_layer: Node2D
 var hud: Control
 var oil_label: Label
+var oil_pips: Array[ColorRect] = []
+var oil_count: Label
 var status_label: Label
 var buttons := {}
 var reach: Dictionary = {}
@@ -278,6 +280,16 @@ func _build_hud() -> void:
 	oil_label = _label("", 11, UI_AMBER)
 	oil_label.position = Vector2(10, 24)
 	hud.add_child(oil_label)
+	# Pips are drawn, not typed: the web build has no system fonts for symbols like ■.
+	for i in START_OIL:
+		var pip := ColorRect.new()
+		pip.position = Vector2(40 + i * 9, 30)
+		pip.size = Vector2(6, 9)
+		hud.add_child(pip)
+		oil_pips.append(pip)
+	oil_count = _label("", 11, UI_AMBER)
+	oil_count.position = Vector2(40 + START_OIL * 9 + 6, 24)
+	hud.add_child(oil_count)
 
 	var bottom := ColorRect.new()
 	bottom.color = INK_BLACK
@@ -305,10 +317,10 @@ func _build_hud() -> void:
 
 
 func _refresh_hud() -> void:
-	var pips := ""
-	for i in START_OIL:
-		pips += "■" if i < oil else "□"
-	oil_label.text = "OIL  %s  %d" % [pips, oil]
+	oil_label.text = "OIL"
+	oil_count.text = str(oil)
+	for i in oil_pips.size():
+		oil_pips[i].color = UI_AMBER if i < oil else Color(0.2, 0.25, 0.32)
 	var cost: int = Fog.OIL_COST[setting]
 	var lines := {
 		Fog.Lantern.HOODED: "Hooded. Unseen, and blind. Burns nothing.",
