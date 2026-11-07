@@ -1,7 +1,14 @@
 # Lethemoor: The Last Lantern
 
-Gothic tactics-horror roguelite for Android phones (portrait), Godot 4.5, GDScript only.
+Gothic **turn-based survival horror** for Android phones (portrait), Godot 4.5, GDScript only.
 Owner: Duff. Read this first; it is the handoff between sessions.
+
+> **PIVOT (Nov 7): no longer squad tactics.** Read `docs/design/survival_horror_pivot.md` FIRST.
+> It overrides anything below (and the design doc) about roster, classes, intent previews,
+> saving, 32 px tiles, 360×640 and the slice definition. One survivor, step-based, fixed map that
+> reshuffles each night, revenant = your own corpse, 64 px characters on 48 px tiles at 540×960.
+> Next job: do the resize (see the pivot doc's "Size and screen"), then the new slice.
+> Two open calls for Duff are listed there (skill tree: rec. no; sound spend: rec. small).
 
 ## Where things stand
 - **This is the active game** (Nov 7, 2026). Chaos Is the Mother of Order is paused in its own repo.
@@ -38,12 +45,11 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `tools/fixes/<name>.py`. First import: `bearer48` / `bearer64` from `grok_art/lantern_bearer.jpg`
   (WIP: not yet rendered in the art test scene; 64 reads far better than 48).
   See "Art session notes (Nov 7)" below before touching art.
-- Next: **M1 = vertical slice** (design doc Stage 5): one hunter, one room, lantern + fog,
-  one enemy (thrall: slow, walks toward the brightest lantern) that actually takes turns,
-  2 AP, real art and sound, plus the top-down vs isometric render test.
+- Next: **resize to 48 px tiles / 540×960**, then **M1 = new slice** (pivot doc #12): 2–3 rooms,
+  locked door + key, one Stalker, one safe room, real sound. (Old tactics slice is void.)
 
 ## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
-Ask Duff first what he's changing; the notes below may be partly out of date after that.
+Duff's change happened: see the pivot doc. Size is now decided (64 px characters, 48 px tiles).
 - **Target look:** Final Fantasy Resonance (Square Enix, HD-2D, out Oct 22 2026). HD-2D =
   simple pixel sprites + modern engine light (glow, depth, fog, vignette). So: keep sprites
   clean, put the mood in Godot lights. Duff wants it "overall more creepy".
@@ -62,9 +68,7 @@ Ask Duff first what he's changing; the notes below may be partly out of date aft
 - **Next art step:** render `bearer64` in `scenes/art_test.tscn`. `art_test_view.gd` hardcodes
   `hunter48` and `FLAME_OFFSET (12.5, 11.5)`; make the sprite name a parameter and compute the
   flame offset from the `_glow` image's centroid. Then capture `docs/renders/m1_bearer_*.png`.
-- **Size decision pending:** 64px looks best but stands ~2 tiles tall on the 32px grid
-  (bigger tiles or a smaller figure inside the 64 frame?). 48 loses the face. 32 (old lock)
-  is too small for horror faces. Get Duff's call with renders side by side.
+- **Size decided (Nov 7):** 64 px character frame on 48 px tiles, 540×960 base.
 - **Paid/blocked options:** SpriteCook needs desktop setup (not possible, phone-only).
   Creative Claw had 4 credits, ~16 per image. Default to the free Grok → importer path.
 
@@ -85,8 +89,7 @@ Ask Duff first what he's changing; the notes below may be partly out of date aft
 - Real art source: SpriteCook is NOT connectable from phone (needs a desktop setup; not in the
   connector directory). Creative Claw costs ~16 credits/image (Duff had 4 on Nov 7). Free paths:
   code-drawn sprites (as hunter48) or Duff generates in Grok, we downscale + palette-snap.
-- Character size: 48x48 (HD-2D proportions, overflows the 32px tile) vs the locked 32x32. Duff to
-  decide after seeing `m1_art_closeup.png`.
+- Skill tree or not, and sound spend: see the pivot doc's Open questions.
 - Is the M0 lantern look (warm pool, black beyond, soft edge) the right direction?
 
 ## Layout
