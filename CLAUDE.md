@@ -58,10 +58,19 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   opengl3 res://scenes/hd2d_test.tscn -- --capture`. Lessons: portrait needs a 3-tile alley and
   fov ~44 or the walls fall off-screen; full wet-floor specular reads as a second light (keep
   `metallic_specular` ~0.2); sprites must not cast shadows from a lantern in front of them.
-  Weakest part is the placeholder floor tile, not the engine. **Open call for Duff:** stay
-  2D (current room) or move the look to this 2D-sprites-in-3D style. Not wired into gameplay.
-- Next: **resize to 48 px tiles / 540×960**, then **M1 = new slice** (pivot doc #12): 2–3 rooms,
-  locked door + key, one Stalker, one safe room, real sound. (Old tactics slice is void.)
+  Weakest part is the placeholder floor tile, not the engine. Not wired into gameplay.
+- **DECIDED (Duff, Nov 11): the game is 3D. HD-2D = pixel sprites as billboards in a 3D world,
+  3D lights, Compatibility renderer.** The flat 2D room (`room.tscn`, 2D lights) is now the old
+  renderer. Rules stay grid-only in `scripts/sim/` (unchanged); only the view gets swapped.
+  A parallel session built a Canva-bearer look test on branch `art-canva-test`
+  (`scenes/look_test_3d.tscn`, `docs/renders/look_*.png`, Canva sprite Duff prefers over Grok's).
+  Merge or harvest that branch before building the 3D room; use the Canva bearer.
+- Next: **M1a = 3D room view**: render `rooms/*.txt` as 3D (floor/wall boxes, 1 grid tile =
+  1 unit), bearer billboard, OmniLight3D lantern driven by the fog rules, thralls with eyes,
+  tap-to-step on the grid, same three lantern buttons. Then **M1 = new slice** (pivot doc #12):
+  2–3 rooms, locked door + key, one Stalker, one safe room, real sound. The "48 px tiles /
+  540×960" 2D resize is mostly moot in 3D: keep 540×960 as the UI base and 64 px sprites;
+  floor/wall textures need new 3D-ready tiles (current ones are placeholder).
 
 ## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
 Duff's change happened: see the pivot doc. Size is now decided (64 px characters, 48 px tiles).
