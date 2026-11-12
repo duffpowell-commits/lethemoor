@@ -7,19 +7,19 @@ config_version=5
 
 config/name="Lethemoor: The Last Lantern"
 config/description="Gothic tactics-horror roguelite. Light is life."
-run/main_scene="res://scenes/room.tscn"
+run/main_scene="res://scenes/room3d.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 
 [display]
 
-; Pixel-art base resolution: 360x640 portrait (11 x 20 tiles of 32 px).
-; Scaled up by whole numbers so pixels stay crisp on phones.
-window/size/viewport_width=360
-window/size/viewport_height=640
-window/size/window_width_override=720
-window/size/window_height_override=1280
-window/stretch/mode="viewport"
-window/stretch/scale_mode="integer"
+; UI base 540x960 portrait (pivot doc). canvas_items: the 3D renders at the phone's full
+; resolution (HD-2D needs that), the UI scales up from 540x960. "expand" fills tall phones.
+window/size/viewport_width=540
+window/size/viewport_height=960
+window/size/window_width_override=540
+window/size/window_height_override=960
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=1
 
 [rendering]

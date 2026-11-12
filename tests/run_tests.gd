@@ -93,3 +93,18 @@ func test_room_parses() -> void:
 	var f = r.make_fog()
 	check(f.is_wall(Vector2i(0, 0)), "corner is wall")
 	check(not f.is_wall(r.hunter), "hunter stands on floor")
+
+
+func test_reach_and_path() -> void:
+	var r = Room.parse("#####\n#H..#\n#.#.#\n#..T#\n#####")
+	var reach: Dictionary = r.reachable(r.hunter, 4, r.thralls)
+	check(reach.has(Vector2i(3, 2)), "can reach round the pillar")
+	check(not reach.has(Vector2i(2, 2)), "can't stand in a wall")
+	check(not reach.has(r.thralls[0]), "can't walk into a seen thrall")
+	check(not r.reachable(r.hunter, 1).has(Vector2i(2, 1) + Vector2i(1, 0)), "2 steps away is out of a 1-step reach")
+	var p: Array = r.path_in(reach, r.hunter, Vector2i(3, 2))
+	check(p.size() == 4, "path to (3,2) is 4 tiles incl. both ends, got %d" % p.size())
+	check(p[0] == r.hunter and p[-1] == Vector2i(3, 2), "path starts at the hunter and ends at the target")
+	for i in range(1, p.size()):
+		check((p[i] - p[i - 1]).abs().x + (p[i] - p[i - 1]).abs().y == 1, "every step is one tile, 4-way")
+	check(r.path_in(reach, r.hunter, Vector2i(2, 2)).is_empty(), "no path into a wall")

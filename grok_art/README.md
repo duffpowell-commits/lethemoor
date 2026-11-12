@@ -44,3 +44,4 @@ Writes `assets/art/<name>.png`, `<name>_n.png` (normal map) and `<name>_glow.png
 | file | sprite | notes |
 |---|---|---|
 | `lantern_bearer.jpg` | `bearer48`, `bearer64` | screenshot source; skull face hand-fixed on 64 |
+| `canva_lantern_bearer.png` | `canva_bearer64` | Canva generate-image, Nov 11; connector only returns a 200px preview; mirrored before import so the lantern sits lower-right; face + lantern smear at 64 |

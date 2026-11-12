@@ -65,12 +65,32 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   A parallel session built a Canva-bearer look test on branch `art-canva-test`
   (`scenes/look_test_3d.tscn`, `docs/renders/look_*.png`, Canva sprite Duff prefers over Grok's).
   Merge or harvest that branch before building the 3D room; use the Canva bearer.
-- Next: **M1a = 3D room view**: render `rooms/*.txt` as 3D (floor/wall boxes, 1 grid tile =
-  1 unit), bearer billboard, OmniLight3D lantern driven by the fog rules, thralls with eyes,
-  tap-to-step on the grid, same three lantern buttons. Then **M1 = new slice** (pivot doc #12):
-  2–3 rooms, locked door + key, one Stalker, one safe room, real sound. The "48 px tiles /
-  540×960" 2D resize is mostly moot in 3D: keep 540×960 as the UI base and 64 px sprites;
-  floor/wall textures need new 3D-ready tiles (current ones are placeholder).
+- **Done — M1a (Nov 12): 3D room view, now the main scene.** `scenes/room3d.tscn` +
+  `scripts/room3d_view.gd` draw `rooms/quay_01.txt` in 3D (1 tile = 1 unit, grid (x,y) at world
+  (x,0,y)), Canva bearer billboard (`canva_bearer64`, flips left/right when walking), 3D
+  OmniLight3D lantern with shadows + flame bloom + flicker, thralls shown only when LIT (eyes
+  too: no info leaks from the dark), tap a tile → camera ray onto the floor → shortest path →
+  slide tile by tile with a 2-frame bob, oil burns once per move (same rules as 2D). Fog drives
+  surface brightness (`SHADE`: DARK 0, REMEMBERED 0.2, LIT 1); the light is only the look.
+  Camera: fov 50, offset (0, 10.5, 8) from the hunter, follows smoothly (~9 tiles across).
+  Rules moved to sim: `room.reachable()` + `room.path_in()` (tested; the test was seen failing).
+  Renders + a real tap test (taps go through Input in window pixels; prints `TAP PASS/FAIL`):
+  `xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3
+  --resolution 1080x1920 res://scenes/room3d.tscn -- --capture` → `docs/renders/m1a_*.png`
+  (`m1a_sheet.png` = normal / bright / hooded / walked). Gotcha: `unproject_position` gives UI
+  coords (540×960); real touches arrive in window pixels → multiply by
+  `get_viewport().get_final_transform()` when faking taps.
+  **Display changed:** 540×960 base, `stretch/mode=canvas_items`, `aspect=expand` (3D renders
+  at full phone res). The old 2D `room.tscn` still assumes 360×640 and now draws in the top-left
+  corner: it's the old renderer, kept for reference only. Canva bearer art harvested from branch
+  `art-canva-test` (its renderer change to "mobile" and Three.js test were NOT taken: repo rule
+  is Compatibility everywhere).
+  Weak spots: placeholder 32 px floor/wall textures read as big bricks (art job: 3D-ready tiles,
+  wall tops); remembered tiles go flat/textureless at 0.2 (fine for "layout known"); the
+  canva_bearer64 face smears at 64 px.
+- Next: **M1 = new slice** (pivot doc #12): 2–3 rooms, locked door + key, one Stalker, one safe
+  room, real sound. Also: real tile art for 3D, and one-step-per-tap vs the 4-tile placeholder
+  move (pivot says step-based; decide with Duff on the phone build).
 
 ## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
 Duff's change happened: see the pivot doc. Size is now decided (64 px characters, 48 px tiles).
@@ -139,9 +159,9 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 
 ## Tech rules
 - Renderer is **Compatibility** everywhere: the only one that runs in iPhone Safari.
-- Base resolution 360×640 portrait, integer scaling, nearest filtering (crisp pixels).
-  Room area is y 48–496; top bar 48 px; thumb controls in the bottom 144 px.
-- Fog is gameplay truth (sim grid); 2D lights are the look. Never let the look decide rules.
+- UI base 540×960 portrait, canvas_items stretch (3D at full phone res), nearest filtering on
+  sprites/tiles. 3D room: top bar 72 px, thumb zone (status + lantern buttons) bottom 216 px.
+- Fog is gameplay truth (sim grid); lights are the look. Never let the look decide rules.
 - Game logic stays grid-only so a later isometric renderer is a renderer swap, not a rewrite.
 
 ## House rules
