@@ -41,7 +41,11 @@ func _build() -> void:
 	for i in 4:
 		floors.append(_mat("floor_%d" % i))
 	var wall := _mat("wall_face_0")
+	wall.albedo_color = Color(0.55, 0.6, 0.78)  # cold stone, so walls and floor read apart
 	var wall_top := _mat("wall_top")
+	wall_top.albedo_color = Color(0.3, 0.32, 0.42)
+	for m in floors:
+		m.albedo_color = Color(0.95, 0.85, 0.7)
 
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(1, 1)
@@ -99,7 +103,7 @@ func _build() -> void:
 
 	var moon := DirectionalLight3D.new()
 	moon.light_color = Color(0.45, 0.55, 0.85)
-	moon.light_energy = 0.12
+	moon.light_energy = 0.3
 	moon.shadow_enabled = true
 	moon.rotation_degrees = Vector3(-55, 30, 0)
 	add_child(moon)
@@ -109,7 +113,7 @@ func _build() -> void:
 	env.background_color = Color(0.01, 0.012, 0.025)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.08, 0.09, 0.16)
-	env.ambient_light_energy = 0.7
+	env.ambient_light_energy = 1.3
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.03, 0.035, 0.06)
@@ -124,17 +128,17 @@ func _build() -> void:
 
 	var cam := Camera3D.new()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
-	cam.fov = 34.0
-	var target := _w(room.hunter) + Vector3(0, 0.6, -3.5)
-	cam.position = target + Vector3(0, 12.0, 15.0)
+	cam.fov = 24.0
+	var target := _w(room.hunter) + Vector3(0, 0.6, -3.2)
+	cam.position = target + Vector3(0, 15.0, 13.0)
 	add_child(cam)
 	cam.look_at(target)
 	var attrs := CameraAttributesPractical.new()
 	attrs.dof_blur_far_enabled = true
-	attrs.dof_blur_far_distance = 21.0
+	attrs.dof_blur_far_distance = 19.0
 	attrs.dof_blur_far_transition = 5.0
 	attrs.dof_blur_near_enabled = true
-	attrs.dof_blur_near_distance = 14.0
+	attrs.dof_blur_near_distance = 12.5
 	attrs.dof_blur_near_transition = 2.0
 	attrs.dof_blur_amount = 0.12
 	cam.attributes = attrs
@@ -145,7 +149,8 @@ func _build() -> void:
 	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
 		lantern.light_energy *= 0.35
 		moon.light_energy *= 0.5
-		env.ambient_light_energy *= 0.5
+		env.ambient_light_energy *= 0.7
+		env.fog_density *= 0.5
 		flame.modulate = Color(2.2, 1.5, 0.8)
 
 	C.add_vignette(self)
@@ -170,3 +175,9 @@ func _billboard(t: Texture2D, at: Vector3, px: float) -> Node3D:
 	mi.position = at + Vector3(0, size.y / 2.0, 0)
 	add_child(mi)
 	return mi
+
+
+# phone test build: tap anywhere to flip between the 2D and 3D versions
+func _unhandled_input(e: InputEvent) -> void:
+	if (e is InputEventScreenTouch and e.pressed) or (e is InputEventMouseButton and e.pressed):
+		get_tree().change_scene_to_file("res://scenes/look_test_2d.tscn")

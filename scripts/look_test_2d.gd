@@ -104,3 +104,9 @@ func _actor(t: Texture2D, p: Vector2i, sc: float) -> void:
 	s.scale = Vector2(sc, sc)
 	s.position = _cell(p)
 	add_child(s)
+
+
+# phone test build: tap anywhere to flip between the 2D and 3D versions
+func _unhandled_input(e: InputEvent) -> void:
+	if (e is InputEventScreenTouch and e.pressed) or (e is InputEventMouseButton and e.pressed):
+		get_tree().change_scene_to_file("res://scenes/look_test_3d.tscn")

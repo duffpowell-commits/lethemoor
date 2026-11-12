@@ -107,3 +107,10 @@ jobs:
           gh release view dev >/dev/null 2>&1 || gh release create dev --prerelease --title "Latest dev build" --notes "Rebuilt on every push to main."
           gh release upload dev build/android/lethemoor.apk build/lethemoor-web.zip --clobber
           gh release edit dev --notes "Rebuilt on every push to main. Last: ${GITHUB_SHA::7}"
+      - name: Publish the look test (art-canva-test branch only)
+        if: github.ref == 'refs/heads/art-canva-test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view look-test >/dev/null 2>&1 || gh release create look-test --prerelease --target art-canva-test --title "Look test: 2D vs 3D" --notes "Tap the screen to flip between 2D and 3D."
+          gh release upload look-test build/android/lethemoor.apk --clobber
