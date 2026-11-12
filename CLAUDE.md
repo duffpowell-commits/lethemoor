@@ -47,6 +47,19 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `tools/fixes/<name>.py`. First import: `bearer48` / `bearer64` from `grok_art/lantern_bearer.jpg`
   (WIP: not yet rendered in the art test scene; 64 reads far better than 48).
   See "Art session notes (Nov 7)" below before touching art.
+- **HD-2D 3D test (Nov 11):** Duff asked how far Godot 3D goes (he'd asked about Unreal on
+  phone; answer: Unreal can't run on Android, Godot is the tool). `scenes/hd2d_test.tscn` +
+  `scripts/hd2d_test_view.gd`: a real 3D alley (existing 32 px tiles on boxes), bearer64 and
+  thralls as upright billboard sprites, a 3D OmniLight3D lantern with shadows, depth fog, glow,
+  filmic tonemap, vignette, high tilted 44° camera. **Compatibility renderer only** (so no
+  volumetric fog, SSAO, DOF: this IS the ceiling for an iPhone-Safari-safe build).
+  Renders: `docs/renders/hd2d_sheet.png` (normal / bright / hooded); Bright lights a thrall
+  that Normal leaves as eyes only. Render cmd: `xvfb-run -a godot --path . --rendering-driver
+  opengl3 res://scenes/hd2d_test.tscn -- --capture`. Lessons: portrait needs a 3-tile alley and
+  fov ~44 or the walls fall off-screen; full wet-floor specular reads as a second light (keep
+  `metallic_specular` ~0.2); sprites must not cast shadows from a lantern in front of them.
+  Weakest part is the placeholder floor tile, not the engine. **Open call for Duff:** stay
+  2D (current room) or move the look to this 2D-sprites-in-3D style. Not wired into gameplay.
 - Next: **resize to 48 px tiles / 540×960**, then **M1 = new slice** (pivot doc #12): 2–3 rooms,
   locked door + key, one Stalker, one safe room, real sound. (Old tactics slice is void.)
 
