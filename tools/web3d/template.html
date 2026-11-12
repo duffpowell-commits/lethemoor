@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:,">
+<title>Lethemoor: web 3D look test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #030308; overflow: hidden; touch-action: none;
+    font-family: Georgia, "Times New Roman", serif; color: #e6c88c; }
+  #c { display: block; width: 100%; height: 100%; }
+  #vig { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 75% 60% at 50% 55%, transparent 40%, rgba(0,0,6,.85) 100%); }
+  #top { position: fixed; top: 0; left: 0; right: 0; padding: 12px 14px; font-size: 15px;
+    letter-spacing: .04em; pointer-events: none; text-shadow: 0 1px 3px #000; }
+  #top small { display: block; opacity: .6; font-size: 12px; margin-top: 2px; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; justify-content: center;
+    padding: 12px 12px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.7)); }
+  #bar button { font: inherit; font-size: 15px; color: #e6c88c; background: rgba(30,22,12,.85);
+    border: 1px solid #6b4f2a; border-radius: 6px; padding: 10px 14px; min-width: 86px; }
+  #bar button.on { background: #6b4f2a; color: #fff3d6; }
+  #oil { position: fixed; top: 12px; right: 14px; font-size: 13px; opacity: .8; pointer-events: none; }
+  #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 24px;
+    text-align: center; background: #030308; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vig"></div>
+<div id="top">Lethemoor · web 3D look test<small>Tap a tile to step. Same room, same bearer.</small></div>
+<div id="oil"></div>
+<div id="bar">
+  <button data-m="bright">Bright</button>
+  <button data-m="normal" class="on">Normal</button>
+  <button data-m="hooded">Hooded</button>
+</div>
+<div id="err">This phone's browser couldn't start 3D (WebGL). Try another browser.</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "__THREE__/build/three.module.js",
+  "three/addons/": "__THREE__/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const ART = __ART__;
+const ROOM = __ROOM__.trim().split('\n').map(r => r.trim());
+const W = ROOM[0].length, H = ROOM.length;
+const isWall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || ROOM[y][x] === '#';
+
+// ---------------------------------------------------------------- renderer
+const canvas = document.getElementById('c');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false }); }
+catch (e) { document.getElementById('err').style.display = 'flex'; throw e; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020309);
+scene.fog = new THREE.FogExp2(0x060914, 0.04);
+
+const loader = new THREE.TextureLoader();
+function tex(name, repeat) {
+  const t = loader.load(ART[name]);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+  return t;
+}
+
+// ---------------------------------------------------------------- room (1 tile = 1 unit)
+const WALL_H = 1.2;
+const floorMats = [0, 1, 2, 3].map(i => new THREE.MeshStandardMaterial({
+  map: tex('floor_' + i), color: 0xf2d9b3, roughness: 0.95 }));
+const wallSide = new THREE.MeshStandardMaterial({ map: tex('wall_face_0'), color: 0x8c99c7, roughness: 0.9 });
+const wallTop = new THREE.MeshStandardMaterial({ map: tex('wall_top'), color: 0x4d5269, roughness: 1 });
+const floorGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const variant = (x, y) => Math.abs(x * 7 + y * 13 + x * y) % 4;
+
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  if (isWall(x, y)) {
+    // cutaway: the row nearest the camera is cut low so it never hides the survivor
+    const h = y === H - 1 ? 0.2 : WALL_H;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, h, 1),
+      [wallSide, wallSide, wallTop, wallTop, wallSide, wallSide]);
+    m.position.set(x + .5, h / 2, y + .5);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  } else {
+    const f = new THREE.Mesh(floorGeo, floorMats[variant(x, y)]);
+    f.position.set(x + .5, 0, y + .5);
+    f.receiveShadow = true;
+    scene.add(f);
+  }
+}
+
+// ---------------------------------------------------------------- billboards
+const billboards = [];
+function billboard(name, px, opts = {}) {
+  const t = tex(name);
+  const img = ART_SIZE[name];
+  const w = img[0] * px, h = img[1] * px;
+  const g = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0);
+  const mat = opts.glow
+    ? new THREE.MeshBasicMaterial({ map: t, transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, toneMapped: false, side: THREE.DoubleSide, color: new THREE.Color(5, 3, 1.3) })
+    : new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, roughness: 1, side: THREE.DoubleSide });
+  const m = new THREE.Mesh(g, mat);
+  if (!opts.glow) {
+    m.castShadow = true;
+    m.customDistanceMaterial = new THREE.MeshDistanceMaterial({ map: t, alphaTest: 0.5 });
+    m.customDepthMaterial = new THREE.MeshDepthMaterial({ map: t, alphaTest: 0.5 });
+  }
+  scene.add(m);
+  billboards.push(m);
+  return m;
+}
+const ART_SIZE = __SIZES__;
+const PX = 1 / 48;   // a 64 px character stands 1.33 tiles tall
+
+let start;
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const c = ROOM[y][x];
+  if (c === 'T') billboard('thrall', 1 / 32).position.set(x + .5, 0, y + .5);
+  if (c === 'L') billboard('lamp', 1 / 32).position.set(x + .5, 0, y + .5);
+  if (c === 'H') start = { x, y };
+}
+const body = billboard(__SPRITE__, PX);
+const flame = billboard(__SPRITE__ + '_glow', PX, { glow: true });
+const FLAME = __FLAME__;  // flame centre in sprite pixels from top-left
+
+// ---------------------------------------------------------------- light
+const lantern = new THREE.PointLight(0xffa04a, 15, 5.5, 1.3);
+lantern.castShadow = true;
+lantern.shadow.mapSize.set(1024, 1024);
+lantern.shadow.bias = -0.004;
+lantern.shadow.radius = 4;
+scene.add(lantern);
+scene.add(new THREE.HemisphereLight(0x5a6aa0, 0x120c08, 0.9));
+const moon = new THREE.DirectionalLight(0x7f95d6, 0.6);
+moon.position.set(-6, 10, -4);
+moon.target.position.set(W / 2, 0, H / 2);
+moon.castShadow = true;
+moon.shadow.mapSize.set(1024, 1024);
+Object.assign(moon.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 30 });
+scene.add(moon, moon.target);
+
+const MODES = {
+  bright: { i: 26, d: 8, oil: 2 },
+  normal: { i: 15, d: 5.5, oil: 1 },
+  hooded: { i: 1.2, d: 1.8, oil: 0 },
+};
+let mode = 'normal';
+let oil = 40;
+const oilEl = document.getElementById('oil');
+function showOil() { oilEl.textContent = 'Oil ' + oil; }
+showOil();
+document.querySelectorAll('#bar button').forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation();
+  mode = b.dataset.m;
+  document.querySelectorAll('#bar button').forEach(o => o.classList.toggle('on', o === b));
+}));
+
+// ---------------------------------------------------------------- camera
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+const CAM_OFF = new THREE.Vector3(0, 11, 9.5);
+function fit() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  // keep about 9 tiles across whatever the phone's shape
+  const hfov = 34 * Math.PI / 180;
+  camera.fov = Math.min(60, 2 * Math.atan(Math.tan(hfov / 2) / camera.aspect) * 180 / Math.PI);
+  camera.updateProjectionMatrix();
+}
+
+// ---------------------------------------------------------------- post: bloom
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 1.1, 0.6, 0.78);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+addEventListener('resize', fit);
+fit();
+
+// ---------------------------------------------------------------- movement (one tile per tap)
+const pos = { x: start.x, y: start.y };
+const shown = new THREE.Vector2(start.x + .5, start.y + .5);
+const ray = new THREE.Raycaster();
+const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+canvas.addEventListener('pointerdown', e => {
+  const ndc = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = new THREE.Vector3();
+  if (!ray.ray.intersectPlane(ground, hit)) return;
+  const dx = Math.floor(hit.x) - pos.x, dy = Math.floor(hit.z) - pos.y;
+  if (!dx && !dy) return;
+  const step = Math.abs(dx) >= Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
+  const nx = pos.x + step[0], ny = pos.y + step[1];
+  if (isWall(nx, ny) || ROOM[ny][nx] === 'T') return;
+  pos.x = nx; pos.y = ny;
+  if (body.scale.x !== (step[0] < 0 ? -1 : step[0] > 0 ? 1 : body.scale.x)) {
+    body.scale.x = flame.scale.x = step[0] < 0 ? -1 : step[0] > 0 ? 1 : body.scale.x;
+  }
+  oil = Math.max(0, oil - MODES[mode].oil);
+  showOil();
+});
+
+// ---------------------------------------------------------------- loop
+const camTarget = new THREE.Vector3();
+let t0 = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - t0) / 1000); t0 = now;
+  const t = now / 1000;
+  shown.lerp(new THREE.Vector2(pos.x + .5, pos.y + .5), 1 - Math.pow(0.0005, dt));
+  body.position.set(shown.x, 0, shown.y);
+  // the flame sits on the camera side of the body so it always draws in front
+  const toCam = new THREE.Vector3().subVectors(camera.position, body.position).setY(0).normalize();
+  flame.position.copy(body.position).addScaledVector(toCam, 0.02);
+
+  for (const b of billboards) b.quaternion.copy(camera.quaternion);
+
+  // lantern hangs where the sprite's flame is, nudged toward the camera to light his front
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  const fx = (FLAME[0] - 32) * PX * body.scale.x, fy = (64 - FLAME[1]) * PX;
+  lantern.position.copy(body.position).addScaledVector(right, fx).setY(fy).addScaledVector(toCam, 0.45);
+  const m = oil > 0 ? MODES[mode] : MODES.hooded;
+  const flicker = 1 + 0.05 * Math.sin(t * 11.3) + 0.04 * Math.sin(t * 23.7 + 1.3) + 0.03 * Math.sin(t * 5.1);
+  lantern.intensity += (m.i * flicker - lantern.intensity) * Math.min(1, dt * 8);
+  lantern.distance += (m.d - lantern.distance) * Math.min(1, dt * 6);
+  flame.material.opacity = oil > 0 && mode !== 'hooded' ? 1 : 0.25;
+
+  camTarget.lerp(new THREE.Vector3(shown.x, 0.5, shown.y - 2.2), 1 - Math.pow(0.02, dt));
+  camera.position.copy(camTarget).add(CAM_OFF);
+  camera.lookAt(camTarget);
+
+  composer.render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__ready = true;
+</script>
+</body>
+</html>
