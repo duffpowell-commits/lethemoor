@@ -1,8 +1,10 @@
 extends Node3D
 ## The playable room in 3D (M1a, Nov 12). HD-2D: pixel sprites as upright billboards in a
 ## 3D world, one real 3D lantern light. Compatibility renderer (runs in iPhone Safari).
-## Rules are untouched: fog, oil and reach all come from scripts/sim/. This file only draws
-## them and turns taps into moves. Fog is the truth; the light is the look.
+## Rules live in scripts/sim/ (night.gd runs the turns: oil, dread, thralls). This file only
+## draws them and turns taps into steps. Fog is the truth; the light is the look.
+## M1b (Nov 13): one tile per turn. Tap a tile and she walks there step by step, every step a
+## turn; she stops early when something happens. Tap her own tile to wait a turn.
 ## 1 grid tile = 1 world unit. Grid (x, y) sits at world (x, 0, y): rows run toward the camera.
 ## Renders + tap test:
 ##   xvfb-run -a godot --path . --rendering-driver opengl3 res://scenes/room3d.tscn -- --capture
@@ -10,13 +12,12 @@ extends Node3D
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Room = preload("res://scripts/sim/room.gd")
+const Night = preload("res://scripts/sim/night.gd")
 
 const UI_W := 540                  # UI base, portrait (pivot doc: 540x960)
 const UI_H := 960
 const TOP_H := 72
 const BOTTOM_H := 216              # thumb zone: status line + three big lantern buttons
-const MOVE_RANGE := 4              # tiles per move (placeholder until the step rules land)
-const START_OIL := 12
 const WALL_H := 1.35
 const PX := 1.0 / 48.0             # sprite pixel size: a 64 px bearer is 1.33 tiles tall
 const STEP_TIME := 0.16            # seconds per tile while sliding
@@ -30,6 +31,7 @@ const INK_BLACK := Color("#05070c")
 const UI_TEXT := Color("#d9cdb4")
 const UI_AMBER := Color("#f2c25a")
 const UI_DIM := Color("#7d8fa8")
+const UI_BLOOD := Color("#c81e2e")
 ## How bright each fog state draws a surface. The light adds on top of LIT.
 const SHADE := {Fog.DARK: 0.0, Fog.REMEMBERED: 0.2, Fog.LIT: 1.0}
 ## Lantern light per setting: [range in tiles, energy]. Range ~ fog radius + a soft edge.
@@ -39,14 +41,14 @@ const LIGHT := {
 	Fog.Lantern.BRIGHT: [5.4, 4.2],
 }
 
+var game                           # sim/night.gd: the truth
 var room
 var fog
-var hunter := Vector2i.ZERO
-var setting: int = Fog.Lantern.NORMAL
-var oil := START_OIL
+var hunter := Vector2i.ZERO        # mirrors game.hunter (kept for the tap test)
 var night := 1
-var reach := {}
 var flicker := false
+var fake_flicker := false          # high dread: the flame lies
+var last_event := ""
 var facing := 1                    # 1 = lantern on the right, -1 = flipped
 var walking := false
 var t := 0.0
@@ -58,19 +60,23 @@ var flame: Sprite3D
 var tile_mats := {}                # Vector2i -> StandardMaterial3D (floor and walls)
 var tile_base := {}                # Vector2i -> base albedo Color
 var reach_marks := {}              # Vector2i -> MeshInstance3D
-var thrall_nodes := {}             # Vector2i -> Node3D
+var thrall_nodes: Array = []       # index matches game.thralls
 
 var hud: Control
 var status_label: Label
 var oil_pips: Array[ColorRect] = []
 var oil_count: Label
+var dread_fill: ColorRect
+var dread_label: Label
 var buttons := {}
+var end_screen: Control
 
 
 func _ready() -> void:
-	room = Room.parse(FileAccess.get_file_as_string("res://rooms/quay_01.txt"))
-	fog = room.make_fog()
-	hunter = room.hunter
+	game = Night.start(FileAccess.get_file_as_string("res://rooms/quay_01.txt"))
+	room = game.room
+	fog = game.fog
+	hunter = game.hunter
 	_build_world()
 	_build_hud()
 	_refresh()
@@ -159,7 +165,8 @@ func _build_world() -> void:
 		tile_mats[Vector2i(-100 - lp.x, -100 - lp.y)] = post.material_override  # fogged with its tile
 		tile_base[Vector2i(-100 - lp.x, -100 - lp.y)] = iron.albedo_color
 
-	for tp: Vector2i in room.thralls:
+	for thrall in game.thralls:
+		var tp: Vector2i = thrall.pos
 		var holder := Node3D.new()
 		holder.position = _w(tp)
 		var th := _billboard("thrall")
@@ -180,7 +187,7 @@ func _build_world() -> void:
 			eye.position = Vector3(ex, 1.05, 0.05)
 			holder.add_child(eye)
 		add_child(holder)
-		thrall_nodes[tp] = holder
+		thrall_nodes.append(holder)
 
 	bearer = _billboard(SPRITE)
 	add_child(bearer)
@@ -254,27 +261,31 @@ func _place_camera(snap: bool) -> void:
 # ---------------------------------------------------------------- rules -> look
 
 func _seen_thralls() -> Array:
-	return room.thralls.filter(func(p): return fog.get_state(p) == Fog.LIT)
+	return game.positions().filter(func(p): return fog.get_state(p) == Fog.LIT)
 
 
 func _refresh() -> void:
-	fog.update([{pos = hunter, setting = setting}])
-	flicker = fog.flickers(hunter, room.thralls)
-	reach = room.reachable(hunter, MOVE_RANGE, _seen_thralls())
+	hunter = game.hunter
+	flicker = game.flickers()
+	fake_flicker = game.hallucinating() and not flicker and randf() < 0.35
 	for p in tile_mats:
 		var gp: Vector2i = p if p.x > -100 else Vector2i(-100 - p.x, -100 - p.y)
 		var k: float = SHADE[fog.get_state(gp)]
 		var base: Color = tile_base[p]
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for p in reach_marks:
-		reach_marks[p].visible = reach.has(p) and p != hunter and fog.get_state(p) != Fog.DARK
-	for tp in thrall_nodes:
-		thrall_nodes[tp].visible = fog.get_state(tp) == Fog.LIT
-	var lv: Array = LIGHT[setting]
+		reach_marks[p].visible = not walking and game.can_step(p) and fog.get_state(p) != Fog.DARK
+	for i in thrall_nodes.size():
+		var tp: Vector2i = game.thralls[i].pos
+		thrall_nodes[i].visible = fog.get_state(tp) == Fog.LIT
+		if not walking:
+			thrall_nodes[i].position = _w(tp)
+	var eff: int = game.effective()
+	var lv: Array = LIGHT[eff]
 	light.omni_range = lv[0]
 	light.light_energy = lv[1]
-	flame.visible = setting != Fog.Lantern.HOODED
-	bearer.modulate = Color(0.6, 0.65, 0.8) if setting == Fog.Lantern.HOODED else Color(1, 1, 1)
+	flame.visible = eff != Fog.Lantern.HOODED
+	bearer.modulate = Color(0.6, 0.65, 0.8) if eff == Fog.Lantern.HOODED else Color(1, 1, 1)
 	_refresh_hud()
 
 
@@ -298,55 +309,113 @@ func screen_of(p: Vector2i) -> Vector2:
 func _unhandled_input(event: InputEvent) -> void:
 	var press: bool = event is InputEventScreenTouch and event.pressed
 	press = press or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
-	if not press or walking:
+	if not press:
+		return
+	if game.over():
+		if end_screen and end_screen.visible:
+			get_tree().reload_current_scene()
+		return
+	if walking:
 		return
 	try_move(cell_at(event.position))
 
 
+## Tap your own tile: wait a turn. Tap any known floor tile: walk there, one turn per tile.
 func try_move(cell: Vector2i) -> bool:
-	if walking or cell == hunter or not reach.has(cell) or fog.get_state(cell) == Fog.DARK:
+	if walking or game.over():
 		return false
-	_walk(room.path_in(reach, hunter, cell))
+	if cell == hunter:
+		_walk_path([hunter, hunter])
+		return true
+	if room.is_wall(cell) or fog.get_state(cell) == Fog.DARK:
+		return false
+	var reach: Dictionary = room.reachable(hunter, room.size.x * room.size.y, _seen_thralls())
+	var path: Array = room.path_in(reach, hunter, cell)
+	if path.size() < 2:
+		return false
+	_walk_path(path)
 	return true
 
 
-## Slide tile by tile with a small 2-frame bob; rules update once at the end of the move.
-func _walk(path: Array[Vector2i]) -> void:
+## Events that stop a walk: something changed, the player should get to choose again.
+const STOP_EVENTS := ["horror", "panic", "out_of_oil", "taken", "grabbed", "escaped"]
+
+
+## Each tile is one turn of the sim. The hunter slides, thralls slide with her; the walk stops
+## the moment anything happens (a horror, a panic, a new flicker, death).
+func _walk_path(path: Array) -> void:
 	walking = true
+	last_event = ""
 	for m in reach_marks.values():
 		m.visible = false
 	for i in range(1, path.size()):
+		var was_flicker: bool = game.flickers()
+		var from_t: Array = game.positions()
 		var a := _w(path[i - 1])
 		var b := _w(path[i])
+		var events: Array = game.wait() if path[i] == path[i - 1] else game.step(path[i])
+		if path[i] != path[i - 1] and events.is_empty() and not game.dead:
+			break   # step refused (it became illegal): stop here
 		if path[i].x != path[i - 1].x:
 			facing = signi(path[i].x - path[i - 1].x)
+		if game.hunter != path[i]:
+			b = a   # grabbed before she got there
+		_refresh_fog_only()
 		var e := 0.0
 		while e < STEP_TIME:
 			e += get_process_delta_time()
 			var k := minf(e / STEP_TIME, 1.0)
-			var bob := 0.04 if k < 0.5 else 0.0
+			var bob := 0.04 if k < 0.5 and a != b else 0.0
 			_place_bearer(a.lerp(b, k) + Vector3(0, bob, 0))
+			for j in thrall_nodes.size():
+				thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 			await get_tree().process_frame
-	hunter = path[-1]
-	oil = Fog.burn(oil, setting)
+		for ev in events:   # the line under the screen names the thing that matters most
+			if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
+				last_event = ev
+		if game.over() or events.any(func(ev): return ev in STOP_EVENTS):
+			break
+		if game.flickers() and not was_flicker:
+			last_event = "flicker"
+			break
 	walking = false
 	_refresh()
+	if game.over():
+		_show_end()
+
+
+## Mid-walk: fog and thrall visibility follow every step, the HUD waits for the stop.
+func _refresh_fog_only() -> void:
+	for p in tile_mats:
+		var gp: Vector2i = p if p.x > -100 else Vector2i(-100 - p.x, -100 - p.y)
+		var k: float = SHADE[fog.get_state(gp)]
+		var base: Color = tile_base[p]
+		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
+	for i in thrall_nodes.size():
+		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT
+	var eff: int = game.effective()
+	light.omni_range = LIGHT[eff][0]
+	flame.visible = eff != Fog.Lantern.HOODED
+	_refresh_hud()
 
 
 func _set_lantern(s: int) -> void:
-	setting = s
+	if game.over():
+		return
+	game.set_lantern(s)
+	last_event = ""
 	_refresh()
 
 
 func _process(delta: float) -> void:
 	t += delta
 	_place_camera(false)
-	if setting == Fog.Lantern.HOODED:
+	if game.effective() == Fog.Lantern.HOODED:
 		return
 	# a living flame breathes; something unseen nearby makes it stutter
-	var base: float = LIGHT[setting][1]
+	var base: float = LIGHT[game.effective()][1]
 	var wobble := sin(t * 7.0) * 0.05 + sin(t * 13.0) * 0.04
-	if flicker and fmod(t, 1.1) < 0.18:
+	if (flicker or fake_flicker) and fmod(t, 1.1) < 0.18:
 		wobble -= 0.6 * absf(sin(t * 60.0))
 	light.light_energy = base + wobble
 
@@ -398,15 +467,29 @@ func _build_hud() -> void:
 	oil_label.position = Vector2(14, 36)
 	top.add_child(oil_label)
 	# pips are drawn, not typed: the web build has no system fonts for symbols
-	for i in START_OIL:
+	for i in Night.START_OIL:
 		var pip := ColorRect.new()
-		pip.position = Vector2(58 + i * 14, 44)
-		pip.size = Vector2(9, 14)
+		pip.position = Vector2(58 + i * 8, 44)
+		pip.size = Vector2(5, 14)
 		top.add_child(pip)
 		oil_pips.append(pip)
 	oil_count = _label("", 16, UI_AMBER)
-	oil_count.position = Vector2(58 + START_OIL * 14 + 8, 36)
+	oil_count.position = Vector2(58 + Night.START_OIL * 8 + 6, 36)
 	top.add_child(oil_count)
+	# dread: the second clock. Fills in the dark, drains in the light.
+	dread_label = _label("DREAD", 16, UI_DIM)
+	dread_label.position = Vector2(352, 36)
+	top.add_child(dread_label)
+	var track := ColorRect.new()
+	track.color = Color(0.12, 0.14, 0.2)
+	track.position = Vector2(420, 45)
+	track.size = Vector2(104, 12)
+	top.add_child(track)
+	dread_fill = ColorRect.new()
+	dread_fill.color = UI_BLOOD
+	dread_fill.position = Vector2(420, 45)
+	dread_fill.size = Vector2(0, 12)
+	top.add_child(dread_fill)
 
 	var bottom := ColorRect.new()
 	bottom.color = INK_BLACK
@@ -433,23 +516,71 @@ func _build_hud() -> void:
 
 
 func _refresh_hud() -> void:
-	oil_count.text = str(oil)
+	oil_count.text = str(game.oil)
 	for i in oil_pips.size():
-		oil_pips[i].color = UI_AMBER if i < oil else Color(0.2, 0.25, 0.32)
-	var cost: int = Fog.OIL_COST[setting]
+		oil_pips[i].color = UI_AMBER if i < game.oil else Color(0.2, 0.25, 0.32)
+	dread_fill.size.x = 104.0 * game.dread / Night.DREAD_MAX
+	dread_label.add_theme_color_override("font_color", UI_BLOOD if game.hallucinating() else UI_DIM)
 	var lines := {
-		Fog.Lantern.HOODED: "Hooded. Unseen, and blind. Burns nothing.",
-		Fog.Lantern.NORMAL: "The lantern burns low: two paces of light. 1 oil a move.",
-		Fog.Lantern.BRIGHT: "The flame burns high: four paces, and every eye turns to it. %d oil a move." % cost,
+		Fog.Lantern.HOODED: "Hooded. Unseen, and blind. The dark gets into you.",
+		Fog.Lantern.NORMAL: "The lantern burns low: two paces of light. 1 oil a step.",
+		Fog.Lantern.BRIGHT: "The flame burns high: four paces, and every eye turns to it. 2 oil a step.",
 	}
-	var s: String = lines[setting]
-	if flicker:
-		s += "  The flame gutters. Something is near."
-	if oil == 0:
+	var said := {
+		"horror": "Something stands at the edge of the light. It has seen you.",
+		"panic": "Your hands shake. Oil spills hissing on the stones.",
+		"out_of_oil": "The last of the oil is gone. The dark comes in.",
+		"thrall_moved": "",
+		"flicker": "The flame gutters. Something is near.",
+	}
+	var s: String = lines[game.setting]
+	if game.oil == 0:
 		s = "The oil is spent. The dark is coming in."
+	var extra: String = said.get(last_event, "")
+	if extra != "":
+		s = extra
+	elif flicker or fake_flicker:
+		s += "  The flame gutters. Something is near."
+	if game.hallucinating() and extra == "":
+		s += "  You are not sure what you see."
+	if not game.over() and extra == "" and game.turn == 0:
+		s += "  Tap a tile to walk. Tap yourself to wait."
 	status_label.text = s
 	for k in buttons:
-		buttons[k].modulate = Color(1, 0.85, 0.5) if k == setting else Color(0.55, 0.6, 0.7)
+		buttons[k].modulate = Color(1, 0.85, 0.5) if k == game.setting else Color(0.55, 0.6, 0.7)
+
+
+## Death or dawn. One tap and the night starts over.
+func _show_end() -> void:
+	if end_screen == null:
+		end_screen = ColorRect.new()
+		end_screen.color = Color(0.01, 0.01, 0.02, 0.82)
+		end_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+		end_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hud.add_child(end_screen)
+		var big := _label("", 34, UI_BLOOD)
+		big.name = "Big"
+		big.position = Vector2(30, 330)
+		big.size = Vector2(UI_W - 60, 50)
+		big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		end_screen.add_child(big)
+		var small := _label("", 17, UI_TEXT)
+		small.name = "Small"
+		small.position = Vector2(40, 400)
+		small.size = Vector2(UI_W - 80, 200)
+		small.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		small.autowrap_mode = TextServer.AUTOWRAP_WORD
+		end_screen.add_child(small)
+	var big: Label = end_screen.get_node("Big")
+	var small: Label = end_screen.get_node("Small")
+	if game.escaped:
+		big.text = "DAWN"
+		big.add_theme_color_override("font_color", UI_AMBER)
+		small.text = "You reach the water's edge as the sky goes grey.\n\n%d steps  ·  %d oil left\n\nTap to walk the night again." % [game.turn, game.oil]
+	else:
+		big.text = "THE DARK TOOK YOU"
+		small.text = "%s\n\n%d steps  ·  %d oil left\n\nTap to try again." % [game.cause, game.turn, game.oil]
+	end_screen.visible = true
 
 
 # ---------------------------------------------------------------- capture + tap test
@@ -489,18 +620,36 @@ func _tap(cell: Vector2i, should_move := true) -> void:
 		" screen=", pos, " hunter=", hunter)
 
 
+## Let the sim run a few turns through the same code path a tap uses, and wait for it.
+func _act(cell: Vector2i) -> void:
+	try_move(cell)
+	while walking:
+		await get_tree().process_frame
+
+
 func _capture() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
-	_set_lantern(Fog.Lantern.NORMAL)
-	await _shot("m1a_normal")
-	_set_lantern(Fog.Lantern.BRIGHT)
-	await _shot("m1a_bright")
-	_set_lantern(Fog.Lantern.HOODED)
-	await _shot("m1a_hooded")
-	_set_lantern(Fog.Lantern.NORMAL)
-	await _tap(hunter + Vector2i(0, -2))   # two up the quay
-	await _tap(hunter + Vector2i(2, -1))   # then up and right: a turn, so facing flips
-	_set_lantern(Fog.Lantern.BRIGHT)
-	await _shot("m1a_walked")
+	await _shot("m1b_start")
+	var oil_before: int = game.oil
+	await _tap(hunter + Vector2i(0, -1))   # one tile up: one turn
+	print("STEP ", "PASS" if game.turn == 1 and game.oil == oil_before - 1 else "FAIL",
+		" turn=", game.turn, " oil=", game.oil)
 	await _tap(Vector2i(4, 9), false)        # a wall: she must NOT move
+	_set_lantern(Fog.Lantern.BRIGHT)
+	for i in 8:                              # bright: something out there sees it
+		await _act(hunter)
+		if last_event == "horror" or game.over():
+			break
+	await _shot("m1b_horror")
+	print("HORROR ", "PASS" if last_event == "horror" else "FAIL", " dread=", game.dread)
+	_set_lantern(Fog.Lantern.HOODED)
+	await _act(hunter)
+	await _act(hunter)
+	await _shot("m1b_hooded")
+	for i in 12:                             # hooding hides the light, not where you stood
+		if game.over():
+			break
+		await _act(hunter)
+	await _shot("m1b_dead")
+	print("DEATH ", "PASS" if game.dead else "FAIL", " cause=", game.cause)
 	get_tree().quit()

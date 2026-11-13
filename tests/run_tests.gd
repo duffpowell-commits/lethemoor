@@ -5,6 +5,7 @@ extends SceneTree
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Room = preload("res://scripts/sim/room.gd")
+const Night = preload("res://scripts/sim/night.gd")
 
 var failures := 0
 var passed := 0
@@ -108,3 +109,124 @@ func test_reach_and_path() -> void:
 	for i in range(1, p.size()):
 		check((p[i] - p[i - 1]).abs().x + (p[i] - p[i - 1]).abs().y == 1, "every step is one tile, 4-way")
 	check(r.path_in(reach, r.hunter, Vector2i(2, 2)).is_empty(), "no path into a wall")
+
+
+# ---------------------------------------------------------------- M1b: turns, dread, thralls
+
+const CORRIDOR := "###########\n#H.......T#\n###########"
+
+
+func test_one_step_per_turn() -> void:
+	var n = Night.start("#####\n#H..#\n#####")
+	check(not n.can_step(Vector2i(3, 1)), "can't jump two tiles")
+	check(not n.can_step(Vector2i(1, 0)), "can't step into a wall")
+	check(n.step(Vector2i(2, 1)).size() >= 0 and n.hunter == Vector2i(2, 1), "one tile moves you")
+	check(n.turn == 1, "a step is a turn")
+	check(n.oil == Night.START_OIL - 1, "normal burns 1 oil per step, got %d" % n.oil)
+
+
+func test_bright_burns_two_hooded_none() -> void:
+	var n = Night.start("######\n#H...#\n######")
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	n.step(Vector2i(2, 1))
+	check(n.oil == Night.START_OIL - 2, "bright burns 2")
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.step(Vector2i(3, 1))
+	check(n.oil == Night.START_OIL - 2, "hooded burns nothing")
+
+
+func test_dread_rises_in_dark_falls_in_light() -> void:
+	var n = Night.start("#####\n#H..#\n#####")
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.wait()
+	n.wait()
+	check(n.dread == Night.DREAD_DARK * 2, "two dark turns add dread, got %d" % n.dread)
+	n.set_lantern(Fog.Lantern.NORMAL)
+	n.wait()
+	check(n.dread == Night.DREAD_DARK * 2 + Night.DREAD_LIT, "a lit turn takes some back")
+
+
+func test_no_oil_means_dark() -> void:
+	var n = Night.start("#####\n#H..#\n#####")
+	n.oil = 1
+	var ev: Array = n.wait()
+	check(n.oil == 0 and ev.has("out_of_oil"), "last drop burns, and you're told")
+	check(n.effective() == Fog.Lantern.HOODED, "no oil = hooded, whatever the button says")
+	n.wait()
+	check(n.dread == Night.DREAD_DARK, "and the dark feeds dread (dread never goes below 0), got %d" % n.dread)
+
+
+func test_panic_spills_oil() -> void:
+	var n = Night.start("#####\n#H..#\n#####")
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.dread = Night.DREAD_MAX - 1
+	var ev: Array = n.wait()
+	check(ev.has("panic"), "hitting max dread panics")
+	check(n.oil == Night.START_OIL - Night.PANIC_OIL, "panic spills oil")
+	check(n.dread == Night.PANIC_RESET, "and dread drops back")
+
+
+func test_thrall_walks_to_the_light() -> void:
+	var n = Night.start(CORRIDOR)   # thrall 8 tiles off, normal notices at 5
+	n.wait()
+	check(n.thralls[0].pos == Vector2i(9, 1), "normal light 8 tiles off: unnoticed")
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	n.wait()
+	check(n.thralls[0].pos == Vector2i(8, 1), "bright: it sees you and comes")
+
+
+func test_hooding_loses_it() -> void:
+	var n = Night.start(CORRIDOR)
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	n.wait()                       # it saw you at (1,1): target set
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.step(Vector2i(2, 1))
+	n.step(Vector2i(1, 1))
+	check(n.thralls[0].target == Vector2i(1, 1) or n.thralls[0].target == null, "it only knows where it last saw you")
+	var n2 = Night.start("#########\n#H......#\n#.#####.#\n#.......#\n######T##\n#########")
+	n2.set_lantern(Fog.Lantern.HOODED)
+	for i in 3:
+		n2.wait()
+	check(n2.thralls[0].pos == Vector2i(6, 4), "hooded and far: it never notices")
+
+
+func test_adjacent_thrall_takes_you() -> void:
+	var n = Night.start("######\n#H.T.#\n######")
+	n.set_lantern(Fog.Lantern.HOODED)
+	var ev: Array = n.wait()
+	check(not n.dead, "two tiles off and hooded: still alive (it noticed nothing)")
+	n.set_lantern(Fog.Lantern.NORMAL)
+	ev = n.wait()
+	check(n.thralls[0].pos == Vector2i(2, 1), "lit: it closes in")
+	ev = n.wait()
+	check(n.dead and ev.has("taken"), "next to you on its turn: you die")
+	check(n.step(Vector2i(1, 1)).is_empty(), "the dead don't walk")
+
+
+func test_walking_into_unseen_thrall() -> void:
+	var n = Night.start("#####\n#HT.#\n#####")
+	n.set_lantern(Fog.Lantern.HOODED)
+	check(n.can_step(Vector2i(2, 1)), "you can't see it, so you can step there")
+	var ev: Array = n.step(Vector2i(2, 1))
+	check(n.dead and ev.has("grabbed"), "and it has you")
+	var m = Night.start("#####\n#HT.#\n#####")
+	check(not m.can_step(Vector2i(2, 1)), "lit, you see it and can't walk into it")
+
+
+func test_horror_spikes_dread_once() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.thralls.append({pos = Vector2i(5, 1), target = null, seen = false})
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	var ev: Array = n.wait()
+	check(ev.has("horror"), "a thrall stepping into your light is a horror")
+	var d: int = n.dread
+	n.set_lantern(Fog.Lantern.NORMAL)
+	n.step(Vector2i(2, 1))
+	check(n.dread <= d + Night.DREAD_HORROR, "dread doesn't spike every turn for the same sighting")
+
+
+func test_reaching_exit_escapes() -> void:
+	var n = Night.start("#####\n#H.E#\n#####")
+	n.step(Vector2i(2, 1))
+	var ev: Array = n.step(Vector2i(3, 1))
+	check(n.escaped and ev.has("escaped"), "the exit ends the night")

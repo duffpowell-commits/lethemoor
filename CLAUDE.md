@@ -88,7 +88,25 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   Weak spots: placeholder 32 px floor/wall textures read as big bricks (art job: 3D-ready tiles,
   wall tops); remembered tiles go flat/textureless at 0.2 (fine for "layout known"); the
   canva_bearer64 face smears at 64 px.
-- Next: **M1 = new slice** (pivot doc #12): 2–3 rooms, locked door + key, one Stalker, one safe
+- **Done — M1b (Nov 13): the game exists.** Design review (Claude Doc, Duff approved "go"):
+  https://claude.ai/artifact/CV5byZkc6gHebMJgQVm6xE (dread as second clock, Thrall + Stalker,
+  throwable oil, lamps as paid checkpoints, web cut "Lethemoor: One Night" for CrazyGames/Poki,
+  faceless-character art rule, prompt kit). `scripts/sim/night.gd` runs the turns: one tile per
+  turn (or wait), oil per step (start 30), dread +4/turn hooded or dry, -2 lit, +15 when a thrall
+  enters your light, 100 = panic (spill 5 oil, back to 60), 50+ = hallucinating (fake flickers in
+  the view). Thralls: adjacent on their turn = you die; notice your lantern by LOS within 1/5/8
+  tiles (hooded/normal/bright), walk to where they last saw it, then stand there. Walking into an
+  unseen thrall = death. Exit tile = dawn. 11 new tests (19 total). View: tap a tile to walk there
+  step by step (each tile is a turn, stops on horror/panic/new flicker/death), tap yourself to wait,
+  dread bar in the top bar, thralls slide with you, end screen with one-tap retry.
+  `quay_01` thrall moved (6,10) → (8,7) so the first turn isn't a death. Renders
+  `docs/renders/m1b_*.png` (`m1b_sheet.png` = start / horror / hooded / dead); capture prints
+  TAP/STEP/HORROR/DEATH PASS. Not tuned on a phone yet: equal speed means fleeing in the open
+  always works; deaths come from dead ends, hooding without moving, and walking blind.
+- Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
+  burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
+  remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
+- Older plan: **M1 = new slice** (pivot doc #12): 2–3 rooms, locked door + key, one Stalker, one safe
   room, real sound. Also: real tile art for 3D, and one-step-per-tap vs the 4-tile placeholder
   move (pivot says step-based; decide with Duff on the phone build).
 
