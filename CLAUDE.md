@@ -27,8 +27,8 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   room `rooms/quay_01.txt`; `scenes/room.tscn` draws it with real Godot 2D light + wall shadows,
   a soft fog layer, tap-to-move (4 tiles, placeholder) and the three lantern buttons.
   Renders: `docs/renders/m0_*.png` (`m0_sheet.png` = all four lantern states; `m0_web_chrome.png`
-  = the web build running in headless Chrome). CI builds a web zip + debug APK on every push,
-  and every push to `main` refreshes the **`dev` release** (Releases → dev → tap the APK):
+  = the web build running in headless Chrome). CI builds a web zip + debug APK on pushes to `main` and on PRs
+  (not plain branch pushes or docs/*.md-only changes, to save Actions minutes), and every push to `main` refreshes the **`dev` release** (Releases → dev → tap the APK):
   https://github.com/duffpowell-commits/lethemoor/releases/tag/dev. Web zip is 9.5 MB
   (engine wasm is most of it; game data is ~30 KB).
 - Web gotcha: no system fonts on web, so symbols like ■ show as boxes. Draw them or ship a font.
