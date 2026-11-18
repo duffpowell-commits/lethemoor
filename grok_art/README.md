@@ -34,6 +34,12 @@ Avoid: chibi, cute, anime gloss, 3D render look, painterly brushwork.
 Attach an approved design as a style anchor ("match this exact style and palette"). One pose per
 image; Grok can't hold a character consistent across a whole animation sheet.
 
+## From Foxboard (Duff's phone art editor)
+Foxboard's **Send to game** button drops art here as `grok_art/<date>-foxboard/<name>-<time>.png`
+(it arrives as `.png.b64`; `.github/workflows/foxboard_decode.yml` turns it into the real PNG within
+about a minute). Sprites come flat on the `#00FF00` key unless Duff turned that off. Import them
+like any other drop (below).
+
 ## Turning it into a sprite (Claude runs this)
     python3 tools/import_sprite.py grok_art/<file> <name> --size 64 [--crop x0,y0,x1,y1]
     python3 tools/fixes/<name>.py        # hand fixes the shrink can't do (faces, hands)

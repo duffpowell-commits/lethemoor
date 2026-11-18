@@ -41,6 +41,10 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   (`m1_art_closeup.png` is the one to judge; `_moon` vs `_flat` = normal map on/off, subtle).
   Render: `xvfb-run -a godot --path . --rendering-driver opengl3 res://scenes/art_test.tscn -- --capture`.
   Not wired into the room yet. HD-2D idea: sprites stay simple, engine light does the mood.
+- **Foxboard inbox (Nov 18):** Duff's phone art editor Foxboard (repo `duffpowell-commits/Foxboard`) has a
+  Send to game button that commits art into `grok_art/<date>-foxboard/` (base64 first; `foxboard_decode.yml`
+  decodes it to PNG/GIF and pushes as github-actions[bot]). `build.yml` ignores `grok_art/**`, so a drop never
+  builds or ships. Expect bot commits on main: `git fetch` before pushing, as always.
 - **Art pipeline (Nov 7): Grok designs, Claude converts.** Duff drops green-screen designs in
   `grok_art/` (see its README). `tools/import_sprite.py` keys the green, shrinks, snaps to the
   palette, cleans speckle, outlines, writes sprite + normal map + flame glow. Hand fixes live in
