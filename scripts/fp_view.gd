@@ -48,7 +48,8 @@ const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL
 const THRALL_LOOKS := ["thrall_dock", "thrall_netmender", "thrall_dockwoman"]
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
-const MAP_CELL := 7.0
+const MAP_CELL := 13.0               # the corner map follows you: ~15 x 12 tiles around you
+const MAP_SIZE := Vector2(196, 160)
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
 
 var game
@@ -56,6 +57,8 @@ var room
 var fog
 var busy := false
 var t := 0.0
+var lunge_hit := 0.0                # 1 the moment something lunges at you, fades: red edge + shake
+var lunge_flash: TextureRect
 var flicker := false
 var fake_flicker := false
 var last_event := ""
@@ -313,10 +316,30 @@ func _build_world() -> void:
 		tile_base[Vector2i(-200 - np.x, -200 - np.y)] = pm2.albedo_color
 		letter_mats[np] = pm2
 
-	# oil flasks on the floor: small amber glass that catches the lantern
+	# oil flasks on the floor: grimy, dead-looking glass, but a cold glint on the shoulder comes and
+	# goes so your eye still finds it (unshaded, so it shows a little past the lantern's edge)
+	var gg := Gradient.new()
+	gg.set_color(0, Color(1, 1, 1, 1))
+	gg.set_color(1, Color(1, 1, 1, 0))
+	var glint_tex := GradientTexture2D.new()
+	glint_tex.gradient = gg
+	glint_tex.fill = GradientTexture2D.FILL_RADIAL
+	glint_tex.fill_from = Vector2(0.5, 0.5)
+	glint_tex.fill_to = Vector2(1.0, 0.5)
+	glint_tex.width = 32
+	glint_tex.height = 32
 	for op: Vector2i in room.oil_flasks:
 		var flask := _prop_sprite("prop_flask", 0.3)
 		flask.position = _w(op) + Vector3(0.15, 0, 0.1)
+		var glint := Sprite3D.new()
+		glint.texture = glint_tex
+		glint.pixel_size = 0.07 / 32.0
+		glint.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		glint.shaded = false
+		glint.modulate = Color(0.85, 0.92, 1.0, 0.0)
+		glint.position = Vector3(-0.025, 0.21, 0.01)   # the glass shoulder, in the sprite's own space
+		glint.name = "Glint"
+		flask.add_child(glint)
 		add_child(flask)
 		flask_nodes[op] = flask
 
@@ -707,6 +730,8 @@ func act(kind: String) -> void:
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 		await get_tree().process_frame
 	turn_events = events
+	if "lunge" in events and not game.dead:
+		lunge_hit = 1.0
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
 			last_event = ev
@@ -806,14 +831,45 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	t += delta
 	_flicker_fires()
-	# standing thralls twitch: a jerk of the head now and then, never smooth
+	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
+		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
+		if g:
+			var ph := t * 1.3 + float(fp.x * 7 + fp.y * 3)
+			g.modulate.a = 0.15 + 0.75 * pow(maxf(0.0, sin(ph)), 6.0)
+	# standing thralls twitch: a jerk of the head now and then, never smooth. Crouched (the tell
+	# before a lunge) it drops low and wide, shivers and goes dark red; just after a lunge it rears up.
 	for i in thrall_sprites.size():
 		var th: Dictionary = game.thralls[i]
 		if th.get("kind", "thrall") == "thrall" and not th.get("lying", false) and thrall_nodes[i].visible:
+			var sp: Sprite3D = thrall_sprites[i]
 			var jerk := 0.0
 			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
 				jerk = 0.05 * sin(t * 90.0 + i)
-			thrall_sprites[i].position.x = jerk
+			if th.get("crouched", false):
+				var beat := 0.5 + 0.5 * sin(t * 9.0)
+				sp.scale = Vector3(1.3, 0.66, 1.0)
+				jerk = 0.018 * sin(t * 47.0 + i)
+				sp.modulate = Color(0.36 + 0.14 * beat, 0.1, 0.11)   # dark, blood-dim, pulsing
+			elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
+				sp.scale = Vector3(1.0, 1.1, 1.0)    # reared up, right in your face
+				sp.modulate = Color(0.5, 0.15, 0.15)
+			else:
+				sp.scale = Vector3(1.12, 0.84, 1.0)
+				sp.modulate = Color(0.8, 0.8, 0.82)
+			sp.position.x = jerk
+	if lunge_hit > 0.0:
+		lunge_hit = maxf(0.0, lunge_hit - delta * 1.6)
+		if cam:
+			cam.h_offset = randf_range(-1, 1) * 0.06 * minf(lunge_hit, 1.0)
+			cam.v_offset = randf_range(-1, 1) * 0.04 * minf(lunge_hit, 1.0)
+		if lunge_flash:
+			lunge_flash.modulate.a = minf(lunge_hit, 1.0) * 0.8
+	else:
+		if cam and cam.h_offset != 0.0:
+			cam.h_offset = 0.0
+			cam.v_offset = 0.0
+		if lunge_flash and lunge_flash.modulate.a > 0.0:
+			lunge_flash.modulate.a = 0.0
 	var eff: int = game.effective()
 	if hand_art:
 		var want: String = HAND_ART[eff]
@@ -981,6 +1037,23 @@ func _build_hud() -> void:
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(vig)
+	# blood at the edges of sight when something lunges (faded in by lunge_hit)
+	var rg := Gradient.new()
+	rg.set_color(0, Color(0.5, 0, 0.02, 0))
+	rg.set_color(1, Color(0.55, 0, 0.03, 0.85))
+	rg.add_point(0.55, Color(0.5, 0, 0.02, 0))
+	var rgt := GradientTexture2D.new()
+	rgt.gradient = rg
+	rgt.fill = GradientTexture2D.FILL_RADIAL
+	rgt.fill_from = Vector2(0.5, 0.45)
+	rgt.fill_to = Vector2(1.0, 0.45)
+	lunge_flash = TextureRect.new()
+	lunge_flash.texture = rgt
+	lunge_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lunge_flash.stretch_mode = TextureRect.STRETCH_SCALE
+	lunge_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lunge_flash.modulate.a = 0.0
+	layer.add_child(lunge_flash)
 	layer.add_child(hud)
 	get_viewport().size_changed.connect(func(): _on_resize.call_deferred())
 
@@ -1023,7 +1096,8 @@ func _build_hud() -> void:
 
 	# corner map: what you remember, drawn small. North is up; the arrow is you.
 	minimap = Control.new()
-	minimap.size = Vector2(room.size) * MAP_CELL
+	minimap.size = MAP_SIZE
+	minimap.clip_contents = true
 	minimap.position = Vector2(UI_W - 14 - minimap.size.x, TOP_H + 10)
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap.draw.connect(_draw_map)
@@ -1266,29 +1340,49 @@ func _draw_dread() -> void:
 	dread_bar.draw_rect(Rect2(Vector2(-2, -2), r.size + Vector2(4, 4)), UI.BRASS_DIM, false, 1.0)
 
 
-## Remembered floor dim, lit floor amber, walls you've seen grey; thralls only if lit now.
+## The corner map: a scrap of chart. Walls you've seen as stone blocks (lit ones edged pale), floor
+## you remember in slate, floor in your light warm. Small drawn signs for the bell, letters, flasks,
+## lamps and the boathook; thralls only where lit now, a red X where you last saw one. You are the
+## arrow, with a faint wedge for what you're facing.
 func _draw_map() -> void:
 	var c := MAP_CELL
-	minimap.draw_rect(Rect2(Vector2(-3, -3), minimap.size + Vector2(6, 6)), Color(0, 0, 0, 0.6))
-	minimap.draw_rect(Rect2(Vector2(-3, -3), minimap.size + Vector2(6, 6)), UI.BRASS_DIM, false, 1.0)
-	for y in room.size.y:
-		for x in room.size.x:
+	var frame := Rect2(Vector2.ZERO, minimap.size)
+	minimap.draw_rect(frame, Color(0.02, 0.025, 0.035, 0.82))
+	# you sit in the middle; the chart slides under you
+	var o: Vector2 = (minimap.size / 2.0 - (Vector2(game.hunter) + Vector2(0.5, 0.5)) * c).round()
+	minimap.draw_set_transform(o)
+	var x0 := maxi(0, int(floor(-o.x / c)))
+	var y0 := maxi(0, int(floor(-o.y / c)))
+	var x1 := mini(room.size.x, int(ceil((minimap.size.x - o.x) / c)))
+	var y1 := mini(room.size.y, int(ceil((minimap.size.y - o.y) / c)))
+	for y in range(y0, y1):
+		for x in range(x0, x1):
 			var p := Vector2i(x, y)
 			var st: int = fog.get_state(p)
 			if st == Fog.DARK:
 				continue
-			var col: Color
+			var r := Rect2(Vector2(x, y) * c, Vector2(c, c))
+			var lit := st == Fog.LIT
 			if room.is_wall(p):
-				col = Color(0.3, 0.34, 0.42) if st == Fog.LIT else Color(0.18, 0.2, 0.26)
+				minimap.draw_rect(r, Color(0.2, 0.22, 0.28) if lit else Color(0.12, 0.13, 0.17))
+				# a pale edge on each side that faces open floor: the walls read as a plan, not a grid
+				for d: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+					var n := p + d
+					if n.x < 0 or n.y < 0 or n.x >= room.size.x or n.y >= room.size.y or room.is_wall(n):
+						continue
+					if fog.get_state(n) == Fog.DARK:
+						continue
+					var edge := Color(0.62, 0.6, 0.55) if lit else Color(0.36, 0.37, 0.4)
+					var a2 := r.position + Vector2(c, c) * 0.5 + Vector2(d) * c * 0.5
+					var t2 := Vector2(-d.y, d.x) * c * 0.5
+					minimap.draw_line(a2 - t2, a2 + t2, edge, 1.6)
 			else:
-				col = Color(0.75, 0.5, 0.2) if st == Fog.LIT else Color(0.28, 0.3, 0.36)
-			minimap.draw_rect(Rect2(Vector2(x, y) * c + Vector2(0.5, 0.5), Vector2(c - 1, c - 1)), col)
-			if room.bells.has(p):
-				minimap.draw_circle((Vector2(p) + Vector2(0.5, 0.5)) * c, c * 0.4, UI.AMBER)
-			elif room.letters.has(p) and not game.letters_read.has(p):
-				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2, 1.5), Vector2(c - 4, c - 3)), UI.TEXT)
-			elif game.flasks_left.has(p):
-				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2.5, 2.5), Vector2(c - 5, c - 5)), LANTERN)
+				var col := Color(0.55, 0.36, 0.14) if lit else Color(0.2, 0.22, 0.27)
+				minimap.draw_rect(r.grow(-0.5), col)
+				if game.prints.has(p) and lit:   # wet prints: something walked here
+					minimap.draw_circle(r.get_center() + Vector2(-2, 1), 1.6, Color(0.1, 0.12, 0.16))
+					minimap.draw_circle(r.get_center() + Vector2(2, -2), 1.6, Color(0.1, 0.12, 0.16))
+			_map_sign(p, r)
 	for th in game.thralls:
 		if th.get("gone", false):
 			continue   # burned: no square, no last-seen mark
@@ -1296,17 +1390,53 @@ func _draw_map() -> void:
 			if fog.get_state(th.pos) != Fog.DARK:   # a body on the stones, nothing more (so it seems)
 				minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(1.5, 3), Vector2(c - 3, c - 6)), Color(UI.DIM, 0.8))
 		elif fog.get_state(th.pos) == Fog.LIT:
-			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
+			var tc := (Vector2(th.pos) + Vector2(0.5, 0.5)) * c
+			minimap.draw_circle(tc, c * 0.48, Color(UI.BLOOD, 0.35))
+			minimap.draw_circle(tc, c * 0.3, UI.BLOOD)
 		elif th.last_seen != null:
 			# last-seen marker: where you saw it, not where it is. It may have moved.
 			var m: Vector2 = Vector2(th.last_seen) * c
-			var dim := Color(UI.BLOOD, 0.55)
+			var dim := Color(UI.BLOOD, 0.6)
 			minimap.draw_line(m + Vector2(2, 2), m + Vector2(c - 2, c - 2), dim, 1.5)
 			minimap.draw_line(m + Vector2(c - 2, 2), m + Vector2(2, c - 2), dim, 1.5)
 	var ctr := (Vector2(game.hunter) + Vector2(0.5, 0.5)) * c
 	var f := Vector2(game.facing)
 	var side := Vector2(-f.y, f.x)
-	minimap.draw_colored_polygon(PackedVector2Array([ctr + f * 4.5, ctr - f * 3 + side * 3.5, ctr - f * 3 - side * 3.5]), UI.TEXT)
+	var reach: float = c * 2.6
+	minimap.draw_colored_polygon(PackedVector2Array([ctr, ctr + (f + side * 0.85) * reach, ctr + f * reach * 1.15, ctr + (f - side * 0.85) * reach]), Color(1.0, 0.8, 0.45, 0.13))
+	var arrow := PackedVector2Array([ctr + f * 7.0, ctr - f * 5.0 + side * 5.5, ctr - f * 2.0, ctr - f * 5.0 - side * 5.5])
+	minimap.draw_colored_polygon(arrow, UI.TEXT)
+	arrow.append(arrow[0])
+	minimap.draw_polyline(arrow, Color(0, 0, 0, 0.8), 1.2)
+	minimap.draw_set_transform(Vector2.ZERO)
+	# brass frame on top, a north mark top left
+	minimap.draw_rect(frame.grow(-0.75), UI.BRASS_DIM, false, 1.5)
+	for k in [Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]:
+		minimap.draw_circle(frame.position + Vector2(3, 3) + (frame.size - Vector2(6, 6)) * k, 2.5, UI.BRASS_DIM)
+	var nm := Vector2(8, 8)
+	minimap.draw_colored_polygon(PackedVector2Array([nm + Vector2(4, 0), nm + Vector2(8, 9), nm + Vector2(0, 9)]), UI.BRASS)
+
+
+## One small drawn sign on a map tile (no symbol fonts on web).
+func _map_sign(p: Vector2i, r: Rect2) -> void:
+	var ctr := r.get_center()
+	var c := r.size.x
+	if room.bells.has(p):   # a bell: dome, lip, clapper
+		minimap.draw_circle(ctr + Vector2(0, -0.5), c * 0.32, UI.AMBER)
+		minimap.draw_rect(Rect2(ctr + Vector2(-c * 0.42, c * 0.05), Vector2(c * 0.84, c * 0.16)), UI.AMBER)
+		minimap.draw_circle(ctr + Vector2(0, c * 0.33), c * 0.1, UI.AMBER)
+	elif room.letters.has(p) and not game.letters_read.has(p):   # a page with a folded corner
+		var pg := Rect2(ctr - Vector2(c * 0.28, c * 0.36), Vector2(c * 0.56, c * 0.72))
+		minimap.draw_rect(pg, Color(0.86, 0.8, 0.66))
+		minimap.draw_line(pg.position + Vector2(1.5, 2.5), pg.position + Vector2(pg.size.x - 1.5, 2.5), Color(0.3, 0.25, 0.2), 0.8)
+		minimap.draw_line(pg.position + Vector2(1.5, 4.5), pg.position + Vector2(pg.size.x - 1.5, 4.5), Color(0.3, 0.25, 0.2), 0.8)
+	elif game.flasks_left.has(p):   # a flask: round belly, thin neck
+		minimap.draw_circle(ctr + Vector2(0, c * 0.12), c * 0.26, Color(0.62, 0.42, 0.16))
+		minimap.draw_rect(Rect2(ctr + Vector2(-c * 0.08, -c * 0.38), Vector2(c * 0.16, c * 0.32)), Color(0.62, 0.42, 0.16))
+	elif room.lamps.has(p):   # an unlit lamp post: a ring
+		minimap.draw_arc(ctr, c * 0.3, 0, TAU, 12, Color(0.75, 0.7, 0.55), 1.2)
+	elif game.hooks_left.has(p):   # the boathook: a slanted pole
+		minimap.draw_line(ctr + Vector2(-c, c) * 0.35, ctr + Vector2(c, -c) * 0.35, Color(0.75, 0.7, 0.55), 1.4)
 
 
 func _refresh_hud() -> void:
@@ -2429,6 +2559,37 @@ func _capture_art() -> void:
 		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 		_refresh()
 		await _shot(v[0])
+	# the tell and the lunge: a thrall two tiles ahead, crouched; then reared up with blood at the edges
+	var ti := -1
+	for i in game.thralls.size():
+		if game.thralls[i].kind == "thrall" and not game.thralls[i].get("lying", false):
+			ti = i
+			break
+	var keep_pos: Vector2i = game.thralls[ti].pos
+	game.hunter = Vector2i(6, 18)
+	game.facing = Vector2i.RIGHT
+	game.thralls[ti].pos = Vector2i(8, 18)
+	game.thralls[ti].crouched = true
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	_refresh()
+	thrall_nodes[ti].position = _w(game.thralls[ti].pos)
+	for k in 8:
+		await get_tree().process_frame
+	await _shot("fp_art_crouch")
+	game.thralls[ti].crouched = false
+	game.thralls[ti].lunge_cd = Night.LUNGE_COOLDOWN
+	game.thralls[ti].pos = Vector2i(7, 18)
+	_refresh()
+	thrall_nodes[ti].position = _w(game.thralls[ti].pos)
+	for k in 4:
+		await get_tree().process_frame
+	lunge_hit = 20.0   # held for the shot (a capture frame can be slow)
+	await _shot("fp_art_lunge")
+	game.thralls[ti].lunge_cd = 0
+	game.thralls[ti].pos = keep_pos
+	thrall_nodes[ti].position = _w(keep_pos)
+	lunge_hit = 0.0
 	# a corpse playing dead two tiles ahead, wet prints leading past it
 	game.hunter = Vector2i(17, 10)
 	game.facing = Vector2i.DOWN
