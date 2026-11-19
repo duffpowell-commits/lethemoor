@@ -10,6 +10,11 @@ config/description="Gothic tactics-horror roguelite. Light is life."
 run/main_scene="res://scenes/fp_room.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 
+[autoload]
+
+; all sound: scripts/audio.gd (clips in assets/audio/, sources in assets/audio/SOURCES.md)
+Audio="*res://scripts/audio.gd"
+
 [display]
 
 ; UI base 540x960 portrait (pivot doc). canvas_items: the 3D renders at the phone's full

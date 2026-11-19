@@ -9,6 +9,7 @@ extends Node3D
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Night = preload("res://scripts/sim/night.gd")
+const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing without the autoload
 const Lessons = preload("res://scripts/lessons.gd")
 const UI = preload("res://scripts/ui_style.gd")
 
@@ -107,6 +108,7 @@ func _ready() -> void:
 	_build_hud()
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
+	Sound.hook_night()
 	if not title_done:
 		_show_title()
 	else:
@@ -380,6 +382,7 @@ func _refresh() -> void:
 	flicker = game.flickers()
 	fake_flicker = game.hallucinating() and not flicker and randf() < 0.35
 	_refresh_fog()
+	Sound.hook_track(game)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].position = _w(game.thralls[i].pos)
 	_refresh_hud()
@@ -476,6 +479,7 @@ func act(kind: String) -> void:
 		"hook": events = game.hook()
 		"pour": events = game.pour()
 		"spark": events = game.spark()
+	Sound.hook_turn(kind, events, game, game.turn != turn0)
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
@@ -525,6 +529,8 @@ func swipe(d: Vector2) -> void:
 func _set_lantern(s: int) -> void:
 	if game.over() or modal != null:
 		return
+	if s != game.setting:
+		Sound.hook_lantern(s)
 	game.set_lantern(s)
 	last_event = ""
 	_refresh()
