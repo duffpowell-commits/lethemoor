@@ -268,6 +268,12 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   opens with the words; on web via `window.lmQueue` -> `location.href`) or COPY; a copy is kept in
   `user://lethemoor.cfg` [verdicts]. Capture prints VERDICT PASS (`fp_verdict.png`). Oil slick =
   glossy ragged puddle (generated texture), fire = additive flame particles + guttering light.
+- **Done — art pass (Nov 19, PRs #10-#19):** painted Foxboard/Forge art in every slot: faceless thralls in
+  three looks (`THRALL_LOOKS`: dock worker, net-mender, dock woman, by thrall order), Stalker bride, bell,
+  flask, boathook, lamppost, oil slick + burning pool, fire flipbook (`fire_sheet.png`), night sky panorama
+  (`sky_night.png`, `fog_sky_affect` 0.35), nailed letters, hand lantern per light state (`HAND_ART`), title
+  key art, app icon (project + Android launcher/adaptive). Capture pass 4 shoots `fp_art_*.png`. Wall tops
+  skipped: eye height 0.82 vs walls 2.4, never seen. Not yet checked by Duff on his phone.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
