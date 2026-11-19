@@ -25,6 +25,7 @@ const DIRS := [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 var room
 var fog
 var hunter := Vector2i.ZERO
+var facing := Vector2i.UP       # first-person view looks this way (top-down ignores it)
 var setting: int = Fog.Lantern.NORMAL
 var oil := START_OIL
 var dread := 0
@@ -32,7 +33,8 @@ var turn := 0
 var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
-## Each thrall: {pos: Vector2i, target: Vector2i or null (last place it saw your light), seen: bool}
+## Each thrall: {pos, target (last place it saw your light, or null), seen (in your light now),
+## last_seen (where YOU last saw it, or null: the map's marker, and it can be stale)}
 var thralls: Array = []
 
 
@@ -42,10 +44,12 @@ static func start(room_text: String) -> RefCounted:
 	n.fog = n.room.make_fog()
 	n.hunter = n.room.hunter
 	for p: Vector2i in n.room.thralls:
-		n.thralls.append({pos = p, target = null, seen = false})
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null})
 	n.fog.update([{pos = n.hunter, setting = n.setting}])
 	for th in n.thralls:
 		th.seen = n.fog.get_state(th.pos) == Fog.LIT
+		if th.seen:
+			th.last_seen = th.pos
 	return n
 
 
@@ -95,8 +99,25 @@ func step(p: Vector2i) -> Array:
 		_die("Something was standing in the dark. It was waiting.")
 		events.append("grabbed")
 		return events
+	if p - hunter != -facing:
+		facing = p - hunter   # walking turns you to face where you go; backing up doesn't
 	hunter = p
 	return _end_turn(events)
+
+
+## Step one tile in a grid direction (first person: forward is `facing`, back is -facing).
+## Facing doesn't change when you step back: you retreat with your eyes on the dark.
+func step_dir(d: Vector2i) -> Array:
+	return step(hunter + d)
+
+
+## Turn 90 degrees. Costs a whole turn: the world moves while you look away.
+## `side` is +1 for right (clockwise on the grid), -1 for left.
+func turn_by(side: int) -> Array:
+	if over():
+		return []
+	facing = Vector2i(-facing.y, facing.x) if side > 0 else Vector2i(facing.y, -facing.x)
+	return _end_turn([])
 
 
 ## Stand still for a turn (hide hooded, let a thrall pass).
@@ -148,6 +169,8 @@ func _horrors(events: Array) -> void:
 			if not events.has("horror"):
 				events.append("horror")
 		th.seen = now
+		if now:
+			th.last_seen = th.pos
 
 
 func _sees_light(th: Dictionary) -> bool:

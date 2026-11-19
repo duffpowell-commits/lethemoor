@@ -107,6 +107,27 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `docs/renders/m1b_*.png` (`m1b_sheet.png` = start / horror / hooded / dead); capture prints
   TAP/STEP/HORROR/DEATH PASS. Not tuned on a phone yet: equal speed means fleeing in the open
   always works; deaths come from dead ends, hooding without moving, and walking blind.
+- **DECIDED (Duff, Nov 19): first person, fully.** Lethemoor is now a first-person, turn-based
+  grid crawler (Duff: "Switch fully now"). Rules unchanged in `scripts/sim/`; `night.gd` gained
+  `facing`, `turn_by(side)` (a 90-degree turn costs a turn), `step_dir(d)` (backing up keeps your
+  facing) and per-thrall `last_seen` (where you last saw it; it can be stale). 22 tests.
+  **Main scene is `scenes/fp_room.tscn`** (`scripts/fp_view.gd`): eye-height camera, frustum
+  shifted so the view centres between the top bar and the 330 px bottom panel, hand lantern
+  low right (placeholder box + flame, light inside it), thralls as billboards only when LIT.
+  Controls: swipe on the view (up forward, down back, left/right turn; 50 UI px minimum),
+  buttons as backup (TURN L / FORWARD / TURN R / WAIT / BACK), keyboard WASD/arrows, space,
+  1-2-3. Corner map top right: remembered tiles, lit thralls red, last-seen marks as dim red X.
+  Top bar TOP-DOWN / FIRST PERSON buttons switch views (the top-down `room3d.tscn` stays).
+  Capture (prints FWD/TURN/SWIPE/HORROR/DEATH PASS, real input events):
+  `xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3
+  --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture` -> `docs/renders/fp_*.png`
+  (`fp_sheet.png` = start / horror / hooded / dead).
+  Still to do for first person: sound cues (behind you matters more now), real art to match
+  `/mnt/project-files/foxboard-concepts/lethemoor_first_person.png` (wet stone walls/floor,
+  peeling wallpaper, veiled faceless front-facing enemies, gloved hand + brass lantern).
+  Design gaps listed to Duff Nov 19: loop between nights, progression (rec. no skill tree),
+  inventory in first person, meeting your own revenant corpse (rec. design first, with sound),
+  enemy roster looks, story delivery, One Night end condition.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

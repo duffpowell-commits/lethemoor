@@ -463,6 +463,14 @@ func _build_hud() -> void:
 	var title := _label("NIGHT %d  ·  THE DROWNED QUAY" % night, 16, UI_TEXT)
 	title.position = Vector2(14, 8)
 	top.add_child(title)
+	var fp := Button.new()   # back to the main view (first person, Nov 19)
+	fp.text = "FIRST PERSON"
+	fp.position = Vector2(540 - 134, 6)
+	fp.size = Vector2(120, 26)
+	fp.add_theme_font_size_override("font_size", 13)
+	fp.focus_mode = Control.FOCUS_NONE
+	fp.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/fp_room.tscn"))
+	top.add_child(fp)
 	var oil_label := _label("OIL", 16, UI_AMBER)
 	oil_label.position = Vector2(14, 36)
 	top.add_child(oil_label)

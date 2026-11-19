@@ -215,7 +215,7 @@ func test_walking_into_unseen_thrall() -> void:
 
 func test_horror_spikes_dread_once() -> void:
 	var n = Night.start("##########\n#H.......#\n##########")
-	n.thralls.append({pos = Vector2i(5, 1), target = null, seen = false})
+	n.thralls.append({pos = Vector2i(5, 1), target = null, seen = false, last_seen = null})
 	n.set_lantern(Fog.Lantern.BRIGHT)
 	var ev: Array = n.wait()
 	check(ev.has("horror"), "a thrall stepping into your light is a horror")
@@ -230,3 +230,42 @@ func test_reaching_exit_escapes() -> void:
 	n.step(Vector2i(2, 1))
 	var ev: Array = n.step(Vector2i(3, 1))
 	check(n.escaped and ev.has("escaped"), "the exit ends the night")
+
+
+# ---------------------------------------------------------------- first-person test: facing
+
+
+func test_turning_costs_a_turn() -> void:
+	var n = Night.start("#####\n#...#\n#.H.#\n#...#\n#####")
+	check(n.facing == Vector2i.UP, "you start facing up the map")
+	n.turn_by(1)
+	check(n.facing == Vector2i.RIGHT, "turn right: up -> right")
+	check(n.turn == 1 and n.oil == Night.START_OIL - 1, "a turn is a turn: the lantern burns")
+	n.turn_by(-1)
+	n.turn_by(-1)
+	check(n.facing == Vector2i.LEFT, "two lefts from right -> left")
+	for i in 4:
+		n.turn_by(1)
+	check(n.facing == Vector2i.LEFT, "four rights: back where you were")
+
+
+func test_back_step_keeps_facing() -> void:
+	var n = Night.start("#####\n#...#\n#.H.#\n#...#\n#####")
+	n.step_dir(-n.facing)
+	check(n.hunter == Vector2i(2, 3) and n.facing == Vector2i.UP, "backing up keeps your eyes forward")
+	n.step_dir(Vector2i.RIGHT)
+	check(n.facing == Vector2i.RIGHT, "walking sideways turns you that way")
+
+
+func test_last_seen_marker_goes_stale() -> void:
+	var n = Night.start(CORRIDOR)
+	check(n.thralls[0].last_seen == null, "never seen: no marker")
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	n.wait()   # it notices and comes 1 tile; not in the 4-tile light yet
+	for i in 3:
+		n.wait()
+	check(n.thralls[0].last_seen == n.thralls[0].pos, "in your light: the marker is where it is")
+	var seen_at: Vector2i = n.thralls[0].last_seen
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.step(Vector2i(2, 1))
+	check(n.thralls[0].last_seen == seen_at, "out of the light: the marker stays where you saw it")
