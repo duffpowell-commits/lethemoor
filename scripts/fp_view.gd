@@ -476,10 +476,17 @@ func _pose(i: int) -> void:
 	var sp: Sprite3D = thrall_sprites[i]
 	var lying: bool = game.thralls[i].get("lying", false)
 	sp.billboard = BaseMaterial3D.BILLBOARD_DISABLED if lying else BaseMaterial3D.BILLBOARD_FIXED_Y
-	sp.rotation = Vector3(-PI / 2, 0.9, 0) if lying else Vector3.ZERO
-	sp.position = Vector3(0, 0.03, 0) if lying else Vector3.ZERO
-	sp.offset = Vector2.ZERO if lying else Vector2(0, sp.texture.get_height() / 2.0)
-	sp.modulate = Color(0.55, 0.56, 0.6) if lying else (sp.modulate if game.thralls[i].kind == "stalker" else Color(0.8, 0.8, 0.82))
+	if lying:
+		# on its side across your view, turned to you, sagging back a little: a body, at a glance
+		var to_cam: Vector3 = cam.global_position - thrall_nodes[i].global_position if cam else Vector3.FORWARD
+		sp.rotation = Vector3(0, atan2(to_cam.x, to_cam.z), PI / 2 + 0.08)
+		sp.offset = Vector2.ZERO
+		sp.position = Vector3(0, sp.texture.get_width() * sp.pixel_size * 0.42, 0)
+	else:
+		sp.rotation = Vector3.ZERO
+		sp.position = Vector3.ZERO
+		sp.offset = Vector2(0, sp.texture.get_height() / 2.0)
+	sp.modulate = Color(0.68, 0.68, 0.72) if lying else (sp.modulate if game.thralls[i].kind == "stalker" else Color(0.8, 0.8, 0.82))
 
 
 ## Two wet bare footprints, drawn once: dark, a little glossy.
@@ -1825,7 +1832,7 @@ func _kill_shot() -> void:
 			break
 	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	face.stretch_mode = TextureRect.STRETCH_SCALE
 	face.modulate = Color(0.75, 0.7, 0.7) if not stalker else Color(1.1, 1.08, 1.12)
 	kill_shot.add_child(face)
 	var red := ColorRect.new()
@@ -1841,8 +1848,10 @@ func _kill_shot() -> void:
 		var k := clampf(e / 0.28, 0.0, 1.0)          # it comes up fast, then hangs there
 		var size := lerpf(h * 0.5, h * 2.1, k * k)
 		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 14.0 * (1.0 - e / T_KILL)
-		face.size = Vector2(size * 0.62, size)
-		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.42 - size * 0.32) + shake
+		var tex := face.texture.get_size()
+		face.size = Vector2(size * tex.x / tex.y, size)   # its own shape: nothing cropped off the top
+		# the hood is in the top fifth of the art: keep it in the middle of the screen as it comes
+		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * 0.13) + shake
 		dark.color.a = 0.6 * k
 		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
 		await get_tree().process_frame
