@@ -316,15 +316,16 @@ func _build_world() -> void:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
-		th.texture = _tex("bride")
-		th.pixel_size = 1.9 / th.texture.get_height()   # ~1.9 tiles tall, cut from Duff's mockup
+		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
+		th.texture = _tex("bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
+		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 		th.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		th.shaded = true
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
-		th.modulate = Color(0.55, 0.5, 0.48)    # thralls: the same shroud, darker (own art later)
-		if thrall.get("kind", "thrall") == "stalker":
+		th.modulate = Color(0.8, 0.8, 0.82)    # thralls: sodden, a touch darker than the lantern says
+		if stalker:
 			th.modulate = Color(1.25, 1.22, 1.3)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
 		holder.add_child(th)
@@ -1566,6 +1567,7 @@ func _capture_trap() -> void:
 	b.pos = west + Vector2i(-2, 0)
 	b.target = null
 	_refresh()
+	await _shot("fp_thrall")   # art check: a thrall two tiles ahead, in the lantern's reach
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
 	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
