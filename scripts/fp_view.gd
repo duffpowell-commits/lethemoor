@@ -37,7 +37,9 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 2.2],
 	Fog.Lantern.BRIGHT: [5.6, 3.0],
 }
-const STOP_EVENTS := ["horror", "panic", "out_of_oil", "taken", "grabbed", "escaped"]
+const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim"]
+const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
+const MAP_CELL := 7.0
 
 var game
 var room
@@ -57,6 +59,10 @@ var flame: MeshInstance3D
 var tile_mats := {}
 var tile_base := {}
 var thrall_nodes: Array = []
+var flask_nodes := {}             # tile -> node, hidden once picked up
+var letter_mats := {}             # tile -> material, goes pale once read
+var letters_label: Label
+static var capture_phase := 0     # capture runs twice: win at the bell, then a death
 
 var hud: Control
 var status_label: Label
@@ -71,7 +77,7 @@ var end_screen: Control
 
 
 func _ready() -> void:
-	game = Night.start(FileAccess.get_file_as_string("res://rooms/quay_01.txt"))
+	game = Night.start(FileAccess.get_file_as_string(ROOM))
 	room = game.room
 	fog = game.fog
 	_build_world()
@@ -173,6 +179,66 @@ func _build_world() -> void:
 		tile_mats[Vector2i(-100 - lp.x, -100 - lp.y)] = post.material_override
 		tile_base[Vector2i(-100 - lp.x, -100 - lp.y)] = iron.albedo_color
 
+	# the bell: a dark frame with a brass bell hanging in it. Brass glows a little: it's the goal.
+	for bp: Vector2i in room.bells:
+		for side in [-0.4, 0.4]:
+			var leg := MeshInstance3D.new()
+			var lm := BoxMesh.new()
+			lm.size = Vector3(0.08, 2.2, 0.08)
+			leg.mesh = lm
+			leg.position = _w(bp) + Vector3(side, 1.1, 0)
+			leg.material_override = iron.duplicate()
+			add_child(leg)
+		var bell := MeshInstance3D.new()
+		var bm := CylinderMesh.new()
+		bm.top_radius = 0.12
+		bm.bottom_radius = 0.3
+		bm.height = 0.42
+		bell.mesh = bm
+		bell.position = _w(bp) + Vector3(0, 1.6, 0)
+		var brass := StandardMaterial3D.new()
+		brass.albedo_color = Color("#8a6a2a")
+		brass.metallic = 0.8
+		brass.roughness = 0.35
+		brass.emission_enabled = true
+		brass.emission = Color("#3a2608")
+		bell.material_override = brass
+		add_child(bell)
+
+	# letters: a pale page nailed at chest height, facing the open floor. Read under BRIGHT.
+	for np: Vector2i in room.letters:
+		var page := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(0.28, 0.36)
+		page.mesh = q
+		var pm2 := StandardMaterial3D.new()
+		pm2.albedo_color = Color("#b9ab88")
+		pm2.cull_mode = BaseMaterial3D.CULL_DISABLED
+		page.material_override = pm2
+		page.position = _w(np) + Vector3(0, 1.1, 0)
+		page.rotation.y = randf() * TAU
+		add_child(page)
+		tile_mats[Vector2i(-200 - np.x, -200 - np.y)] = pm2
+		tile_base[Vector2i(-200 - np.x, -200 - np.y)] = pm2.albedo_color
+		letter_mats[np] = pm2
+
+	# oil flasks on the floor: small amber glass that catches the lantern
+	for op: Vector2i in room.oil_flasks:
+		var flask := MeshInstance3D.new()
+		var fm2 := CylinderMesh.new()
+		fm2.top_radius = 0.04
+		fm2.bottom_radius = 0.08
+		fm2.height = 0.22
+		flask.mesh = fm2
+		var gm := StandardMaterial3D.new()
+		gm.albedo_color = Color("#a8641c")
+		gm.metallic_specular = 0.9
+		gm.roughness = 0.15
+		flask.material_override = gm
+		flask.position = _w(op) + Vector3(0.15, 0.11, 0.1)
+		add_child(flask)
+		flask_nodes[op] = flask
+
 	for thrall in game.thralls:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
@@ -246,12 +312,21 @@ func _refresh() -> void:
 
 func _refresh_fog() -> void:
 	for p in tile_mats:
-		var gp: Vector2i = p if p.x > -100 else Vector2i(-100 - p.x, -100 - p.y)
+		var gp: Vector2i = p
+		if p.x <= -200:
+			gp = Vector2i(-200 - p.x, -200 - p.y)
+		elif p.x <= -100:
+			gp = Vector2i(-100 - p.x, -100 - p.y)
 		var k: float = SHADE[fog.get_state(gp)]
 		var base: Color = tile_base[p]
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT
+	for fp: Vector2i in flask_nodes:
+		flask_nodes[fp].visible = game.flasks_left.has(fp) and fog.get_state(fp) != Fog.DARK
+	for lp: Vector2i in letter_mats:
+		if game.letters_read.has(lp):
+			tile_base[Vector2i(-200 - lp.x, -200 - lp.y)] = Color("#5e5444")   # read: it's spent
 	var eff: int = game.effective()
 	light.omni_range = LIGHT[eff][0]
 	light.light_energy = LIGHT[eff][1]
@@ -420,9 +495,12 @@ func _build_hud() -> void:
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.size.y = TOP_H
 	hud.add_child(top)
-	var title := _label("NIGHT 1  ·  THE DROWNED QUAY", 16, UI_TEXT)
+	var title := _label("ONE NIGHT  ·  THE BELL TOWER", 16, UI_TEXT)
 	title.position = Vector2(14, 8)
 	top.add_child(title)
+	letters_label = _label("", 14, UI_DIM)
+	letters_label.position = Vector2(290, 10)
+	top.add_child(letters_label)
 	var sw := _button("TOP-DOWN", Vector2(UI_W - 124, 6), Vector2(110, 26),
 		func(): get_tree().change_scene_to_file("res://scenes/room3d.tscn"), top)
 	sw.add_theme_font_size_override("font_size", 13)
@@ -453,8 +531,8 @@ func _build_hud() -> void:
 
 	# corner map: what you remember, drawn small. North is up; the arrow is you.
 	minimap = Control.new()
-	minimap.position = Vector2(UI_W - 14 - 11 * 9, TOP_H + 10)
-	minimap.size = Vector2(11 * 9, 14 * 9)
+	minimap.size = Vector2(room.size) * MAP_CELL
+	minimap.position = Vector2(UI_W - 14 - minimap.size.x, TOP_H + 10)
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap.draw.connect(_draw_map)
 	hud.add_child(minimap)
@@ -484,7 +562,7 @@ func _build_hud() -> void:
 
 ## Remembered floor dim, lit floor amber, walls you've seen grey; thralls only if lit now.
 func _draw_map() -> void:
-	var c := 9.0
+	var c := MAP_CELL
 	minimap.draw_rect(Rect2(Vector2.ZERO, minimap.size), Color(0, 0, 0, 0.55))
 	for y in room.size.y:
 		for x in room.size.x:
@@ -498,6 +576,12 @@ func _draw_map() -> void:
 			else:
 				col = Color(0.75, 0.5, 0.2) if st == Fog.LIT else Color(0.28, 0.3, 0.36)
 			minimap.draw_rect(Rect2(Vector2(x, y) * c + Vector2(0.5, 0.5), Vector2(c - 1, c - 1)), col)
+			if room.bells.has(p):
+				minimap.draw_circle((Vector2(p) + Vector2(0.5, 0.5)) * c, c * 0.4, UI_AMBER)
+			elif room.letters.has(p) and not game.letters_read.has(p):
+				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2, 1.5), Vector2(c - 4, c - 3)), UI_TEXT)
+			elif game.flasks_left.has(p):
+				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2.5, 2.5), Vector2(c - 5, c - 5)), LANTERN)
 	for th in game.thralls:
 		if fog.get_state(th.pos) == Fog.LIT:
 			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI_BLOOD)
@@ -515,6 +599,7 @@ func _draw_map() -> void:
 
 func _refresh_hud() -> void:
 	oil_count.text = str(game.oil)
+	letters_label.text = "LETTERS %d/%d" % [game.letters_read.size(), room.letters.size()]
 	for i in oil_pips.size():
 		oil_pips[i].color = UI_AMBER if i < game.oil else Color(0.2, 0.25, 0.32)
 	dread_fill.size.x = 104.0 * game.dread / Night.DREAD_MAX
@@ -530,6 +615,10 @@ func _refresh_hud() -> void:
 		"out_of_oil": "The last of the oil is gone. The dark comes in.",
 		"flicker": "The flame gutters. Something is near.",
 		"blocked": "Stone. You can't go that way.",
+		"oil": "A flask, still corked. The lantern drinks.",
+		"letter": "A letter, nailed to the post. You read it by the high flame.",
+		"letter_dim": "Words on a page. Too dim to read. Burn brighter.",
+		"rang": "The bell.",
 	}
 	var s: String = lines[game.setting]
 	if game.oil == 0:
@@ -570,7 +659,11 @@ func _show_end() -> void:
 		end_screen.add_child(small)
 	var big: Label = end_screen.get_node("Big")
 	var small: Label = end_screen.get_node("Small")
-	if game.escaped:
+	if game.rang:
+		big.text = "THE BELL RINGS  ·  %s" % game.grade()
+		big.add_theme_color_override("font_color", UI_AMBER)
+		small.text = "It rolls out over the drowned quay, and every door in the town hears it.\n\n%d oil left  ·  %d of %d letters read  ·  %d turns\nScore %d\n\nTap to walk the night again." % [game.oil, game.letters_read.size(), room.letters.size(), game.turn, game.points()]
+	elif game.escaped:
 		big.text = "DAWN"
 		big.add_theme_color_override("font_color", UI_AMBER)
 		small.text = "You reach the water's edge as the sky goes grey.\n\n%d turns  ·  %d oil left\n\nTap to walk the night again." % [game.turn, game.oil]
@@ -608,20 +701,30 @@ func _press(b: Button) -> void:
 			break
 
 
-func _capture() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
-	for i in 20:
-		await get_tree().process_frame
-	await _shot("fp_start")
-	var at: Vector2i = game.hunter
-	await _press(move_buttons["forward"])
-	print("FWD ", "PASS" if game.hunter == at + Vector2i.UP and game.turn == 1 else "FAIL", " hunter=", game.hunter)
-	await _press(move_buttons["right"])
-	print("TURN ", "PASS" if game.facing == Vector2i.RIGHT and game.turn == 2 else "FAIL", " facing=", game.facing)
-	var turn_before: int = game.turn
-	# a real finger drag across the world view, through the input system
+## Walk to `goal` the way a player would: turn to face the next tile, then step. Every action
+## is a real button press. Stops at `stop_on` events, at the goal, or when the night ends.
+func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
+	for guard in 200:
+		if game.over() or game.hunter == goal:
+			return last_event
+		var reach: Dictionary = room.reachable(game.hunter, 999)
+		var path: Array = room.path_in(reach, game.hunter, goal)
+		if path.size() < 2:
+			return "no_path"
+		var d: Vector2i = path[1] - game.hunter
+		if game.facing == d:
+			await _press(move_buttons["forward"])
+		else:
+			var right := Vector2i(-game.facing.y, game.facing.x)
+			await _press(move_buttons["right" if d == right else "left"])
+		if last_event in stop_on:
+			return last_event
+	return "gave_up"
+
+
+func _swipe_real(from: Vector2, to: Vector2) -> void:
 	var xf := get_viewport().get_final_transform()
-	for pair in [[Vector2(380, 420), true], [Vector2(240, 430), false]]:
+	for pair in [[from, true], [to, false]]:
 		var ev := InputEventMouseButton.new()
 		ev.button_index = MOUSE_BUTTON_LEFT
 		ev.pressed = pair[1]
@@ -633,22 +736,53 @@ func _capture() -> void:
 		await get_tree().process_frame
 		if not busy:
 			break
-	print("SWIPE ", "PASS" if game.facing == Vector2i.UP and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
-	await _press(move_buttons["forward"])
-	var horror := last_event == "horror"
-	for i in 8:
-		if horror or game.over():
-			break
-		await _press(move_buttons["wait"])
-		horror = last_event == "horror"
-	await _shot("fp_horror")
-	print("HORROR ", "PASS" if horror else "FAIL", " dread=", game.dread)
+
+
+## Two passes (the scene reloads between them): 0 = controls + walk to the bell and ring it,
+## 1 = read a letter under BRIGHT, then hood and walk blind into a thrall.
+func _capture() -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
+	for i in 20:
+		await get_tree().process_frame
+	if capture_phase == 0:
+		await _shot("fp_start")
+		var at: Vector2i = game.hunter
+		await _press(move_buttons["forward"])
+		print("FWD ", "PASS" if game.hunter == at + Vector2i.UP and game.turn == 1 else "FAIL", " hunter=", game.hunter)
+		await _press(move_buttons["right"])
+		print("TURN ", "PASS" if game.facing == Vector2i.RIGHT and game.turn == 2 else "FAIL", " facing=", game.facing)
+		var turn_before: int = game.turn
+		await _swipe_real(Vector2(380, 420), Vector2(240, 430))   # a finger dragged left = turn left
+		print("SWIPE ", "PASS" if game.facing == Vector2i.UP and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
+		var bell: Vector2i = room.bells[0]
+		var shot_horror := false
+		while not game.over():
+			var why := await _walk_to(bell, ["horror"])
+			if why == "horror" and not shot_horror:
+				await _shot("fp_horror")
+				shot_horror = true
+			elif why != "horror":
+				break
+		print("HORROR ", "PASS" if shot_horror else "FAIL")
+		await _shot("fp_bell")
+		print("BELL ", "PASS" if game.rang else "FAIL", " grade=", game.grade(), " oil=", game.oil, " turns=", game.turn, " ", game.cause)
+		capture_phase = 1
+		get_tree().reload_current_scene()
+		return
+	var letter: Vector2i = room.letters.reduce(func(a, b): return a if (a - game.hunter).length() < (b - game.hunter).length() else b)
+	var reach: Dictionary = room.reachable(game.hunter, 999)
+	var path: Array = room.path_in(reach, game.hunter, letter)
+	await _walk_to(path[path.size() - 2])
+	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
+	await _walk_to(letter, ["letter"])
+	await _shot("fp_letter")
+	print("LETTER ", "PASS" if game.letters_read.size() == 1 else "FAIL", " at=", letter)
 	await _press(lantern_buttons[Fog.Lantern.HOODED])
 	await _shot("fp_hooded")
-	for i in 12:
+	for i in 6:
 		if game.over():
 			break
-		await _press(move_buttons["wait"])
+		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands
 	await _shot("fp_dead")
-	print("DEATH ", "PASS" if game.dead else "FAIL")
+	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
 	get_tree().quit()

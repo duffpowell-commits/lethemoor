@@ -17,6 +17,13 @@ const DREAD_HORROR := 15       # a thrall steps into your light
 const DREAD_HALLUCINATE := 50  # at or above: the view may lie (fake flickers)
 const PANIC_OIL := 5           # at 100 dread you spill this much oil...
 const PANIC_RESET := 60        # ...and dread drops back to here
+## Thralls shamble: they step only on turns divisible by this. In first person every turn of
+## your head costs a turn, so an equal-speed chaser catches you at the first corner.
+const THRALL_EVERY := 2
+const FLASK_OIL := 10          # an oil flask found on the floor
+const LETTER_POINTS := 5       # grade: each letter read is worth this much oil
+## Grade at the bell: oil left + LETTER_POINTS per letter read. [min points, grade]
+const GRADES := [[20, "S"], [14, "A"], [8, "B"], [3, "C"], [0, "D"]]
 ## How far a thrall notices your lantern (tiles, needs line of sight).
 const NOTICE := {Fog.Lantern.HOODED: 1, Fog.Lantern.NORMAL: 5, Fog.Lantern.BRIGHT: 8}
 
@@ -33,6 +40,9 @@ var turn := 0
 var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
+var rang := false               # rang the bell (One Night's goal): escaped with a grade
+var letters_read: Array = []    # letter tiles read (needs BRIGHT on the tile)
+var flasks_left: Array = []     # oil flasks still on the floor
 ## Each thrall: {pos, target (last place it saw your light, or null), seen (in your light now),
 ## last_seen (where YOU last saw it, or null: the map's marker, and it can be stale)}
 var thralls: Array = []
@@ -43,6 +53,7 @@ static func start(room_text: String) -> RefCounted:
 	n.room = Room.parse(room_text)
 	n.fog = n.room.make_fog()
 	n.hunter = n.room.hunter
+	n.flasks_left = n.room.oil_flasks.duplicate()
 	for p: Vector2i in n.room.thralls:
 		n.thralls.append({pos = p, target = null, seen = false, last_seen = null})
 	n.fog.update([{pos = n.hunter, setting = n.setting}])
@@ -141,6 +152,21 @@ func _end_turn(events: Array) -> Array:
 		escaped = true
 		events.append("escaped")
 		return events
+	if room.bells.has(hunter):
+		escaped = true
+		rang = true
+		events.append("rang")
+		return events
+	if flasks_left.has(hunter):
+		flasks_left.erase(hunter)
+		oil += FLASK_OIL
+		events.append("oil")
+	if room.letters.has(hunter) and not letters_read.has(hunter):
+		if effective() == Fog.Lantern.BRIGHT:
+			letters_read.append(hunter)
+			events.append("letter")
+		else:
+			events.append("letter_dim")
 	fog.update([{pos = hunter, setting = effective()}])
 	dread += DREAD_LIT if lit else DREAD_DARK
 	_horrors(events)
@@ -194,6 +220,8 @@ func _thralls_act(events: Array) -> void:
 		if th.pos == th.target:
 			th.target = null
 			continue
+		if turn % THRALL_EVERY != 0:
+			continue   # shambling: this turn it only lurches in place
 		var others: Array = positions()
 		others.remove_at(i)
 		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, others)
@@ -204,6 +232,18 @@ func _thralls_act(events: Array) -> void:
 		th.pos = path[1]
 		if not events.has("thrall_moved"):
 			events.append("thrall_moved")
+
+
+## One Night score: oil left plus letters read. Only meaningful once the bell has rung.
+func points() -> int:
+	return oil + LETTER_POINTS * letters_read.size()
+
+
+func grade() -> String:
+	for g in GRADES:
+		if points() >= g[0]:
+			return g[1]
+	return "D"
 
 
 func _die(why: String) -> void:

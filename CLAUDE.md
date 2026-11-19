@@ -128,6 +128,18 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   Design gaps listed to Duff Nov 19: loop between nights, progression (rec. no skill tree),
   inventory in first person, meeting your own revenant corpse (rec. design first, with sound),
   enemy roster looks, story delivery, One Night end condition.
+- **Done — slice step 1 (Nov 19): One Night goal.** Locked design: `docs/design/first_person_design.md`
+  (beats older docs). Map `rooms/one_night.txt` (15x21; new tiles `B` bell, `N` letter, `O` oil
+  flask +10). Step on the bell = night won (`rang`), graded by `points()` = oil + 5 per letter
+  read, `GRADES` S>=20 / A>=14 / B>=8 / C>=3 / D. Letters read only when you stand on them with
+  BRIGHT. **Thralls now shamble (`THRALL_EVERY` = 2, move every other turn):** with turns costing
+  a turn, equal speed meant any chaser caught you at the first corner. Bot walking fully lit
+  straight to the bell rings it with ~0 oil (D); hooding and letters reach S. 26 tests.
+  Capture runs two passes (static `capture_phase`): FWD/TURN/SWIPE/HORROR/BELL, then
+  LETTER/DEATH; sheet `docs/renders/fp_onenight_sheet.png`. Known look issue: standing on a
+  letter tile puts the page in your face; move pages onto the wall face later.
+  Slice order (Duff OK'd the cut): bell+grade (done), Stalker, boathook + oil slick trap,
+  noise + sound pass, letters, art pass. After slice: corpse, satchel/crafting, bosses, ferryman.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

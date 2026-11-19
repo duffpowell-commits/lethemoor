@@ -261,11 +261,50 @@ func test_last_seen_marker_goes_stale() -> void:
 	var n = Night.start(CORRIDOR)
 	check(n.thralls[0].last_seen == null, "never seen: no marker")
 	n.set_lantern(Fog.Lantern.BRIGHT)
-	n.wait()   # it notices and comes 1 tile; not in the 4-tile light yet
-	for i in 3:
+	for i in 10:   # it notices and shambles closer until it's in the light
 		n.wait()
+		if n.thralls[0].last_seen != null:
+			break
 	check(n.thralls[0].last_seen == n.thralls[0].pos, "in your light: the marker is where it is")
 	var seen_at: Vector2i = n.thralls[0].last_seen
 	n.set_lantern(Fog.Lantern.HOODED)
 	n.step(Vector2i(2, 1))
 	check(n.thralls[0].last_seen == seen_at, "out of the light: the marker stays where you saw it")
+
+
+func test_ringing_the_bell_wins_with_grade() -> void:
+	var n = Night.start("####\n#HB#\n####")
+	n.step(Vector2i(2, 1))
+	check(n.escaped and n.rang, "stepping on the bell rings it and ends the night")
+	check(n.points() == n.oil, "no letters: points = oil left")
+	check(n.grade() == "S" if n.oil >= 25 else true, "grade from points")
+
+
+func test_letter_needs_bright() -> void:
+	var n = Night.start("#####\n#HNN#\n#...#\n#####")
+	var ev: Array = n.step(Vector2i(2, 1))
+	check("letter_dim" in ev and n.letters_read.is_empty(), "normal light can't read a letter")
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	ev = n.step(Vector2i(3, 1))
+	check("letter" in ev and n.letters_read.size() == 1, "bright light reads it")
+	check(n.points() == n.oil + Night.LETTER_POINTS, "a letter adds to the score")
+
+
+func test_oil_flask_pickup_once() -> void:
+	var n = Night.start("#####\n#HO.#\n#####")
+	var before: int = n.oil
+	var ev: Array = n.step(Vector2i(2, 1))
+	check("oil" in ev and n.oil == before - 1 + Night.FLASK_OIL, "flask adds oil (after the step's burn)")
+	n.step(Vector2i(3, 1))
+	n.step(Vector2i(2, 1))
+	check(n.flasks_left.is_empty(), "a flask is picked up only once")
+
+
+func test_one_night_map_is_winnable() -> void:
+	var r = Room.parse(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
+	var reach: Dictionary = r.reachable(r.hunter, 999)
+	check(r.bells.size() == 1 and reach.has(r.bells[0]), "the bell can be reached")
+	for p in r.letters + r.oil_flasks:
+		check(reach.has(p), "every letter and flask can be reached")
+	for t in r.thralls:
+		check((t - r.hunter).length() > 5.5, "no thrall notices you on turn 0")

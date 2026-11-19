@@ -1,6 +1,7 @@
 extends RefCounted
 ## A handmade room, parsed from text. Rooms are handmade, not procedural (scope rule).
 ##   # wall   . floor   H hunter start   T thrall   L street lamp (unlit)   E exit
+##   B bell (ring it: the night is won)   N letter (readable under BRIGHT)   O oil flask (pickup)
 
 var rows: Array = []
 var size := Vector2i.ZERO
@@ -8,6 +9,9 @@ var hunter := Vector2i(-1, -1)
 var thralls: Array[Vector2i] = []
 var lamps: Array[Vector2i] = []
 var exits: Array[Vector2i] = []
+var bells: Array[Vector2i] = []
+var letters: Array[Vector2i] = []
+var oil_flasks: Array[Vector2i] = []
 
 
 static func parse(text: String) -> RefCounted:
@@ -25,6 +29,9 @@ static func parse(text: String) -> RefCounted:
 				"T": r.thralls.append(p)
 				"L": r.lamps.append(p)
 				"E": r.exits.append(p)
+				"B": r.bells.append(p)
+				"N": r.letters.append(p)
+				"O": r.oil_flasks.append(p)
 	return r
 
 
