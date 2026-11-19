@@ -52,8 +52,31 @@ brainstorm. Where this file and older docs disagree, this file wins.
 - Goal: reach the bell tower and ring it before the oil runs out.
 - Graded at the end: oil left + letters found.
 
-## Open: weapons, traps, bosses (Duff's rules, Nov 19)
-- Weapons are used alongside the lantern, found (not bought), and degrade with use.
-- Trap setups exist for tougher enemies.
-- Bosses always die to a trap, or to a quest for their weakness (silver weapon, a herb).
-- Ideas under discussion with Duff; not locked yet.
+## 9. Weapons (Duff, Nov 19: all locked)
+Used in the free hand alongside the lantern. Found, never bought. Every one wears down with use.
+- Boathook: hits from 2 tiles away. Bends a little with every hit.
+- Silvered knife: barely scratches anything except the thing it was made for.
+- Flare gun: one shot of BRIGHT. Stalkers freeze, thralls come running.
+- Oil flask: thrown into flame it becomes a firebomb. It costs oil.
+- Iron bell: everything nearby freezes for 2 turns. The clapper cracks after 3 rings.
+
+## 10. Traps (all locked)
+- Oil slick + spark: pour oil across a corridor, back off, throw light. Whatever stands in it burns.
+- Bait lantern: hang a spare lit lantern, hood yours, thralls walk into the snare.
+- Gaff and rope tripwire: pins whatever crosses a doorway for 3 turns.
+- Collapsing shelf: pull the pin and it crushes whatever is under it. Once per room.
+- Salt line: the Choir can't cross it. Rain washes it away.
+
+## 11. Bosses (all locked; each dies to a trap or a quest for its weakness, never a slugfest)
+- The Drowned Bride: silver comb from her own grave + lure her into the chapel light trap.
+- Quay Master: big and slow. Drop the crane pulley's cargo on him.
+- Rat King: smoke him out with wormwood from the herbalist's ruin.
+- Lamp Keeper (late twist): his weakness is your lantern going out. Fight him in the dark.
+- The Choir's Conductor: break the organ pipes in the order the wall letters teach.
+
+## 12. Other systems (locked)
+- Noise: every action has a sound level. Running, rummaging and ringing draw enemies.
+- Crafting at dawn: combine finds into trap parts (rope + hook = snare).
+- Shaking hand: at high dread your weapon hand shakes and misses more.
+- Mercy: some thralls are still people. Light them gently and they tell you a secret instead.
+- Weather: not locked.
