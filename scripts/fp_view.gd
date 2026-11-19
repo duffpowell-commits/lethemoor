@@ -13,6 +13,7 @@ const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing 
 const Lessons = preload("res://scripts/lessons.gd")
 const Letters = preload("res://scripts/letters.gd")
 const UI = preload("res://scripts/ui_style.gd")
+const Perf = preload("res://scripts/perf.gd")
 
 const UI_W := 540
 const TOP_H := 72
@@ -59,9 +60,14 @@ const SWIPE_MIN := 50.0            # UI px a finger must travel to count as a sw
 
 var cam: Camera3D
 var light: OmniLight3D
+var world_env: Environment
+var perf: Perf                    # FPS readout + graphics quality (scripts/perf.gd)
 var hand: Node3D
 var flame: MeshInstance3D
-var tile_mats := {}
+var tile_mats := {}                # lamp posts + letters: their own material each (few)
+var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
+var tile_tex := {}                 # floor/wall tile -> texture name
+var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
 var thrall_nodes: Array = []
 var flask_nodes := {}             # tile -> node, hidden once picked up
@@ -81,6 +87,7 @@ var dread_bar: Control
 var modal: Control                # title or a field note: blocks moves while it's up
 var guide_sheet: Control
 var card_ok: Button
+var turn_events: Array = []        # every event of the last turn (field notes check them all)
 var title_begin: Button
 var menu_button: Button
 var menu_sheet: Control
@@ -107,9 +114,13 @@ func _ready() -> void:
 	_load_hints()
 	_build_world()
 	_build_hud()
+	perf = Perf.new()
+	add_child(perf)
+	perf.setup(world_env, light, capture_mode)
+	perf.set_position_below(TOP_H)
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	Sound.hook_night()   # before _refresh: track() needs the new night (retry restarts the flame)
 	_refresh()
-	Sound.hook_night()
 	if not title_done:
 		_show_title()
 	else:
@@ -168,6 +179,7 @@ func _build_world() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	var we := WorldEnvironment.new()
 	we.environment = env
+	world_env = env
 	add_child(we)
 
 	var moon := DirectionalLight3D.new()
@@ -187,25 +199,20 @@ func _build_world() -> void:
 				continue           # a wall with no floor beside it can never be seen: no draw
 			var mi := MeshInstance3D.new()
 			mi.visibility_range_end = VIEW_RANGE   # past this the fog has it anyway
-			var m := StandardMaterial3D.new()
-			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
-			m.metallic_specular = 0.25
 			if room.is_wall(p):
 				mi.mesh = wall_mesh
 				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
-				m.albedo_texture = _tex("wall_stone" if (x * 3 + y) % 3 else "wall_paper")
-				m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
-				m.roughness = 0.9
-				tile_base[p] = Color(0.85, 0.82, 0.92)
+				var stone: bool = (x * 3 + y) % 3 != 0
+				tile_tex[p] = "wall_granite" if stone else "wall_damask"
+				# Canva art is lit flat: let the lantern do the light. Paper is paler, so sink it more.
+				tile_base[p] = Color(0.72, 0.72, 0.78) if stone else Color(0.5, 0.48, 0.46)
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				m.albedo_texture = _tex("exit" if p in room.exits else "floor_wet")
-				m.roughness = 0.65
-				tile_base[p] = Color(1, 1, 1)
-			mi.material_override = m
+				tile_tex[p] = "exit" if p in room.exits else "floor_stone"
+				tile_base[p] = Color(0.58, 0.58, 0.62)   # the flagstone art is lit flat: sink it into the dark
 			add_child(mi)
-			tile_mats[p] = m
+			tile_nodes[p] = mi
 
 	var iron := StandardMaterial3D.new()
 	iron.albedo_color = Color("#20242c")
@@ -316,15 +323,16 @@ func _build_world() -> void:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
-		th.texture = _tex("bride")
-		th.pixel_size = 1.9 / th.texture.get_height()   # ~1.9 tiles tall, cut from Duff's mockup
+		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
+		th.texture = _tex("bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
+		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 		th.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		th.shaded = true
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
-		th.modulate = Color(0.55, 0.5, 0.48)    # thralls: the same shroud, darker (own art later)
-		if thrall.get("kind", "thrall") == "stalker":
+		th.modulate = Color(0.8, 0.8, 0.82)    # thralls: sodden, a touch darker than the lantern says
+		if stalker:
 			th.modulate = Color(1.25, 1.22, 1.3)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
 		holder.add_child(th)
@@ -339,7 +347,7 @@ func _build_world() -> void:
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0))
 	var ui_h := _ui_h()            # 960 on a 9:16 screen, taller on modern phones
-	var full_h := cam.size * ui_h / UI_W
+	var full_h := cam.size * ui_h / get_viewport().get_visible_rect().size.x
 	var mid := (TOP_H + (ui_h - BOTTOM_H)) / 2.0
 	cam.frustum_offset = Vector2(0, -full_h * (ui_h / 2.0 - mid) / ui_h)
 	add_child(cam)
@@ -389,7 +397,34 @@ func _refresh() -> void:
 	_refresh_hud()
 
 
+## Every tile with the same texture and fog shade shares one material (perf: hundreds of
+## unique materials made the phone switch GPU state for every tile; now it's about a dozen).
+func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
+	var key := "%s|%s" % [tex, k]
+	if shared_mats.has(key):
+		return shared_mats[key]
+	var m := StandardMaterial3D.new()
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
+	m.metallic_specular = 0.25
+	m.albedo_texture = _tex(tex)
+	if tex.begins_with("wall"):
+		m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
+		m.roughness = 0.9
+	elif tex == "floor_stone":
+		m.uv1_scale = Vector3(3, 2, 1)   # BoxMesh UVs are a 3x2 atlas: one full slab set per tile
+		m.roughness = 0.45                # wet stone: the lantern glints off it
+	else:
+		m.roughness = 0.65
+	m.albedo_color = Color(base.r * k, base.g * k, base.b * k)
+	shared_mats[key] = m
+	return m
+
+
 func _refresh_fog() -> void:
+	for p: Vector2i in tile_nodes:
+		var mat := _tile_mat(tile_tex[p], tile_base[p], SHADE[fog.get_state(p)])
+		if tile_nodes[p].material_override != mat:
+			tile_nodes[p].material_override = mat
 	for p in tile_mats:
 		var gp: Vector2i = p
 		if p.x <= -200:
@@ -466,6 +501,7 @@ func act(kind: String) -> void:
 		return
 	busy = true
 	last_event = ""
+	turn_events = []
 	var from_pos := cam.position
 	var from_yaw := cam.rotation.y
 	var from_t: Array = game.positions()
@@ -484,7 +520,8 @@ func act(kind: String) -> void:
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
-		last_event = "blocked"
+		var ahead: Vector2i = game.hunter + (game.facing if kind == "forward" else -game.facing)
+		last_event = "blocked_fire" if game.burning(ahead) else ("blocked_horror" if game.thrall_at(ahead) >= 0 else "blocked")
 		_refresh_hud()
 		return
 	if game.turn == turn0 and not game.over() and kind in ["hook", "pour", "spark"]:
@@ -505,6 +542,7 @@ func act(kind: String) -> void:
 		for j in thrall_nodes.size():
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 		await get_tree().process_frame
+	turn_events = events
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
 			last_event = ev
@@ -530,7 +568,7 @@ func swipe(d: Vector2) -> void:
 
 
 func _set_lantern(s: int) -> void:
-	if game.over() or modal != null:
+	if busy or game.over() or modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null:
 		return
 	if s != game.setting:
 		Sound.hook_lantern(s)
@@ -538,6 +576,29 @@ func _set_lantern(s: int) -> void:
 	last_event = ""
 	_refresh()
 	_teach()
+
+
+## Android back button / back gesture: close whatever is on top, else pause. Never quits
+## (project.godot has quit_on_go_back off; a stray edge swipe used to end the night).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		go_back()
+
+
+func go_back() -> void:
+	if report_sheet != null:
+		report_sheet.queue_free()
+		report_sheet = null
+	elif guide_sheet != null:
+		guide_sheet.queue_free()
+		guide_sheet = null
+	elif menu_sheet != null:
+		_close_menu()
+	elif modal != null:
+		if card_ok != null:
+			card_ok.pressed.emit()   # field note or letter page: same as its button
+	elif not game.over() and not busy:
+		_open_menu()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -569,6 +630,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_H: act("hook")
 			KEY_P: act("pour")
 			KEY_F: act("spark")
+			KEY_F3: perf.toggle_show()
 			KEY_ESCAPE: _open_menu() if menu_sheet == null else _close_menu()
 			KEY_1: _set_lantern(Fog.Lantern.HOODED)
 			KEY_2: _set_lantern(Fog.Lantern.NORMAL)
@@ -657,6 +719,7 @@ func _build_hud() -> void:
 	# her gloved hand and the brass lantern, painted, low right of the view (from Duff's mockup)
 	hand_art = TextureRect.new()
 	hand_art.texture = _tex("hand_lantern")
+	hand_art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	hand_art.size = Vector2(HAND_W, HAND_W)
@@ -806,6 +869,8 @@ func _draw_map() -> void:
 			elif game.flasks_left.has(p):
 				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2.5, 2.5), Vector2(c - 5, c - 5)), LANTERN)
 	for th in game.thralls:
+		if th.get("gone", false):
+			continue   # burned: no square, no last-seen mark
 		if fog.get_state(th.pos) == Fog.LIT:
 			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
 		elif th.last_seen != null:
@@ -837,6 +902,8 @@ func _refresh_hud() -> void:
 		"out_of_oil": "The last of the oil is gone. The dark comes in.",
 		"flicker": "The flame gutters. Something is near.",
 		"blocked": "Stone. You can't go that way.",
+		"blocked_fire": "The oil is burning there. Wait for it to die.",
+		"blocked_horror": "It stands in your way. You will not walk into it.",
 		"oil": "A flask, still corked. The lantern drinks.",
 		"letter": "A letter, nailed to the post. You read it by the high flame.",
 		"letter_dim": "Words on a page. Too dim to read. Burn brighter.",
@@ -905,6 +972,7 @@ func _show_title() -> void:
 	modal = _sheet(0.93)
 	var bride := TextureRect.new()
 	bride.texture = _tex("bride")
+	bride.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	bride.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bride.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	bride.modulate = Color(0.5, 0.48, 0.52, 0.55)
@@ -1008,6 +1076,7 @@ func _show_page(n: int) -> void:
 	card.add_theme_stylebox_override("panel", margins)
 	var paper := TextureRect.new()
 	paper.texture = load("res://assets/art/letters/%s.png" % pg.paper)
+	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	paper.stretch_mode = TextureRect.STRETCH_SCALE
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1074,7 +1143,13 @@ func _close_card(id: String) -> void:
 func _teach(event: String = "") -> void:
 	if not hints_on or modal != null or game.over() or not title_done:
 		return
-	var id: String = Lessons.due(game, seen, event)
+	# every event of the last turn gets a chance, not just the headline (panic + out_of_oil
+	# on one turn used to drop the panic card)
+	var id := ""
+	for ev in [event] + turn_events:
+		id = Lessons.due(game, seen, ev)
+		if id != "":
+			break
 	if id != "":
 		_show_card(id)
 
@@ -1150,6 +1225,8 @@ func _open_menu() -> void:
 		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
 		["REPORT A BUG", func(): _close_menu(); _open_report()],
 		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
+		["SHOW FPS: " + ("ON" if perf.show else "OFF"), "fps"],
+		["GRAPHICS: " + perf.quality_name(), "gfx"],
 		["QUIT TO TITLE", func(): title_done = false; get_tree().reload_current_scene()],
 	]
 	y += 70
@@ -1161,7 +1238,13 @@ func _open_menu() -> void:
 		b.add_theme_font_size_override("font_size", 19)
 		if it[0] == "RESUME":
 			UI.lit(b)
-		if it[1].is_valid():
+		if it[1] is String and it[1] == "fps":
+			b.pressed.connect(func():
+				perf.toggle_show()
+				b.text = "SHOW FPS: " + ("ON" if perf.show else "OFF"))
+		elif it[1] is String and it[1] == "gfx":
+			b.pressed.connect(func(): b.text = "GRAPHICS: " + perf.cycle_quality())
+		elif it[1].is_valid():
 			b.pressed.connect(it[1])
 		else:
 			b.pressed.connect(func():
@@ -1231,16 +1314,23 @@ func _open_report() -> void:
 		var first := note.text.strip_edges().split("\n")[0].left(60)
 		var title := "Bug: " + (first if first != "" else "(no note)")
 		var url := "https://github.com/%s/issues/new?labels=bug&title=%s&body=%s" % [REPO, title.uri_encode(), _report_text(note.text).uri_encode()]
-		OS.shell_open(url)
-		done.text = "Opened GitHub. Sign in there and press Create to file it.")
+		if _web_queue("open", url):
+			done.text = "Tap anywhere once more to open GitHub, then sign in and press Create."
+		else:
+			OS.shell_open(url)
+			done.text = "Opened GitHub. Sign in there and press Create to file it.")
 	box.add_child(send)
 	var copy := Button.new()
 	copy.text = "COPY, TO TEXT IT TO DUFF"
 	copy.focus_mode = Control.FOCUS_NONE
 	copy.custom_minimum_size = Vector2(0, 56)
 	copy.pressed.connect(func():
-		DisplayServer.clipboard_set("Lethemoor bug: " + _report_text(note.text))
-		done.text = "Copied. Paste it in a text to Duff.")
+		var text := "Lethemoor bug: " + _report_text(note.text)
+		DisplayServer.clipboard_set(text)
+		if _web_queue("copy", text):
+			done.text = "Tap anywhere once more to copy, then paste it in a text to Duff."
+		else:
+			done.text = "Copied. Paste it in a text to Duff.")
 	box.add_child(copy)
 	var cancel := Button.new()
 	cancel.text = "CLOSE"
@@ -1252,6 +1342,16 @@ func _open_report() -> void:
 	box.add_child(cancel)
 	box.add_child(done)
 	report_text_box = note
+
+
+## Web only: Safari lets a page open a tab or write the clipboard only inside a real tap, and
+## Godot sees the tap a frame after the browser is done with it. So hand the job to the page
+## (export head_include runs `window.lmQueue` on the next tap). False off the web.
+func _web_queue(kind: String, value: String) -> bool:
+	if not OS.has_feature("web"):
+		return false
+	JavaScriptBridge.eval("window.lmQueue={k:%s,v:%s};" % [JSON.stringify(kind), JSON.stringify(value)], true)
+	return true
 
 
 func _load_hints() -> void:
@@ -1267,6 +1367,7 @@ func _save_hints() -> void:
 	if capture_mode:
 		return
 	var cfg := ConfigFile.new()
+	cfg.load("user://lethemoor.cfg")   # keep the other sections (audio mute, fps, graphics)
 	cfg.set_value("hints", "on", hints_on)
 	cfg.set_value("hints", "seen", seen.keys())
 	cfg.save("user://lethemoor.cfg")
@@ -1456,8 +1557,14 @@ func _capture() -> void:
 		var rep := _report_text(report_text_box.text)
 		await _shot("fp_report")
 		print("REPORT ", "PASS" if "tile (" in rep and "oil" in rep and "Build:" in rep else "FAIL")
-		report_sheet.queue_free()
-		report_sheet = null
+		# Android back: closes the top sheet, opens the menu in play, closes it again, never quits
+		go_back()
+		var back_closed: bool = report_sheet == null
+		go_back()
+		var back_menu: bool = menu_sheet != null
+		go_back()
+		print("BACK ", "PASS" if back_closed and back_menu and menu_sheet == null \
+				and not ProjectSettings.get_setting("application/config/quit_on_go_back") else "FAIL")
 	hints_on = false               # the rest of the capture plays like someone who knows
 	if modal != null:
 		modal.queue_free()
@@ -1495,6 +1602,9 @@ func _capture() -> void:
 		return
 	if capture_phase == 3:
 		await _capture_trap()
+		return
+	if capture_phase == 4:
+		await _capture_art()
 		return
 	var letter: Vector2i = room.letters.reduce(func(a, b): return a if (a - game.hunter).length() < (b - game.hunter).length() else b)
 	var reach: Dictionary = room.reachable(game.hunter, 999)
@@ -1566,7 +1676,26 @@ func _capture_trap() -> void:
 	b.pos = west + Vector2i(-2, 0)
 	b.target = null
 	_refresh()
+	await _shot("fp_thrall")   # art check: a thrall two tiles ahead, in the lantern's reach
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
 	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
+	capture_phase = 4
+	get_tree().reload_current_scene()
+
+
+## Pass 4 (art only, no checks): stand in fixed spots with the lantern high and look at the props.
+func _capture_art() -> void:
+	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
+	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
+		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
+		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT]]
+	for v in views:
+		game.hunter = v[1]
+		game.facing = v[2]
+		game.fog.update(game.lights())
+		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+		_refresh()
+		await _shot(v[0])
+	print("ART PASS")
 	get_tree().quit()

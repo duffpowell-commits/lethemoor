@@ -64,7 +64,7 @@ static func _now(id: String, game, event: String) -> bool:
 		"horror":
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 		"stalker":
-			return game.thralls.any(func(th): return th.get("kind", "thrall") == "stalker" and fog.get_state(th.pos) == Fog.LIT)
+			return game.thralls.any(func(th): return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 		"flicker":
 			return game.flickers()
 		"letter":
@@ -72,7 +72,7 @@ static func _now(id: String, game, event: String) -> bool:
 		"flask":
 			return game.flasks_left.any(func(p): return fog.get_state(p) == Fog.LIT)
 		"map":
-			return game.thralls.any(func(th): return th.last_seen != null and fog.get_state(th.pos) != Fog.LIT)
+			return game.thralls.any(func(th): return not th.get("gone", false) and th.last_seen != null and fog.get_state(th.pos) != Fog.LIT)
 		"panic":
 			return event == "panic"
 		"noise":

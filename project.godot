@@ -5,10 +5,15 @@ config_version=5
 
 [application]
 
+config/quit_on_go_back=false
+
 config/name="Lethemoor: The Last Lantern"
 config/description="Gothic tactics-horror roguelite. Light is life."
 run/main_scene="res://scenes/fp_room.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
+; 60 fps cap: a turn-based game gains nothing from 90/120 Hz screens, and the phone runs cooler
+; and lasts longer at half the work. FPS readout + graphics levels: scripts/perf.gd.
+run/max_fps=60
 
 [autoload]
 

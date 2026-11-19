@@ -220,6 +220,28 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   it). **Sound hook:** each action resets `noises` ([{pos, level, kind}]) and `heard_by`
   (thrall indexes drawn this turn); event `"heard"` when anything turned toward a sound. Field
   note `noise`. Running / rummaging / ringing levels get added when those actions exist.
+- **Audit (Nov 19, evening):** rules + capture were clean; fixed in the view layer: Android
+  Back/back-gesture quit the game instantly (now `quit_on_go_back=false` + `go_back()` closes
+  the top sheet or opens the menu; capture prints BACK PASS), burned horrors stayed on the
+  corner map + in two field-note checks, retry left the flame loop silent (`Sound.hook_night()`
+  now runs before the first `_refresh`), fire crackle kept playing over the death screen,
+  lantern keys worked under the menu/mid-step, frustum assumed a 540-wide screen, bumping fire
+  or a visible horror said "Stone". Also fixed: every event of a turn now reaches `_teach` (`turn_events`),
+  painted HUD art (hand lantern, title bride, letter paper) uses linear filtering, and on web
+  REPORT A BUG queues the open/copy in `window.lmQueue` (head_include) so the NEXT tap runs it
+  inside a real gesture (Safari blocks it otherwise; label says "tap anywhere once more").
+  PRs #7 (frame rate) and #8 (art pass) were merged with this. Still open: HUD is laid out
+  once for 540 wide (no `size_changed`, no rotate handling). (Hints-save-wipes-mute: fixed by the frame-rate work below.)
+- **Done — phone frame rate (Nov 19):** `scripts/perf.gd` (child of the fp view). MENU -> SHOW FPS
+  (or F3) puts a readout under the top bar: `fps  ms  worst  |  draws  |  quality`, saved in
+  `user://lethemoor.cfg` [perf]. MENU -> GRAPHICS cycles AUTO / HIGH / MEDIUM / LOW. AUTO starts
+  HIGH and steps down one level after 4 s under 45 fps (never back up in a run). MEDIUM = glow
+  off; LOW = also lantern shadows off + 3D at 70% res. Measured in a software-GPU capture run:
+  HIGH ~80 ms/frame, MEDIUM ~47, LOW ~39 (glow was the big cost; resolution barely mattered).
+  Captures force HIGH (`LM_PERF_QUALITY=MEDIUM|LOW` overrides); `LM_PERF_LOG=1` prints the
+  readout every second. Also: floor/wall tiles share ~12 materials (by texture + fog shade)
+  instead of one each; `run/max_fps=60` (turn-based, no need for 90/120 Hz); `_save_hints` no
+  longer wipes the audio mute (it saved a fresh cfg). Real phone numbers: still from Duff.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
