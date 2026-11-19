@@ -1243,14 +1243,15 @@ func _center(c: Control, parent: Control, y: float, w: float) -> void:
 
 func _show_title() -> void:
 	modal = _sheet(0.93)
+	# key art (Forge, bride's face veiled over by hand): the bearer's lantern, the bride down the alley
 	var bride := TextureRect.new()
-	bride.texture = _tex("bride")
+	bride.texture = _tex("title_keyart")
 	bride.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	bride.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bride.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	bride.modulate = Color(0.5, 0.48, 0.52, 0.55)
-	bride.size = Vector2(UI_W, 560)
-	bride.position = Vector2(0, _ui_h() * 0.5 - 330)
+	bride.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	bride.modulate = Color(0.62, 0.6, 0.62, 1.0)    # dim enough for the title and buttons to read
+	bride.size = Vector2(UI_W, _ui_h())
+	bride.position = Vector2.ZERO
 	bride.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	modal.add_child(bride)
 	var y := _ui_h() * 0.5 - 330
@@ -1263,6 +1264,9 @@ func _show_title() -> void:
 	var tag := _label("Light is life. Oil is time.\nThe dead don't stay gone.", 21, UI.DIM, UI.italic())
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_center(tag, modal, y + 128, UI_W)
+	for l in [name_l, sub, tag]:   # the key art's lantern sits behind the words: keep them readable
+		l.add_theme_constant_override("outline_size", 10)
+		l.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.03, 0.85))
 	var by := _ui_h() * 0.5 + 150
 	var begin := Button.new()
 	begin.text = "BEGIN THE NIGHT"
