@@ -200,9 +200,10 @@ func _build_world() -> void:
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				m.albedo_texture = _tex("exit" if p in room.exits else "floor_wet")
-				m.roughness = 0.65
-				tile_base[p] = Color(1, 1, 1)
+				m.albedo_texture = _tex("exit" if p in room.exits else "floor_stone")
+				m.uv1_scale = Vector3(3, 2, 1)   # BoxMesh UVs are a 3x2 atlas: one full slab set per tile
+				m.roughness = 0.45                # wet stone: the lantern glints off it
+				tile_base[p] = Color(0.58, 0.58, 0.62)   # the flagstone art is lit flat: sink it into the dark
 			mi.material_override = m
 			add_child(mi)
 			tile_mats[p] = m
