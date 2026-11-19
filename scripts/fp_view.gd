@@ -13,6 +13,7 @@ const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing 
 const Lessons = preload("res://scripts/lessons.gd")
 const Letters = preload("res://scripts/letters.gd")
 const UI = preload("res://scripts/ui_style.gd")
+const Perf = preload("res://scripts/perf.gd")
 
 const UI_W := 540
 const TOP_H := 72
@@ -59,9 +60,14 @@ const SWIPE_MIN := 50.0            # UI px a finger must travel to count as a sw
 
 var cam: Camera3D
 var light: OmniLight3D
+var world_env: Environment
+var perf: Perf                    # FPS readout + graphics quality (scripts/perf.gd)
 var hand: Node3D
 var flame: MeshInstance3D
-var tile_mats := {}
+var tile_mats := {}                # lamp posts + letters: their own material each (few)
+var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
+var tile_tex := {}                 # floor/wall tile -> texture name
+var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
 var thrall_nodes: Array = []
 var flask_nodes := {}             # tile -> node, hidden once picked up
@@ -107,6 +113,10 @@ func _ready() -> void:
 	_load_hints()
 	_build_world()
 	_build_hud()
+	perf = Perf.new()
+	add_child(perf)
+	perf.setup(world_env, light, capture_mode)
+	perf.set_position_below(TOP_H)
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	Sound.hook_night()   # before _refresh: track() needs the new night (retry restarts the flame)
 	_refresh()
@@ -168,6 +178,7 @@ func _build_world() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	var we := WorldEnvironment.new()
 	we.environment = env
+	world_env = env
 	add_child(we)
 
 	var moon := DirectionalLight3D.new()
@@ -187,25 +198,18 @@ func _build_world() -> void:
 				continue           # a wall with no floor beside it can never be seen: no draw
 			var mi := MeshInstance3D.new()
 			mi.visibility_range_end = VIEW_RANGE   # past this the fog has it anyway
-			var m := StandardMaterial3D.new()
-			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
-			m.metallic_specular = 0.25
 			if room.is_wall(p):
 				mi.mesh = wall_mesh
 				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
-				m.albedo_texture = _tex("wall_stone" if (x * 3 + y) % 3 else "wall_paper")
-				m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
-				m.roughness = 0.9
+				tile_tex[p] = "wall_stone" if (x * 3 + y) % 3 else "wall_paper"
 				tile_base[p] = Color(0.85, 0.82, 0.92)
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				m.albedo_texture = _tex("exit" if p in room.exits else "floor_wet")
-				m.roughness = 0.65
+				tile_tex[p] = "exit" if p in room.exits else "floor_wet"
 				tile_base[p] = Color(1, 1, 1)
-			mi.material_override = m
 			add_child(mi)
-			tile_mats[p] = m
+			tile_nodes[p] = mi
 
 	var iron := StandardMaterial3D.new()
 	iron.albedo_color = Color("#20242c")
@@ -389,7 +393,31 @@ func _refresh() -> void:
 	_refresh_hud()
 
 
+## Every tile with the same texture and fog shade shares one material (perf: hundreds of
+## unique materials made the phone switch GPU state for every tile; now it's about a dozen).
+func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
+	var key := "%s|%s" % [tex, k]
+	if shared_mats.has(key):
+		return shared_mats[key]
+	var m := StandardMaterial3D.new()
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
+	m.metallic_specular = 0.25
+	m.albedo_texture = _tex(tex)
+	if tex.begins_with("wall"):
+		m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
+		m.roughness = 0.9
+	else:
+		m.roughness = 0.65
+	m.albedo_color = Color(base.r * k, base.g * k, base.b * k)
+	shared_mats[key] = m
+	return m
+
+
 func _refresh_fog() -> void:
+	for p: Vector2i in tile_nodes:
+		var mat := _tile_mat(tile_tex[p], tile_base[p], SHADE[fog.get_state(p)])
+		if tile_nodes[p].material_override != mat:
+			tile_nodes[p].material_override = mat
 	for p in tile_mats:
 		var gp: Vector2i = p
 		if p.x <= -200:
@@ -593,6 +621,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_H: act("hook")
 			KEY_P: act("pour")
 			KEY_F: act("spark")
+			KEY_F3: perf.toggle_show()
 			KEY_ESCAPE: _open_menu() if menu_sheet == null else _close_menu()
 			KEY_1: _set_lantern(Fog.Lantern.HOODED)
 			KEY_2: _set_lantern(Fog.Lantern.NORMAL)
@@ -1178,6 +1207,8 @@ func _open_menu() -> void:
 		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
 		["REPORT A BUG", func(): _close_menu(); _open_report()],
 		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
+		["SHOW FPS: " + ("ON" if perf.show else "OFF"), "fps"],
+		["GRAPHICS: " + perf.quality_name(), "gfx"],
 		["QUIT TO TITLE", func(): title_done = false; get_tree().reload_current_scene()],
 	]
 	y += 70
@@ -1189,7 +1220,13 @@ func _open_menu() -> void:
 		b.add_theme_font_size_override("font_size", 19)
 		if it[0] == "RESUME":
 			UI.lit(b)
-		if it[1].is_valid():
+		if it[1] is String and it[1] == "fps":
+			b.pressed.connect(func():
+				perf.toggle_show()
+				b.text = "SHOW FPS: " + ("ON" if perf.show else "OFF"))
+		elif it[1] is String and it[1] == "gfx":
+			b.pressed.connect(func(): b.text = "GRAPHICS: " + perf.cycle_quality())
+		elif it[1].is_valid():
 			b.pressed.connect(it[1])
 		else:
 			b.pressed.connect(func():
@@ -1295,6 +1332,7 @@ func _save_hints() -> void:
 	if capture_mode:
 		return
 	var cfg := ConfigFile.new()
+	cfg.load("user://lethemoor.cfg")   # keep the other sections (audio mute, fps, graphics)
 	cfg.set_value("hints", "on", hints_on)
 	cfg.set_value("hints", "seen", seen.keys())
 	cfg.save("user://lethemoor.cfg")
