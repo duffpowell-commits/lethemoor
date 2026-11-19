@@ -27,7 +27,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Install Godot
@@ -48,6 +48,15 @@ jobs:
           exit $fail
       - name: Rule tests
         run: godot --headless --path . --script tests/run_tests.gd
+      - name: Play the slice (real taps; checks the camera moves, not just the rules)
+        # The view can be broken while every rule test passes (Nov 19: steps moved the sim but
+        # not the camera). This plays title -> hint -> walk -> bell -> letter -> death -> Stalker.
+        run: |
+          sudo apt-get install -y -qq xvfb >/dev/null
+          timeout 600 xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 \
+            --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture 2>&1 | tee capture.log | grep -E "PASS|FAIL|SCRIPT ERROR" || true
+          ! grep -qE "FAIL|SCRIPT ERROR" capture.log
+          grep -q "STALKER PASS" capture.log
 
   export:
     needs: test

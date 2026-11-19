@@ -42,6 +42,7 @@ const LIGHT := {
 const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
+const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
 
 var game
 var room
@@ -130,6 +131,14 @@ func _place_cam(pos: Vector3, yaw: float) -> void:
 
 # ---------------------------------------------------------------- world
 
+func _buried(p: Vector2i) -> bool:
+	for d: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT, Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var n := p + d
+		if n.x >= 0 and n.y >= 0 and n.x < room.size.x and n.y < room.size.y and not room.is_wall(n):
+			return false
+	return true
+
+
 func _build_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -163,7 +172,10 @@ func _build_world() -> void:
 	for y in room.size.y:
 		for x in room.size.x:
 			var p := Vector2i(x, y)
+			if room.is_wall(p) and _buried(p):
+				continue           # a wall with no floor beside it can never be seen: no draw
 			var mi := MeshInstance3D.new()
+			mi.visibility_range_end = VIEW_RANGE   # past this the fog has it anyway
 			var m := StandardMaterial3D.new()
 			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
 			m.metallic_specular = 0.25
@@ -570,8 +582,8 @@ func _build_hud() -> void:
 	var title := _label("ONE NIGHT", 17, UI.AMBER, UI.head())
 	title.position = Vector2(14, 7)
 	top.add_child(title)
-	letters_label = _label("", 17, UI.DIM)
-	letters_label.position = Vector2(150, 7)
+	letters_label = _label("", 14, UI.DIM, UI.head())
+	letters_label.position = Vector2(140, 10)
 	top.add_child(letters_label)
 	var guide := _button("?", Vector2(UI_W - 48, 6), Vector2(36, 30), _open_guide, top)
 	guide.add_theme_font_size_override("font_size", 17)
@@ -705,7 +717,7 @@ func _draw_map() -> void:
 
 func _refresh_hud() -> void:
 	oil_count.text = str(game.oil)
-	letters_label.text = "·  letters %d of %d" % [game.letters_read.size(), room.letters.size()]
+	letters_label.text = "·   LETTERS %d / %d" % [game.letters_read.size(), room.letters.size()]
 	oil_bar.queue_redraw()
 	dread_bar.queue_redraw()
 	dread_label.add_theme_color_override("font_color", UI.BLOOD if game.hallucinating() else UI.DIM)
@@ -765,7 +777,7 @@ func _center(c: Control, parent: Control, y: float, w: float) -> void:
 
 
 func _show_title() -> void:
-	modal = _sheet(0.8)
+	modal = _sheet(0.93)
 	var bride := TextureRect.new()
 	bride.texture = _tex("bride")
 	bride.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

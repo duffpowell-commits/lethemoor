@@ -33,7 +33,7 @@ const CARDS := {
 		"Your dread filled. Your hands shook and oil spilled. Get back into the light to steady them."],
 }
 
-const GRADE_LINE := "Grade = oil left + 5 per letter read.   S 20+   A 14+   B 8+   C 3+   D"
+const GRADE_LINE := "Grade = oil left + 5 per letter read.\nS 20+  ·  A 14+  ·  B 8+  ·  C 3+  ·  D"
 
 
 ## The next card to show, or "" if none is due. `event` is the turn's headline event.
