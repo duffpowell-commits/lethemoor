@@ -303,6 +303,11 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   (`sky_night.png`, `fog_sky_affect` 0.35), nailed letters, hand lantern per light state (`HAND_ART`), title
   key art, app icon (project + Android launcher/adaptive). Capture pass 4 shoots `fp_art_*.png`. Wall tops
   skipped: eye height 0.82 vs walls 2.4, never seen. Not yet checked by Duff on his phone.
+- **Audit after the thrall merge (Nov 19, PR #21):** CI now requires the capture's last line `ART PASS`
+  (it used to stay green if passes 3-4 crashed or hung) and fails on load/node errors; mipmaps on every
+  3D-world texture; at most 2 fire lights; kill shot ignores burned/lying horrors. The capture's bell
+  walk clears the thralls after the HORROR shot: it checks input, `tools/balance_bot.gd` checks balance.
+  Not yet seen on a phone: lunge timing, corpse readability, kill shot, swipe-only controls.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
