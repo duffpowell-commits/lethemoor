@@ -20,6 +20,8 @@ run/max_fps=60
 
 ; all sound: scripts/audio.gd (clips in assets/audio/, sources in assets/audio/SOURCES.md)
 Audio="*res://scripts/audio.gd"
+; in-app APK updates from the dev release (Android only): scripts/updater.gd
+Updater="*res://scripts/updater.gd"
 
 [display]
 

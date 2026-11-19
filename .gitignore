@@ -4,3 +4,4 @@ build/
 debug.keystore
 *.keystore
 build.txt
+build_code.txt
