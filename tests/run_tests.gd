@@ -308,3 +308,42 @@ func test_one_night_map_is_winnable() -> void:
 		check(reach.has(p), "every letter and flask can be reached")
 	for t in r.thralls:
 		check((t - r.hunter).length() > 5.5, "no thrall notices you on turn 0")
+
+
+const HALL := "#########\n#H.....S#\n#########"
+
+
+func test_stalker_frozen_while_watched() -> void:
+	var n = Night.start(HALL)   # facing up by default: turn right to face her
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	var at: Vector2i = n.thralls[0].pos
+	check(n.thralls[0].kind == "stalker", "S parses as a stalker")
+	n.turn_by(1)   # she is 6 away, outside BRIGHT radius 4: unlit, so she comes
+	check(n.facing == Vector2i.RIGHT, "now facing down the hall")
+	check(n.thralls[0].pos.x <= at.x - 1, "unlit: she moves")
+	for i in 4:
+		n.wait()
+	check(not n.dead, "lit and looked at: she can't reach you")
+	check(n.watched(n.thralls[0]), "she stands frozen in the light, in view")
+
+
+func test_stalker_gets_you_when_you_look_away() -> void:
+	var n = Night.start(HALL)
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	n.turn_by(1)
+	for i in 4:
+		n.wait()
+	n.turn_by(-1)   # look away (up the wall): one turn with your back to her
+	for i in 2:
+		if not n.dead:
+			n.wait()
+	check(n.dead, "looking away lets her close the gap")
+
+
+func test_in_view_cone() -> void:
+	var n = Night.start(HALL)
+	n.facing = Vector2i.RIGHT
+	check(n.in_view(n.hunter + Vector2i(3, 0)), "straight ahead is in view")
+	check(n.in_view(n.hunter + Vector2i(3, 1)), "a little off to the side is in view")
+	check(not n.in_view(n.hunter + Vector2i(0, 1)), "beside you is not")
+	check(not n.in_view(n.hunter + Vector2i(-2, 0)), "behind you is not")

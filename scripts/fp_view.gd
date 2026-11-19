@@ -37,7 +37,7 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 2.2],
 	Fog.Lantern.BRIGHT: [5.6, 3.0],
 }
-const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim"]
+const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
 
@@ -251,6 +251,10 @@ func _build_world() -> void:
 		th.shaded = true
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
 		th.modulate = Color(0.6, 0.62, 0.7)
+		if thrall.get("kind", "thrall") == "stalker":
+			# placeholder bride: pale and tall until the real veiled sprite lands
+			th.modulate = Color(1.3, 1.25, 1.4)
+			th.pixel_size = PX * 3.7
 		holder.add_child(th)
 		add_child(holder)
 		thrall_nodes.append(holder)
@@ -619,6 +623,7 @@ func _refresh_hud() -> void:
 		"letter": "A letter, nailed to the post. You read it by the high flame.",
 		"letter_dim": "Words on a page. Too dim to read. Burn brighter.",
 		"rang": "The bell.",
+		"stalker_moved": "Silk drags on stone. Something moved while you weren't looking.",
 	}
 	var s: String = lines[game.setting]
 	if game.oil == 0:
@@ -769,6 +774,9 @@ func _capture() -> void:
 		capture_phase = 1
 		get_tree().reload_current_scene()
 		return
+	if capture_phase == 2:
+		await _capture_stalker()
+		return
 	var letter: Vector2i = room.letters.reduce(func(a, b): return a if (a - game.hunter).length() < (b - game.hunter).length() else b)
 	var reach: Dictionary = room.reachable(game.hunter, 999)
 	var path: Array = room.path_in(reach, game.hunter, letter)
@@ -785,4 +793,18 @@ func _capture() -> void:
 		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands
 	await _shot("fp_dead")
 	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
+	capture_phase = 2
+	get_tree().reload_current_scene()
+
+
+## Pass 2: walk into the Stalker's corridor and face her with the lantern high.
+func _capture_stalker() -> void:
+	await _walk_to(Vector2i(3, 7))
+	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
+	await _walk_to(Vector2i(4, 6))
+	while game.facing != Vector2i.RIGHT and not game.over():
+		await _press(move_buttons["right"])
+	var st: Dictionary = game.thralls.filter(func(t): return t.get("kind") == "stalker")[0]
+	await _shot("fp_stalker")
+	print("STALKER ", "PASS" if game.watched(st) and not game.dead else "FAIL", " at=", st.pos, " dead=", game.dead)
 	get_tree().quit()

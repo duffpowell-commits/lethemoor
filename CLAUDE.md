@@ -138,8 +138,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   Capture runs two passes (static `capture_phase`): FWD/TURN/SWIPE/HORROR/BELL, then
   LETTER/DEATH; sheet `docs/renders/fp_onenight_sheet.png`. Known look issue: standing on a
   letter tile puts the page in your face; move pages onto the wall face later.
-  Slice order (Duff OK'd the cut): bell+grade (done), Stalker, boathook + oil slick trap,
+  Slice order (proposed to Duff Nov 19, no objection yet): bell+grade (done), Stalker (done), boathook + oil slick trap,
   noise + sound pass, letters, art pass. After slice: corpse, satchel/crafting, bosses, ferryman.
+- **Done — slice step 2 (Nov 19): the Stalker** (`S` tile; thralls entries now carry `kind`).
+  Frozen only while LIT *and* in your view cone (`in_view`, ~50 degrees each side of `facing`);
+  otherwise 2 steps a turn toward where she last saw your light, and adjacent + unwatched =
+  death. So turning away from her (a turn) is how she gets you; backing up keeps her in view.
+  On One Night she guards the letter/flask corridor at (7,6), off the direct bell route.
+  Placeholder look: the thrall sprite, pale and taller. Capture pass 2 prints STALKER PASS
+  (`fp_stalker.png`). 29 tests.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

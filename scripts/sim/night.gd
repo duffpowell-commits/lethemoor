@@ -20,6 +20,10 @@ const PANIC_RESET := 60        # ...and dread drops back to here
 ## Thralls shamble: they step only on turns divisible by this. In first person every turn of
 ## your head costs a turn, so an equal-speed chaser catches you at the first corner.
 const THRALL_EVERY := 2
+## The Stalker: frozen while it stands in your light AND inside your view (you're looking at
+## it). Otherwise it takes STALKER_STEPS steps a turn. Looking away (a turn) is how it gets you.
+const STALKER_STEPS := 2
+const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const FLASK_OIL := 10          # an oil flask found on the floor
 const LETTER_POINTS := 5       # grade: each letter read is worth this much oil
 ## Grade at the bell: oil left + LETTER_POINTS per letter read. [min points, grade]
@@ -55,7 +59,9 @@ static func start(room_text: String) -> RefCounted:
 	n.hunter = n.room.hunter
 	n.flasks_left = n.room.oil_flasks.duplicate()
 	for p: Vector2i in n.room.thralls:
-		n.thralls.append({pos = p, target = null, seen = false, last_seen = null})
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall"})
+	for p: Vector2i in n.room.stalkers:
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "stalker"})
 	n.fog.update([{pos = n.hunter, setting = n.setting}])
 	for th in n.thralls:
 		th.seen = n.fog.get_state(th.pos) == Fog.LIT
@@ -206,9 +212,54 @@ func _sees_light(th: Dictionary) -> bool:
 
 ## Each thrall: next to you, it takes you. Sees your light, it comes. Lost you, it goes to
 ## the last place it saw you, then stands there.
+## Is `p` in front of you, inside the view cone? (Your own tile counts as not.)
+func in_view(p: Vector2i) -> bool:
+	var d := Vector2(p - hunter)
+	if d == Vector2.ZERO:
+		return false
+	return d.normalized().dot(Vector2(facing)) >= VIEW_COS
+
+
+## A Stalker holds still only while it's lit and you're looking right at it.
+func watched(th: Dictionary) -> bool:
+	return fog.get_state(th.pos) == Fog.LIT and in_view(th.pos)
+
+
+func _stalker_act(i: int, events: Array) -> void:
+	var th: Dictionary = thralls[i]
+	for s in STALKER_STEPS:
+		if watched(th):
+			return
+		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
+			_die("Lace, and a cold breath at your neck. You never saw her move.")
+			events.append("taken")
+			return
+		if _sees_light(th):
+			th.target = hunter
+		if th.target == null or th.pos == th.target:
+			th.target = null
+			return
+		var others: Array = positions()
+		others.remove_at(i)
+		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, others)
+		var path: Array = room.path_in(reach, th.pos, th.target)
+		if path.size() < 2:
+			th.target = null
+			return
+		th.pos = path[1]
+		if not events.has("stalker_moved"):
+			events.append("stalker_moved")
+		fog.update([{pos = hunter, setting = effective()}])
+
+
 func _thralls_act(events: Array) -> void:
 	for i in thralls.size():
 		var th: Dictionary = thralls[i]
+		if th.get("kind", "thrall") == "stalker":
+			_stalker_act(i, events)
+			if dead:
+				return
+			continue
 		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
 			_die("Cold hands, out of the dark. The lantern rolls away.")
 			events.append("taken")
