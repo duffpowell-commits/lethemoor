@@ -230,8 +230,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   painted HUD art (hand lantern, title bride, letter paper) uses linear filtering, and on web
   REPORT A BUG queues the open/copy in `window.lmQueue` (head_include) so the NEXT tap runs it
   inside a real gesture (Safari blocks it otherwise; label says "tap anywhere once more").
-  PRs #7 (frame rate) and #8 (art pass) were merged with this. Still open: HUD is laid out
-  once for 540 wide (no `size_changed`, no rotate handling). (Hints-save-wipes-mute: fixed by the frame-rate work below.)
+  PRs #7 (frame rate) and #8 (art pass) were merged with this. **Rotation (Nov 19):** the HUD
+  is a 540-wide column (`_column()`) centred by anchors; top/bottom bars, sheets and the end
+  screen get a screen-wide backing (`_wing`), brass rules run edge to edge, the vignette covers
+  the whole screen. `_fit_camera()` scales the frustum so the column always shows the same view
+  (wide screens see more to the sides). `size_changed` -> `_on_resize()`: camera, item buttons,
+  hand, title/guide rebuilt, end card, perf readout offset. Capture prints ROTATE PASS (goes
+  sideways mid-night, taps MENU, comes back; `fp_sideways.png`). Android stays locked portrait
+  (`handheld/orientation=1`); this is for Safari, tablets, desktop. Known: sideways, the
+  hand-lantern art's edge shows at the column. (Hints-save-wipes-mute: fixed by the frame-rate work below.)
 - **Done — phone frame rate (Nov 19):** `scripts/perf.gd` (child of the fp view). MENU -> SHOW FPS
   (or F3) puts a readout under the top bar: `fps  ms  worst  |  draws  |  quality`, saved in
   `user://lethemoor.cfg` [perf]. MENU -> GRAPHICS cycles AUTO / HIGH / MEDIUM / LOW. AUTO starts

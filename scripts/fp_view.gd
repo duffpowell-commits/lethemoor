@@ -118,6 +118,7 @@ func _ready() -> void:
 	add_child(perf)
 	perf.setup(world_env, light, capture_mode)
 	perf.set_position_below(TOP_H)
+	perf.offset.x = _col_x()
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	Sound.hook_night()   # before _refresh: track() needs the new night (retry restarts the flame)
 	_refresh()
@@ -345,11 +346,7 @@ func _build_world() -> void:
 	# The HUD covers the top 72 px and bottom 330 px, so centre the view on the strip
 	# between them: a frustum camera with its centre shifted up.
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
-	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0))
-	var ui_h := _ui_h()            # 960 on a 9:16 screen, taller on modern phones
-	var full_h := cam.size * ui_h / get_viewport().get_visible_rect().size.x
-	var mid := (TOP_H + (ui_h - BOTTOM_H)) / 2.0
-	cam.frustum_offset = Vector2(0, -full_h * (ui_h / 2.0 - mid) / ui_h)
+	_fit_camera()
 	add_child(cam)
 
 	# her hand and lantern, low right, riding with the camera
@@ -664,6 +661,59 @@ func _ui_h() -> float:
 	return get_viewport().get_visible_rect().size.y
 
 
+## The HUD is a 540-wide phone column, centred. On a wider screen (sideways phone, tablet,
+## laptop) the world runs on past its sides; this is how far the column sits from the left.
+func _col_x() -> float:
+	return (get_viewport().get_visible_rect().size.x - UI_W) / 2.0
+
+
+## The column always shows the same slice of the world (FOV across 540 UI px), whatever the
+## screen; a wider screen just sees more to the sides. The view is centred on the strip
+## between the top bar and the bottom panel (frustum shifted up).
+func _fit_camera() -> void:
+	var vis := get_viewport().get_visible_rect().size
+	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0)) * vis.x / UI_W
+	var full_h := cam.size * vis.y / vis.x
+	var mid := (TOP_H + (vis.y - BOTTOM_H)) / 2.0
+	cam.frustum_offset = Vector2(0, -full_h * (vis.y / 2.0 - mid) / vis.y)
+
+
+## A screen-wide backing behind a column control (dark bars, dim sheets), so a wide screen
+## doesn't show the world through the sides. It takes the parent's mouse filter.
+func _wing(c: Control, color: Color) -> void:
+	var w := ColorRect.new()
+	w.color = color
+	w.set_anchors_preset(Control.PRESET_FULL_RECT)
+	w.offset_left = -4000
+	w.offset_right = 4000
+	w.show_behind_parent = true
+	w.mouse_filter = c.mouse_filter
+	c.add_child(w)
+	c.move_child(w, 0)
+
+
+## Rotation, a resized browser, the phone's bars sliding in and out: lay it all out again.
+func _on_resize() -> void:
+	if cam == null or hud == null:
+		return
+	_fit_camera()
+	if perf:
+		perf.offset.x = _col_x()
+	if hand_art:
+		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22
+	_refresh_hud()                        # the tool buttons sit on the bottom panel
+	if modal != null and is_instance_valid(title_begin) and modal.is_ancestor_of(title_begin):
+		modal.queue_free()                # the title is laid out by height: build it again
+		modal = null
+		_show_title()
+	if guide_sheet != null:
+		guide_sheet.queue_free()
+		guide_sheet = null
+		_open_guide()
+	if end_screen != null:
+		end_screen.get_node("Card").position.y = _ui_h() * 0.5 - 300
+
+
 func _label(text: String, size: int, color: Color, font: Font = null) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -690,22 +740,34 @@ func _button(text: String, pos: Vector2, size: Vector2, cb: Callable, parent: Co
 func _rule(parent: Control, y: float, top_edge := false) -> void:
 	var r := ColorRect.new()
 	r.color = UI.BRASS_DIM
-	r.position = Vector2(0, y)
-	r.size = Vector2(UI_W, 1)
+	r.position = Vector2(-4000, y)       # runs on past the column on wide screens
+	r.size = Vector2(UI_W + 8000, 1)
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if top_edge:
 		r.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	parent.add_child(r)
 
 
+## A full-height control 540 UI px wide, kept centred by its anchors.
+func _column() -> Control:
+	var c := Control.new()
+	c.anchor_left = 0.5
+	c.anchor_right = 0.5
+	c.anchor_bottom = 1.0
+	c.offset_left = -UI_W / 2.0
+	c.offset_right = UI_W / 2.0
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	hud = Control.new()
-	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
-	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Back to front: the hand lantern (column), the vignette (whole screen), the HUD (column).
+	var hand_col := _column()
+	layer.add_child(hand_col)
+	hud = _column()
 	hud.theme = UI.theme()
-	layer.add_child(hud)
 
 	var g := Gradient.new()
 	g.set_color(0, Color(0, 0, 0, 0))
@@ -725,14 +787,16 @@ func _build_hud() -> void:
 	hand_art.size = Vector2(HAND_W, HAND_W)
 	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - BOTTOM_H - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.add_child(hand_art)
+	hand_col.add_child(hand_art)
 
 	var vig := TextureRect.new()
 	vig.texture = gt
 	vig.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud.add_child(vig)
+	layer.add_child(vig)
+	layer.add_child(hud)
+	get_viewport().size_changed.connect(func(): _on_resize.call_deferred())
 
 	# top bar: name, letters, guide button; then the two clocks, oil and dread
 	var top := ColorRect.new()
@@ -740,6 +804,7 @@ func _build_hud() -> void:
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.size.y = TOP_H
 	hud.add_child(top)
+	_wing(top, UI.INK)
 	_rule(top, TOP_H - 1)
 	var title := _label("ONE NIGHT", 17, UI.AMBER, UI.head())
 	title.position = Vector2(14, 7)
@@ -783,6 +848,7 @@ func _build_hud() -> void:
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_top = -BOTTOM_H
 	hud.add_child(bottom)
+	_wing(bottom, UI.INK)
 	_rule(bottom, 0)
 	status_label = _label("", 19, UI.TEXT, UI.italic())
 	status_label.position = Vector2(16, 8)
@@ -959,6 +1025,8 @@ func _sheet(alpha: float) -> ColorRect:
 	s.set_anchors_preset(Control.PRESET_FULL_RECT)
 	s.mouse_filter = Control.MOUSE_FILTER_STOP
 	hud.add_child(s)
+	_wing(s, s.color)
+	s.color = Color(0, 0, 0, 0)    # the wing does the dimming, once, edge to edge
 	return s
 
 
@@ -1380,6 +1448,8 @@ func _show_end() -> void:
 		end_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 		end_screen.mouse_filter = Control.MOUSE_FILTER_STOP
 		hud.add_child(end_screen)
+		_wing(end_screen, end_screen.color)
+		end_screen.color = Color(0, 0, 0, 0)
 		var card := PanelContainer.new()
 		card.name = "Card"
 		card.custom_minimum_size.x = 480
@@ -1447,6 +1517,28 @@ func _shot(name: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(ProjectSettings.globalize_path("res://docs/renders/" + name + ".png"))
 	print("saved ", name, " ", img.get_size())
+
+
+## Turn the phone sideways and back: the HUD column stays centred, the bars and the view
+## fill the screen, a real tap still lands on its button, and no turn passes.
+func _capture_rotate() -> void:
+	var tall := get_window().size
+	get_window().size = Vector2i(tall.x, tall.x * tall.x / tall.y)   # sideways (fits CI's 1080-wide screen)
+	for i in 20:
+		await get_tree().process_frame
+	var vis := get_viewport().get_visible_rect().size
+	var turn0: int = game.turn
+	var centred: bool = vis.x > vis.y and absf(move_buttons["forward"].get_global_rect().get_center().x - vis.x / 2.0) < 2.0
+	await _shot("fp_sideways")
+	await _press(menu_button)
+	var tapped: bool = menu_sheet != null
+	_close_menu()
+	get_window().size = tall
+	for i in 20:
+		await get_tree().process_frame
+	var back_ok: bool = absf(get_viewport().get_visible_rect().size.x - UI_W) < 1.0 and hud.get_global_rect().position.x == 0.0
+	print("ROTATE ", "PASS" if centred and tapped and back_ok and game.turn == turn0 else "FAIL",
+			" sideways=", vis, " centred=", centred, " tap=", tapped, " back=", back_ok)
 
 
 ## A real finger on a real button: click its centre through the input system.
@@ -1582,6 +1674,7 @@ func _capture() -> void:
 		var turn_before: int = game.turn
 		await _swipe_real(Vector2(380, 420), Vector2(240, 430))   # a finger dragged left = turn left
 		print("SWIPE ", "PASS" if game.facing == f0 and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
+		await _capture_rotate()
 		var bell: Vector2i = room.bells[0]
 		var shot_horror := false
 		while not game.over():
