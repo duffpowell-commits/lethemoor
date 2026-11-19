@@ -634,3 +634,56 @@ func test_light_beats_noise() -> void:
 	check(n.thralls[0].target == Vector2i(7, 1), "a sound alone sends it to the sound")
 	n.wait()
 	check(n.thralls[0].target == n.hunter, "but once it sees your lantern it comes for you")
+
+
+# ---- every night is dealt fresh (Nov 19): same walls, things moved a little, from a seed ----
+
+func _night_layout(g) -> Array:
+	return [g.room.thralls.duplicate(), g.room.stalkers.duplicate(), g.room.oil_flasks.duplicate(), g.room.letters.duplicate()]
+
+
+func test_seed_zero_is_the_handmade_night() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	check(_night_layout(Night.start(text, 0)) == _night_layout(Night.start(text)), "seed 0 keeps the map as drawn (tests and captures rely on it)")
+
+
+func test_same_seed_same_night_and_seeds_differ() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	check(_night_layout(Night.start(text, 41)) == _night_layout(Night.start(text, 41)), "a seed always deals the same night")
+	var seen := {}
+	for s in range(1, 21):
+		seen[str(_night_layout(Night.start(text, s)))] = true
+	check(seen.size() >= 15, "20 seeds give at least 15 different nights (got %d)" % seen.size())
+
+
+func test_dealt_nights_stay_fair() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	var base = Night.start(text, 0)
+	for s in range(1, 301):
+		var g = Night.start(text, s)
+		var r = g.room
+		var from_start: Dictionary = r.reachable(r.hunter, r.size.x * r.size.y)
+		var route: Array = r.path_in(from_start, r.hunter, r.bells[0])
+		check(r.thralls.size() == base.room.thralls.size() and r.stalkers.size() == base.room.stalkers.size() \
+				and r.oil_flasks.size() == base.room.oil_flasks.size() and r.letters.size() == base.room.letters.size(),
+				"seed %d keeps every count" % s)
+		var used := {r.hunter: true, r.bells[0]: true}
+		for k in r.hooks:
+			used[k] = true
+		for p in r.thralls + r.stalkers + r.oil_flasks + r.letters:
+			check(not r.is_wall(p), "seed %d: %s is on floor" % [s, p])
+			check(not used.has(p), "seed %d: %s is shared or sits on the start, bell or hook" % [s, p])
+			used[p] = true
+		for p in r.thralls + r.stalkers:
+			check(from_start.get(p, 0) >= Room.SAFE_START, "seed %d: horror at %s is too close to the start" % [s, p])
+		for p in r.stalkers:
+			check(not p in route, "seed %d: the Stalker at %s blocks the straight road to the bell" % [s, p])
+		for p in r.letters:
+			var beside := false
+			for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				beside = beside or r.is_wall(p + d)
+			check(beside, "seed %d: letter at %s has a wall to hang on" % [s, p])
+		check(g.thralls.size() == r.thralls.size() + r.stalkers.size() and g.flasks_left.size() == r.oil_flasks.size(),
+				"seed %d: the night uses the dealt layout" % s)
+		if failures > 0:
+			return

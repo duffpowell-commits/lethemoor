@@ -107,10 +107,10 @@ var end_screen: Control
 
 
 func _ready() -> void:
-	game = Night.start(FileAccess.get_file_as_string(ROOM))
+	capture_mode = "--capture" in OS.get_cmdline_user_args()
+	game = Night.start(FileAccess.get_file_as_string(ROOM), _pick_night())
 	room = game.room
 	fog = game.fog
-	capture_mode = "--capture" in OS.get_cmdline_user_args()
 	_load_hints()
 	_build_world()
 	_build_hud()
@@ -128,6 +128,21 @@ func _ready() -> void:
 		_teach()
 	if capture_mode:
 		_capture.call_deferred()
+
+
+## Which night to deal. Every run is a new one; the capture plays the map as drawn (0).
+## A reported night can be replayed: ?night=1234 on the web link, or LM_NIGHT=1234.
+func _pick_night() -> int:
+	if capture_mode:
+		return 0
+	var asked := OS.get_environment("LM_NIGHT")
+	if OS.has_feature("web"):
+		var q = JavaScriptBridge.eval("new URLSearchParams(location.search).get('night') || ''", true)
+		if q is String and q != "":
+			asked = q
+	if asked.is_valid_int() and int(asked) > 0:
+		return int(asked)
+	return randi_range(1, 9999)
 
 
 func _tex(name: String) -> Texture2D:
@@ -426,8 +441,87 @@ func _refresh_fog() -> void:
 		minimap.queue_redraw()
 
 
-## Oil on the floor: a dark wet patch while soaked, an orange glow with its own light on fire.
-## Placeholder look: Foxboard art replaces it.
+## Oil on the floor: a glossy black puddle with a ragged edge while soaked; on fire, tongues
+## of flame (billboard particles, additive) over a glowing pool, with a light that gutters.
+## Drawn in code until Foxboard art lands (docs/art_needs.md: slick decal + flame sheet).
+var _puddle: Texture2D
+var _flame: Texture2D
+
+
+## A puddle shape: a soft blob with a noisy, ragged rim (alpha only; colour comes from the material).
+func _puddle_tex() -> Texture2D:
+	if _puddle == null:
+		var n := FastNoiseLite.new()
+		n.seed = 7
+		n.frequency = 0.045
+		var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+		for y in 128:
+			for x in 128:
+				var d := Vector2(x - 64, y - 64).length() / 64.0
+				var edge := 0.78 + 0.22 * n.get_noise_2d(x, y)
+				var a := clampf((edge - d) * 9.0, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1, 1, 1, a))
+		_puddle = ImageTexture.create_from_image(img)
+	return _puddle
+
+
+## One flame tongue: hot white-yellow core fading out at the edges and the top.
+func _flame_tex() -> Texture2D:
+	if _flame == null:
+		var img := Image.create(32, 64, false, Image.FORMAT_RGBA8)
+		for y in 64:
+			for x in 32:
+				var u := (x - 15.5) / 16.0
+				var v := y / 63.0                       # 0 top, 1 bottom
+				var width := 0.25 + 0.75 * pow(v, 0.6)  # narrow tip, wide base
+				var a := clampf(1.0 - absf(u) / width, 0.0, 1.0) * clampf(v * 1.6, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1, 1, 1, a * a))
+		_flame = ImageTexture.create_from_image(img)
+	return _flame
+
+
+func _make_fire() -> CPUParticles3D:
+	var f := CPUParticles3D.new()
+	f.amount = 22
+	f.lifetime = 0.7
+	f.preprocess = 0.7
+	f.local_coords = true
+	f.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	f.emission_box_extents = Vector3(0.34, 0.02, 0.34)
+	f.direction = Vector3.UP
+	f.spread = 8.0
+	f.gravity = Vector3(0, 0.9, 0)
+	f.initial_velocity_min = 0.25
+	f.initial_velocity_max = 0.55
+	f.scale_amount_min = 0.7
+	f.scale_amount_max = 1.2
+	var sc := Curve.new()
+	sc.add_point(Vector2(0, 0.55))
+	sc.add_point(Vector2(0.3, 1.0))
+	sc.add_point(Vector2(1, 0.15))
+	f.scale_amount_curve = sc
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.0, 0.92, 0.6, 0.95))
+	ramp.set_color(1, Color(0.5, 0.06, 0.02, 0.0))
+	ramp.add_point(0.35, Color(1.0, 0.55, 0.15, 0.85))
+	f.color_ramp = ramp
+	var q := QuadMesh.new()
+	q.size = Vector2(0.22, 0.44)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = _flame_tex()
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR   # soft flames, not pixel blocks
+	m.no_depth_test = false
+	q.material = m
+	f.mesh = q
+	f.position = Vector3(0, 0.02, 0)
+	return f
+
+
 func _sync_slicks() -> void:
 	for p: Vector2i in slick_nodes.keys():
 		if not game.slicks.has(p):
@@ -437,34 +531,53 @@ func _sync_slicks() -> void:
 		if not slick_nodes.has(p):
 			var m := MeshInstance3D.new()
 			var pm := PlaneMesh.new()
-			pm.size = Vector2(0.92, 0.92)
+			pm.size = Vector2(0.96, 0.96)
 			m.mesh = pm
-			m.material_override = StandardMaterial3D.new()
+			var mat := StandardMaterial3D.new()
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_texture = _puddle_tex()
+			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+			mat.metallic = 0.6
+			mat.metallic_specular = 1.0
+			mat.roughness = 0.04             # oil: the lantern glints off it
+			m.material_override = mat
 			m.position = _w(p) + Vector3(0, 0.012, 0)
+			m.rotation.y = float(hash(p) % 360) * PI / 180.0   # no two puddles lie the same way
 			var fl := OmniLight3D.new()
 			fl.light_color = Color("#ff8a3a")
 			fl.omni_range = 2.6
 			fl.light_energy = 1.6
 			fl.position = Vector3(0, 0.4, 0)
 			m.add_child(fl)
+			var fire := _make_fire()
+			m.add_child(fire)
 			add_child(m)
 			slick_nodes[p] = m
 		var node: MeshInstance3D = slick_nodes[p]
 		var mat: StandardMaterial3D = node.material_override
 		var lit_fire: bool = game.burning(p)
 		node.get_child(0).visible = lit_fire
+		node.get_child(1).visible = lit_fire
+		node.get_child(1).emitting = lit_fire
 		node.visible = lit_fire or fog.get_state(p) != Fog.DARK
 		if lit_fire:
-			mat.albedo_color = Color("#7a2a08")
+			mat.albedo_color = Color(0.35, 0.1, 0.02, 0.95)
 			mat.emission_enabled = true
-			mat.emission = Color("#ff6a1a")
-			mat.emission_energy_multiplier = 0.9
+			mat.emission = Color("#ff5a12")
+			mat.emission_energy_multiplier = 1.4
 		else:
 			var k: float = SHADE[fog.get_state(p)]
-			mat.albedo_color = Color(0.06 * k + 0.02, 0.05 * k + 0.02, 0.03 * k + 0.02)
+			mat.albedo_color = Color(0.04 * k + 0.015, 0.035 * k + 0.012, 0.025 * k + 0.01, 0.92)
 			mat.emission_enabled = false
-			mat.metallic_specular = 0.9
-			mat.roughness = 0.08
+
+
+## Burning oil gutters: each fire light breathes on its own.
+func _flicker_fires() -> void:
+	for p: Vector2i in slick_nodes:
+		var fl: OmniLight3D = slick_nodes[p].get_child(0)
+		if fl.visible:
+			var ph := float(hash(p) % 100)
+			fl.light_energy = 1.5 + 0.35 * sin(t * 11.0 + ph) + 0.2 * sin(t * 23.0 + ph * 2.0)
 
 
 # ---------------------------------------------------------------- actions
@@ -613,6 +726,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	t += delta
+	_flicker_fires()
 	if busy:
 		pass
 	var eff: int = game.effective()
@@ -688,7 +802,7 @@ func _on_resize() -> void:
 		guide_sheet = null
 		_open_guide()
 	if end_screen != null:
-		end_screen.get_node("Card").position.y = _ui_h() * 0.5 - 300
+		_fit_end_card()
 
 
 func _label(text: String, size: int, color: Color, font: Font = null) -> Label:
@@ -1452,8 +1566,8 @@ func _report_text(note: String) -> String:
 		device += ", " + str(JavaScriptBridge.eval("navigator.userAgent", true))
 	var names := {Fog.Lantern.HOODED: "hooded", Fog.Lantern.NORMAL: "normal", Fog.Lantern.BRIGHT: "bright"}
 	var foes: Array = game.thralls.map(func(th): return "%s %s" % [th.get("kind", "thrall"), th.pos])
-	var state := "tile %s facing %s, turn %d, oil %d, dread %d, lantern %s, letters %d/%d, last event '%s', over %s%s\n%s" % [
-		game.hunter, game.facing, game.turn, game.oil, game.dread, names[game.setting],
+	var state := "night %d, tile %s facing %s, turn %d, oil %d, dread %d, lantern %s, letters %d/%d, last event '%s', over %s%s\n%s" % [
+		game.seed, game.hunter, game.facing, game.turn, game.oil, game.dread, names[game.setting],
 		game.letters_read.size(), room.letters.size(), last_event, game.over(),
 		(" (" + game.cause + ")") if game.dead else "", ", ".join(foes)]
 	return "%s\n\n---\nBuild: %s\nDevice: %s\nState: %s" % [note.strip_edges(), build, device, state]
@@ -1566,6 +1680,7 @@ func _show_end() -> void:
 		card.name = "Card"
 		card.custom_minimum_size.x = 480
 		card.position = Vector2(30, _ui_h() * 0.5 - 300)
+		card.resized.connect(_centre_end_card)
 		end_screen.add_child(card)
 		var box := VBoxContainer.new()
 		box.name = "Box"
@@ -1592,6 +1707,7 @@ func _show_end() -> void:
 		again.add_theme_font_size_override("font_size", 19)
 		UI.lit(again)
 		again.pressed.connect(func(): get_tree().reload_current_scene())
+		box.add_child(_build_verdict())
 		box.add_child(again)
 		var menu := Button.new()
 		menu.text = "TITLE"
@@ -1617,7 +1733,112 @@ func _show_end() -> void:
 	else:
 		big.text = "THE DARK TOOK YOU"
 		small.text = "%s\n\n%d turns  ·  %d oil left" % [game.cause, game.turn, game.oil]
+	small.text += "\n\nNight %d" % game.seed if game.seed > 0 else ""
 	end_screen.visible = true
+	_fit_end_card.call_deferred()
+
+
+## Shrink the card to its contents (it grows while its labels are still empty and never
+## shrinks by itself), then centre it.
+func _fit_end_card() -> void:
+	var card: Control = end_screen.get_node("Card")
+	card.size.y = 0
+	_centre_end_card()
+
+
+func _centre_end_card() -> void:
+	var card: Control = end_screen.get_node("Card")
+	card.position.y = maxf(TOP_H + 8, (_ui_h() - card.size.y) / 2.0)
+
+
+# ---------------------------------------------------------------- tester verdict
+
+var verdict_fun := 0                 # 1-10, 0 = not rated yet
+var verdict_again := ""              # "yes" / "no"
+var verdict_buttons := {}            # for the capture: "fun7", "yes", "no", "text", "copy"
+
+
+## Two taps on the end card: how fun (1-10), would you play again. Then one tap texts it to
+## Duff (opens Messages with it written) or copies it. Kill rule: median fun 6+, testers replay.
+func _build_verdict() -> Control:
+	var wrap := VBoxContainer.new()
+	wrap.add_theme_constant_override("separation", 6)
+	var ask := _label("HOW WAS THAT NIGHT?  1 = DULL, 10 = GREAT", 13, UI.DIM, UI.head())
+	ask.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(ask)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	wrap.add_child(row)
+	var show_row := func(items: Array) -> void:
+		for c in row.get_children():
+			c.queue_free()
+		for it in items:
+			var b := Button.new()
+			b.text = it[0]
+			b.focus_mode = Control.FOCUS_NONE
+			b.custom_minimum_size = Vector2(0, 46)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.add_theme_font_size_override("font_size", 15)
+			b.pressed.connect(it[1])
+			row.add_child(b)
+			verdict_buttons[it[2]] = b
+	var send_row := func() -> void:
+		ask.text = "THANK YOU. SEND IT TO DUFF:"
+		show_row.call([
+			["TEXT IT TO DUFF", func(): _send_verdict(ask, true), "text"],
+			["COPY", func(): _send_verdict(ask, false), "copy"]])
+	var again_row := func() -> void:
+		ask.text = "FUN %d / 10.  WOULD YOU PLAY AGAIN?" % verdict_fun
+		show_row.call([
+			["YES", func():
+				verdict_again = "yes"
+				send_row.call(), "yes"],
+			["NO", func():
+				verdict_again = "no"
+				send_row.call(), "no"]])
+	var nums: Array = []
+	for i in range(1, 11):
+		nums.append([str(i), func():
+			verdict_fun = i
+			again_row.call(), "fun%d" % i])
+	show_row.call(nums)
+	return wrap
+
+
+func _verdict_text() -> String:
+	var build := "dev"
+	if FileAccess.file_exists("res://build.txt"):
+		build = FileAccess.get_file_as_string("res://build.txt").strip_edges()
+	var how := "rang the bell, grade %s (oil %d, letters %d/%d)" % [game.grade(), game.oil, game.letters_read.size(), room.letters.size()] \
+			if game.rang else "died: %s" % game.cause
+	return "Lethemoor verdict: fun %d/10, play again: %s. Night %d: %s, %d turns. Build %s, %s %s." % [
+		verdict_fun, verdict_again, game.seed, how, game.turn, build, OS.get_name(), OS.get_model_name()]
+
+
+func _send_verdict(status: Label, by_text: bool) -> void:
+	var text := _verdict_text()
+	var cfg := ConfigFile.new()          # keep a copy on the phone too
+	if not capture_mode:
+		cfg.load("user://lethemoor.cfg")
+		var all: Array = cfg.get_value("verdicts", "sent", [])
+		all.append(text)
+		cfg.set_value("verdicts", "sent", all)
+		cfg.save("user://lethemoor.cfg")
+	if not by_text:
+		DisplayServer.clipboard_set(text)
+		if _web_queue("copy", text):
+			status.text = "TAP ANYWHERE ONCE MORE TO COPY, THEN PASTE IT TO DUFF"
+		else:
+			status.text = "COPIED. PASTE IT IN A TEXT TO DUFF."
+		return
+	# sms: with no number opens Messages with the words written; you pick Duff
+	var url := "sms:?&body=" + text.uri_encode()
+	if _web_queue("open", url):
+		status.text = "TAP ANYWHERE ONCE MORE TO OPEN MESSAGES"
+	else:
+		if not capture_mode:
+			OS.shell_open(url)
+		status.text = "MESSAGES OPENED. PICK DUFF AND SEND."
 
 
 # ---------------------------------------------------------------- capture + button test
@@ -1835,6 +2056,12 @@ func _capture() -> void:
 		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands
 	await _shot("fp_dead")
 	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
+	await _press(verdict_buttons["fun7"])
+	await _press(verdict_buttons["yes"])
+	await _shot("fp_verdict")
+	await _press(verdict_buttons["text"])
+	var vt := _verdict_text()
+	print("VERDICT ", "PASS" if "fun 7/10" in vt and "play again: yes" in vt and "died:" in vt and verdict_buttons.has("copy") else "FAIL", " ", vt.left(60))
 	capture_phase = 2
 	get_tree().reload_current_scene()
 
