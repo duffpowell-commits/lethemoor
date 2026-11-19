@@ -268,6 +268,35 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   opens with the words; on web via `window.lmQueue` -> `location.href`) or COPY; a copy is kept in
   `user://lethemoor.cfg` [verdicts]. Capture prints VERDICT PASS (`fp_verdict.png`). Oil slick =
   glossy ragged puddle (generated texture), fire = additive flame particles + guttering light.
+- **Done — after the IGN-style review (Nov 19): more oil, bigger map, swipe-first.** START_OIL 45 -> 60;
+  `GRADES` +15 (S 35 / A 29 / B 23 / C 18) so grades mean the same. `one_night.txt` is now 27x21: the old
+  15 columns kept every coordinate (captures, tests, art views still hit the same tiles) plus an east wing
+  joined at (14,4) and (14,19), a second road north, 4 more flasks (9 total), 2 more thralls (6 + Stalker).
+  Thrall indexes DO shift with map edits (thralls[2] is now (5,11)): the capture picks by kind or sets positions by hand.
+  **Swipes are the controls:** the bottom panel is `SLIM_H` 132 (status + HOODED/NORMAL/BRIGHT + WAIT);
+  the view gets ~200 px back. MENU -> MOVE BUTTONS: ON brings back the old pad (`PAD_H` 330), saved in
+  `user://lethemoor.cfg` [controls] pad. `_bh()` is the panel height everywhere; `_layout_bottom()` lays
+  it out. The capture now moves by real swipes (`_go(kind)`), prints PAD PASS (`fp_pad.png`); bell run:
+  B, 23 oil, 57 turns. Field guide lives in MENU. Sheet: `docs/renders/fp_swipe_sheet.png`.
+- **Done — scarier thralls (Nov 19, Duff: "add all of those ideas").** `night.gd` (8 new tests, 61):
+  **crouch + lunge**: a thrall 2 walking tiles off that sees your light crouches a turn (event `crouch`,
+  the tell), then if you're still 2 off it lunges a tile on any turn (`lunge`), then rests
+  `LUNGE_COOLDOWN` 3. **Rousing**: held under BRIGHT light `ROUSE_LOOK` 2 turns running, it stops
+  shambling (`roused`) till it loses you (NORMAL can't rouse: that made a death spiral). **Silence**:
+  `silent(th)` within `QUIET_NEAR` 3 tiles, no shuffle sound. **Corpses** (`C` tile, `room.corpses`,
+  appended LAST to `thralls` with `lying`): no flicker, no horror, no hearing; rise (`rose`) when you're
+  within `CORPSE_WAKE` 2 and it's outside your view cone, or when you walk into one in the dark (you don't
+  move, you live); rising costs it `RISE_TURNS` 1. Dealt only onto dead ends (`room.dead_end`), never
+  across a corridor. One Night: (17,12) at the end of a flask passage, (17,19) in a south alcove.
+  **Wet prints**: `prints` tile -> turns (`PRINT_TURNS` 10) where a thrall stepped from; the view shows
+  lit ones as glossy decals that fade. View: thralls hunched (squat/wide) and twitch, corpses lie flat,
+  grey body on the corner map, **kill shot** (`_kill_shot`: it fills the screen, red flash, shake,
+  `fp_killshot.png`), new status lines + field notes `lunge` / `rose`, sounds. `GRADE_LINE` fixed to the
+  new bands. **Balance bot** `tools/balance_bot.gd` (`-- 300 [night_script]`, `BOT_FIRST=0` for the
+  handmade night, `BOT_TRACE=1`): careful-but-crude policy. Corpses in corridors took it to 0% wins;
+  the (1,16) thrall made a pincer with (3,12) on the main road, so it moved to (5,11): 54% wins over
+  300 dealt nights, avg 4 oil at the bell (it wanders; a person should do better). Capture bot keeps
+  2 tiles clear and evades (`_evade`); CORPSE PASS (`fp_art_corpse.png`).
 - **Done — art pass (Nov 19, PRs #10-#19):** painted Foxboard/Forge art in every slot: faceless thralls in
   three looks (`THRALL_LOOKS`: dock worker, net-mender, dock woman, by thrall order), Stalker bride, bell,
   flask, boathook, lamppost, oil slick + burning pool, fire flipbook (`fire_sheet.png`), night sky panorama

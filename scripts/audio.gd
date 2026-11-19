@@ -225,6 +225,10 @@ func on_turn(kind: String, events: Array, game, spent: bool) -> void:
 			"letter": sfx("letter", 0.0)
 			"letter_dim": sfx("letter_dim", -4.0)
 			"horror": sfx("sting_horror", -3.0)
+			"lunge": sfx("sting_horror", 0.0, 1.15)
+			"crouch": sfx("heard_turn", -1.0, 0.7)
+			"rose": sfx("sting_dread", -1.0, 0.85)
+			"roused": sfx("heard_turn", -2.0, 0.8)
 			"panic": sfx("panic", 0.0)
 			"out_of_oil": sfx("out_of_oil", 0.0)
 			"bell":
@@ -263,7 +267,7 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 		out.append(kind)
 	for e in events:
 		match e:
-			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", \
+			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", "crouch", "lunge", "rose", "roused", \
 					"hook_hit", "hook_broke", "hook_found", "burned":
 				out.append(e)
 			"rang":
@@ -293,8 +297,8 @@ func _world_sounds(game) -> void:
 		if th.get("gone", false):
 			continue   # burned: it makes no more sound
 		var d: float = Vector2(th.pos - game.hunter).length()
-		if d > HEAR:
-			continue
+		if d > HEAR or th.get("lying", false) or (game.has_method("silent") and game.silent(th)):
+			continue   # out of earshot, playing dead, or so close it has gone quiet: that silence is the warning
 		var moved: bool = i < prev_pos.size() and prev_pos[i] != th.pos
 		var near_db := -4.0 - d * 1.2
 		if th.get("kind", "thrall") == "stalker":

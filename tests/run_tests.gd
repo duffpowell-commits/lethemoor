@@ -197,7 +197,9 @@ func test_adjacent_thrall_takes_you() -> void:
 	check(not n.dead, "two tiles off and hooded: still alive (it noticed nothing)")
 	n.set_lantern(Fog.Lantern.NORMAL)
 	ev = n.wait()
-	check(n.thralls[0].pos == Vector2i(2, 1), "lit: it closes in")
+	check(ev.has("crouch"), "lit, two off: it crouches")
+	ev = n.wait()
+	check(n.thralls[0].pos == Vector2i(2, 1), "then it closes in")
 	ev = n.wait()
 	check(n.dead and ev.has("taken"), "next to you on its turn: you die")
 	check(n.step(Vector2i(1, 1)).is_empty(), "the dead don't walk")
@@ -639,7 +641,7 @@ func test_light_beats_noise() -> void:
 # ---- every night is dealt fresh (Nov 19): same walls, things moved a little, from a seed ----
 
 func _night_layout(g) -> Array:
-	return [g.room.thralls.duplicate(), g.room.stalkers.duplicate(), g.room.oil_flasks.duplicate(), g.room.letters.duplicate()]
+	return [g.room.thralls.duplicate(), g.room.stalkers.duplicate(), g.room.corpses.duplicate(), g.room.oil_flasks.duplicate(), g.room.letters.duplicate()]
 
 
 func test_seed_zero_is_the_handmade_night() -> void:
@@ -664,17 +666,19 @@ func test_dealt_nights_stay_fair() -> void:
 		var r = g.room
 		var from_start: Dictionary = r.reachable(r.hunter, r.size.x * r.size.y)
 		var route: Array = r.path_in(from_start, r.hunter, r.bells[0])
-		check(r.thralls.size() == base.room.thralls.size() and r.stalkers.size() == base.room.stalkers.size() \
+		check(r.thralls.size() == base.room.thralls.size() and r.stalkers.size() == base.room.stalkers.size() and r.corpses.size() == base.room.corpses.size() \
 				and r.oil_flasks.size() == base.room.oil_flasks.size() and r.letters.size() == base.room.letters.size(),
 				"seed %d keeps every count" % s)
 		var used := {r.hunter: true, r.bells[0]: true}
 		for k in r.hooks:
 			used[k] = true
-		for p in r.thralls + r.stalkers + r.oil_flasks + r.letters:
+		for p in r.thralls + r.stalkers + r.corpses + r.oil_flasks + r.letters:
 			check(not r.is_wall(p), "seed %d: %s is on floor" % [s, p])
 			check(not used.has(p), "seed %d: %s is shared or sits on the start, bell or hook" % [s, p])
 			used[p] = true
-		for p in r.thralls + r.stalkers:
+		for p in r.corpses:
+			check(r.dead_end(p), "seed %d: the body at %s lies in a dead end, not across a corridor" % [s, p])
+		for p in r.thralls + r.stalkers + r.corpses:
 			check(from_start.get(p, 0) >= Room.SAFE_START, "seed %d: horror at %s is too close to the start" % [s, p])
 		for p in r.stalkers:
 			check(not p in route, "seed %d: the Stalker at %s blocks the straight road to the bell" % [s, p])
@@ -683,7 +687,142 @@ func test_dealt_nights_stay_fair() -> void:
 			for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 				beside = beside or r.is_wall(p + d)
 			check(beside, "seed %d: letter at %s has a wall to hang on" % [s, p])
-		check(g.thralls.size() == r.thralls.size() + r.stalkers.size() and g.flasks_left.size() == r.oil_flasks.size(),
+		check(g.thralls.size() == r.thralls.size() + r.stalkers.size() + r.corpses.size() and g.flasks_left.size() == r.oil_flasks.size(),
 				"seed %d: the night uses the dealt layout" % s)
 		if failures > 0:
 			return
+
+
+# ---------------------------------------------------------------- thralls, made worse (Nov 19)
+
+const LONG := "###########\n#H........#\n###########"
+
+
+func _thrall_at(n, p: Vector2i, extra := {}) -> Dictionary:
+	var th := {pos = p, target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false}
+	th.merge(extra, true)
+	n.thralls.append(th)
+	return th
+
+
+func test_thrall_lunges_from_two_tiles() -> void:
+	var n = Night.start(LONG)
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(3, 1))
+	var ev: Array = n.wait()
+	check("crouch" in ev and th.pos == Vector2i(3, 1), "two tiles off, it sees the light: first it crouches (the tell)")
+	n.turn = 2          # its next turn would be an off (shambling) turn: the lunge ignores that
+	ev = n.wait()
+	check("lunge" in ev and th.pos == Vector2i(2, 1), "still there: it lunges a tile")
+	check(not n.dead, "a lunge closes the gap; the grab comes on its next turn")
+	n.step_dir(Vector2i.LEFT)   # back into the wall: no turn spent
+	n.wait()
+	check(n.dead, "stand there after a lunge and it has you")
+
+
+func test_lunge_rests_and_backing_off_works() -> void:
+	var n = Night.start("###########\n#.....H...#\n###########")
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(8, 1))
+	n.wait()
+	n.wait()
+	check(th.pos == Vector2i(7, 1) and th.lunge_cd == Night.LUNGE_COOLDOWN, "it crouched, lunged, and must rest")
+	for i in 3:
+		n.step_dir(Vector2i.LEFT)   # back away, facing it
+	check(not n.dead, "backing off while it rests gets you clear")
+
+
+func test_long_look_rouses_a_thrall() -> void:
+	var n = Night.start("##############\n#H...........#\n##############")
+	n.facing = Vector2i.RIGHT
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	var th := _thrall_at(n, Vector2i(5, 1))
+	var roused := false
+	for i in 2:
+		roused = roused or "roused" in n.wait()
+	check(roused and th.roused, "held in the light two turns running, it stirs")
+	n.set_lantern(Fog.Lantern.HOODED)
+	var a: Vector2i = th.pos
+	n.wait()
+	check(th.pos != a or n.dead, "roused: it moves on what would be a shambling turn")
+
+
+func test_corpse_plays_dead_until_you_pass() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(4, 1), {lying = true})
+	n.step_dir(Vector2i.RIGHT)          # (2,1): it's ahead, in view: it stays down
+	check(th.lying, "looked at, it plays dead")
+	check(n.awake_positions().is_empty(), "a lying corpse doesn't make the flame gutter")
+	n.turn_by(1)                         # look away, 2 tiles from it
+	check(not th.lying and th.target != null, "look away while close and it gets up")
+	n.turn_by(-1)
+	check(not n.dead, "getting up costs it a turn")
+
+
+func test_tripping_on_a_corpse_in_the_dark() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	n.set_lantern(Fog.Lantern.HOODED)
+	var th := _thrall_at(n, Vector2i(2, 1), {lying = true})
+	var ev: Array = n.step_dir(Vector2i.RIGHT)
+	check("rose" in ev and n.hunter == Vector2i(1, 1) and not n.dead, "you trip on it: you don't move, it wakes, you live")
+	check(not th.lying, "it's up")
+
+
+func test_thralls_leave_wet_prints_that_dry() -> void:
+	var n = Night.start(LONG)
+	n.facing = Vector2i.RIGHT
+	n.set_lantern(Fog.Lantern.BRIGHT)
+	var th := _thrall_at(n, Vector2i(8, 1))
+	var from: Vector2i = th.pos
+	for i in 2:
+		n.wait()
+	check(n.prints.has(from), "where it stepped from is wet")
+	n.prints[from] = 1
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.wait()
+	check(not n.prints.has(from), "prints dry out")
+
+
+func test_close_thralls_go_silent() -> void:
+	var n = Night.start(LONG)
+	var near := _thrall_at(n, Vector2i(3, 1))
+	var far := _thrall_at(n, Vector2i(8, 1))
+	check(n.silent(near) and not n.silent(far), "within 3 tiles a thrall makes no sound")
+
+
+func test_crouch_gives_you_a_turn_to_get_clear() -> void:
+	var n = Night.start(LONG)
+	n.facing = Vector2i.LEFT     # backing away = stepping right, eyes on it
+	n.hunter = Vector2i(3, 1)
+	var th := _thrall_at(n, Vector2i(1, 1))
+	check("crouch" in n.wait(), "it crouches")
+	var ev: Array = n.step_dir(Vector2i.RIGHT)
+	check(not "lunge" in ev and not th.crouched and not n.dead, "you stepped out of reach: no lunge, the crouch is spent")
+
+
+func test_corpse_never_rises_through_a_wall() -> void:
+	var n = Night.start("#######\n#H#...#\n#.#...#\n#######")
+	n.facing = Vector2i.DOWN
+	var th := _thrall_at(n, Vector2i(3, 1), {lying = true})   # 2 tiles away, a wall between
+	n.wait()
+	check(th.lying, "a wall between you: it stays down")
+
+
+func test_hook_breaks_a_crouch() -> void:
+	var n = Night.start(LONG)
+	n.facing = Vector2i.RIGHT
+	n.hook_wear = 3
+	var th := _thrall_at(n, Vector2i(3, 1))
+	n.wait()
+	check(th.crouched, "it crouches")
+	n.hook()
+	check(not th.crouched, "the hook knocks it out of the crouch")
+
+
+func test_killer_is_recorded() -> void:
+	var n = Night.start("#####\n#HT.#\n#####")
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.step(Vector2i(2, 1))
+	check(n.dead and n.killer == "thrall", "walked into a thrall in the dark: the thrall took you")

@@ -4,12 +4,14 @@ extends RefCounted
 ##   B bell (ring it: the night is won)   N letter (readable under BRIGHT)   O oil flask (pickup)
 ##   K boathook (pickup: reach 2, bends with every hit)
 ##   S stalker (the veiled bride: frozen while you look at it in your light, 2 steps in the dark)
+##   C corpse (a thrall playing dead: it gets up once you're close and not looking at it)
 
 var rows: Array = []
 var size := Vector2i.ZERO
 var hunter := Vector2i(-1, -1)
 var thralls: Array[Vector2i] = []
 var stalkers: Array[Vector2i] = []
+var corpses: Array[Vector2i] = []
 var lamps: Array[Vector2i] = []
 var exits: Array[Vector2i] = []
 var bells: Array[Vector2i] = []
@@ -38,6 +40,7 @@ static func parse(text: String) -> RefCounted:
 				"H": r.hunter = p
 				"T": r.thralls.append(p)
 				"S": r.stalkers.append(p)
+				"C": r.corpses.append(p)
 				"L": r.lamps.append(p)
 				"E": r.exits.append(p)
 				"B": r.bells.append(p)
@@ -139,6 +142,8 @@ func shuffle(seed: int) -> void:
 		return far.call(q) and road.call(q) >= road.call(p) and from_start.get(q, 0) >= from_start.get(p, 0)
 	stalkers = _deal(stalkers, rng, used, func(q, p): return fair.call(q, p) and not q in route, horrors)
 	thralls = _deal(thralls, rng, used, fair, horrors)
+	# bodies lie in dead ends you pass or walk into, never across a corridor you must use
+	corpses = _deal(corpses, rng, used, func(q, p): return fair.call(q, p) and dead_end(q), horrors)
 	letters = _deal(letters, rng, used, func(q, _p): return _against_wall(q))
 	oil_flasks = _deal(oil_flasks, rng, used, func(_q, _p): return true)
 
@@ -157,6 +162,15 @@ func _deal(from: Array[Vector2i], rng: RandomNumberGenerator, used: Dictionary, 
 			mark[pick] = true
 		out.append(pick)
 	return out
+
+
+## A floor tile with one way out: an alcove or the end of a passage.
+func dead_end(p: Vector2i) -> bool:
+	var ways := 0
+	for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if not is_wall(p + d):
+			ways += 1
+	return not is_wall(p) and ways == 1
 
 
 func _against_wall(p: Vector2i) -> bool:

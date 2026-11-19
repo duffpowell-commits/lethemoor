@@ -6,11 +6,11 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 
 ## Danger first: if a thrall and a letter turn up together, the thrall gets the card.
-const ORDER := ["goal", "stalker", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
+const ORDER := ["goal", "stalker", "rose", "lunge", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
 
 const CARDS := {
 	"goal": ["RING THE BELL",
-		"The bell hangs somewhere in this ward. Reach it and ring it to end the night.\n\nSwipe up to step, down to back away, left or right to turn, or use the buttons. Every move, even a turn, is one turn. The dark moves when you do."],
+		"The bell hangs somewhere in this ward. Reach it and ring it to end the night.\n\nSwipe up to step, down to back away, left or right to turn. WAIT waits a turn. (Rather have buttons? MENU, MOVE BUTTONS.) Every move, even a turn, is one turn. The dark moves when you do."],
 	"oil": ["OIL IS YOUR CLOCK",
 		"The amber bar is your oil. NORMAL burns 1 a turn, BRIGHT burns 2, HOODED burns none. Changing the lantern is free.\n\nThe oil you still have when the bell rings is your score."],
 	"hood": ["HOODED",
@@ -18,7 +18,11 @@ const CARDS := {
 	"dread": ["DREAD",
 		"The red bar. It climbs in the dark and when something finds you. Light brings it down.\n\nPast the halfway mark the flame starts lying to you. When it fills, your hands shake and you spill 5 oil."],
 	"horror": ["THRALLS",
-		"They come to light. BRIGHT is seen from 8 tiles, NORMAL from 5, HOODED only up close. One beside you on its turn is death.\n\nThey are slow and move every other turn. Outpace them, or hood the lantern and let them lose you."],
+		"They come to light. BRIGHT is seen from 8 tiles, NORMAL from 5, HOODED only up close. One beside you on its turn is death.\n\nThey shamble, a step every other turn. But two tiles off they crouch, then lunge, and one held under BRIGHT light two turns stops shambling. Close up they make no sound at all. Wet prints on the stones mean one passed here."],
+	"lunge": ["IT LUNGED",
+		"Two tiles off and seeing your light, a thrall crouches for a turn, then closes the gap in one jerk. Then it must rest a few turns.\n\nMove now: back off, hook it, or step round a corner. Standing still is death."],
+	"rose": ["THE DEAD GET UP",
+		"Not every body is dead. Some lie still till you've walked past and look away, then rise behind you.\n\nGetting up costs it a turn. Keep bodies in front of you, or give them a wide berth."],
 	"stalker": ["THE BRIDE",
 		"She cannot move while she is lit and you are looking at her. Turn away or let the light fall, and she comes two steps at a time.\n\nBack away from her. Never turn your back."],
 	"flicker": ["THE FLAME GUTTERS",
@@ -39,7 +43,7 @@ const CARDS := {
 		"Your dread filled. Your hands shook and oil spilled. Get back into the light to steady them."],
 }
 
-const GRADE_LINE := "Grade = oil left + 5 per letter read.\nS 20+  ·  A 14+  ·  B 8+  ·  C 3+  ·  D"
+const GRADE_LINE := "Grade = oil left + 5 per letter read.\nS 35+  ·  A 29+  ·  B 23+  ·  C 18+  ·  D"
 
 
 ## The next card to show, or "" if none is due. `event` is the turn's headline event.
@@ -62,7 +66,9 @@ static func _now(id: String, game, event: String) -> bool:
 		"dread":
 			return game.dread >= 25
 		"horror":
-			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
+			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT)
+		"lunge", "rose":
+			return event == id
 		"stalker":
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 		"flicker":

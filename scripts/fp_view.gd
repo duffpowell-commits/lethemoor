@@ -17,7 +17,8 @@ const Perf = preload("res://scripts/perf.gd")
 
 const UI_W := 540
 const TOP_H := 72
-const BOTTOM_H := 330              # status + lantern row + move pad
+const PAD_H := 330                 # status + lantern row + move pad (MENU -> MOVE BUTTONS: ON)
+const SLIM_H := 132                # status + lantern row + WAIT: swipes move you (the default)
 const WALL_H := 2.4                # tall: walls should loom over you
 const EYE := 0.82                  # eye height in tiles (a tile is ~ a stride)
 const CAM_BACK := 0.32             # stand at the back of the tile so the next one is in view
@@ -45,7 +46,7 @@ const LIGHT := {
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
 const THRALL_LOOKS := ["thrall_dock", "thrall_netmender", "thrall_dockwoman"]
-const STOP_EVENTS := ["heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
@@ -73,6 +74,10 @@ var tile_tex := {}                 # floor/wall tile -> texture name
 var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
 var thrall_nodes: Array = []
+var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
+var print_nodes := {}              # tile -> wet footprints decal on the floor
+var print_tex: Texture2D
+var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
 var hook_nodes := {}              # tile -> boathook lying on the floor
 var slick_nodes := {}             # tile -> oil slick / fire on the floor (made as they appear)
@@ -105,6 +110,10 @@ var oil_count: Label
 var dread_label: Label
 var lantern_buttons := {}
 var move_buttons := {}
+var wait_button: Button             # WAIT on the lantern row (swipe mode)
+var bottom_panel: ColorRect
+var pad_on := false                # the old move pad; off = swipes are the controls
+var menu_items := {}               # menu label (before any colon) -> button, for the capture
 var minimap: Control
 var end_screen: Control
 
@@ -343,14 +352,18 @@ func _build_world() -> void:
 		if stalker:
 			th.modulate = Color(1.12, 1.1, 1.15)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
+		if not stalker:
+			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
+			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
 		add_child(holder)
 		thrall_nodes.append(holder)
+		thrall_sprites.append(th)
 
 	cam = Camera3D.new()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
 	cam.near = 0.05
-	# The HUD covers the top 72 px and bottom 330 px, so centre the view on the strip
+	# The HUD covers the top bar and the bottom panel (_bh()), so centre the view on the strip
 	# between them: a frustum camera with its centre shifted up.
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	_fit_camera()
@@ -440,6 +453,8 @@ func _refresh_fog() -> void:
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
+		_pose(i)
+	_sync_prints()
 	for kp: Vector2i in hook_nodes:
 		hook_nodes[kp].visible = game.hooks_left.has(kp) and fog.get_state(kp) != Fog.DARK
 	_sync_slicks()
@@ -454,6 +469,73 @@ func _refresh_fog() -> void:
 	flame.visible = eff != Fog.Lantern.HOODED
 	if minimap:
 		minimap.queue_redraw()
+
+
+## A corpse lies flat on the stones, feet toward the wall; once it gets up it stands like the rest.
+func _pose(i: int) -> void:
+	var sp: Sprite3D = thrall_sprites[i]
+	var lying: bool = game.thralls[i].get("lying", false)
+	sp.billboard = BaseMaterial3D.BILLBOARD_DISABLED if lying else BaseMaterial3D.BILLBOARD_FIXED_Y
+	if lying:
+		# on its side across your view, turned to you, sagging back a little: a body, at a glance
+		var to_cam: Vector3 = cam.global_position - thrall_nodes[i].global_position if cam else Vector3.FORWARD
+		sp.rotation = Vector3(0, atan2(to_cam.x, to_cam.z), PI / 2 + 0.08)
+		sp.offset = Vector2.ZERO
+		sp.position = Vector3(0, sp.texture.get_width() * sp.pixel_size * 0.42, 0)
+	else:
+		sp.rotation = Vector3.ZERO
+		sp.position = Vector3.ZERO
+		sp.offset = Vector2(0, sp.texture.get_height() / 2.0)
+	sp.modulate = Color(0.68, 0.68, 0.72) if lying else (sp.modulate if game.thralls[i].kind == "stalker" else Color(0.8, 0.8, 0.82))
+
+
+## Two wet bare footprints, drawn once: dark, a little glossy.
+func _print_texture() -> Texture2D:
+	if print_tex:
+		return print_tex
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for foot in [[Vector2(22, 40), 1.0], [Vector2(42, 22), -1.0]]:
+		var c: Vector2 = foot[0]
+		for y in 64:
+			for x in 64:
+				var q := Vector2(x, y) - c
+				var heel := (q - Vector2(0, 6)).length() < 5.0
+				var sole := Vector2(q.x / 5.5, (q.y + 2.0) / 9.0).length() < 1.0
+				var toes := false
+				for k in 4:
+					toes = toes or (q - Vector2(-4.0 + k * 2.7 * foot[1] * foot[1], -12.5 + absf(k - 1.5))).length() < 1.6
+				if heel or sole or toes:
+					img.set_pixel(x, y, Color(0.02, 0.03, 0.05, 0.85))
+	print_tex = ImageTexture.create_from_image(img)
+	return print_tex
+
+
+## Wet prints show on lit floor while they last (the sim dries them).
+func _sync_prints() -> void:
+	for p: Vector2i in print_nodes.keys():
+		if not game.prints.has(p):
+			print_nodes[p].queue_free()
+			print_nodes.erase(p)
+	for p: Vector2i in game.prints:
+		if not print_nodes.has(p):
+			var m := MeshInstance3D.new()
+			var q := QuadMesh.new()
+			q.size = Vector2(0.55, 0.55)
+			m.mesh = q
+			var mat := StandardMaterial3D.new()
+			mat.albedo_texture = _print_texture()
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.roughness = 0.15                 # wet: it catches the lantern
+			mat.metallic_specular = 0.6
+			m.material_override = mat
+			m.rotation = Vector3(-PI / 2, float(hash(p) % 628) / 100.0, 0)
+			m.position = _w(p) + Vector3(0, 0.012, 0)
+			add_child(m)
+			print_nodes[p] = m
+		print_nodes[p].visible = fog.get_state(p) == Fog.LIT
+		var mat2: StandardMaterial3D = print_nodes[p].material_override
+		mat2.albedo_color = Color(1, 1, 1, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # drying
 
 
 ## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
@@ -595,7 +677,8 @@ func act(kind: String) -> void:
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
 		var ahead: Vector2i = game.hunter + (game.facing if kind == "forward" else -game.facing)
-		last_event = "blocked_fire" if game.burning(ahead) else ("blocked_horror" if game.thrall_at(ahead) >= 0 else "blocked")
+		var who: int = game.thrall_at(ahead)
+		last_event = "blocked_fire" if game.burning(ahead) else ("blocked" if who < 0 else ("blocked_body" if game.thralls[who].get("lying", false) else "blocked_horror"))
 		_refresh_hud()
 		return
 	if game.turn == turn0 and not game.over() and kind in ["hook", "pour", "spark"]:
@@ -624,6 +707,8 @@ func act(kind: String) -> void:
 	if flicker and not was_flicker and last_event not in STOP_EVENTS:
 		last_event = "flicker"
 		_refresh_hud()
+	if game.dead and ("taken" in events or "grabbed" in events):
+		await _kill_shot()
 	busy = false
 	if game.over():
 		_show_end()
@@ -714,6 +799,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	t += delta
 	_flicker_fires()
+	# standing thralls twitch: a jerk of the head now and then, never smooth
+	for i in thrall_sprites.size():
+		var th: Dictionary = game.thralls[i]
+		if th.get("kind", "thrall") == "thrall" and not th.get("lying", false) and thrall_nodes[i].visible:
+			var jerk := 0.0
+			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
+				jerk = 0.05 * sin(t * 90.0 + i)
+			thrall_sprites[i].position.x = jerk
 	if busy:
 		pass
 	var eff: int = game.effective()
@@ -735,10 +828,15 @@ func _process(delta: float) -> void:
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
 		hand_art.modulate = Color(k, k, k)
-		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22 + sin(t * 2.1) * 2.0
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22 + sin(t * 2.1) * 2.0
 
 
 # ---------------------------------------------------------------- HUD
+
+## Bottom panel height: slim when you move by swiping, tall with the move pad.
+func _bh() -> float:
+	return PAD_H if pad_on else SLIM_H
+
 
 func _ui_h() -> float:
 	return get_viewport().get_visible_rect().size.y
@@ -757,7 +855,7 @@ func _fit_camera() -> void:
 	var vis := get_viewport().get_visible_rect().size
 	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0)) * vis.x / UI_W
 	var full_h := cam.size * vis.y / vis.x
-	var mid := (TOP_H + (vis.y - BOTTOM_H)) / 2.0
+	var mid := (TOP_H + (vis.y - _bh())) / 2.0
 	cam.frustum_offset = Vector2(0, -full_h * (vis.y / 2.0 - mid) / vis.y)
 
 
@@ -783,7 +881,7 @@ func _on_resize() -> void:
 	if perf:
 		perf.offset.x = _col_x()
 	if hand_art:
-		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22
 	_refresh_hud()                        # the tool buttons sit on the bottom panel
 	if modal != null and is_instance_valid(title_begin) and modal.is_ancestor_of(title_begin):
 		modal.queue_free()                # the title is laid out by height: build it again
@@ -868,7 +966,7 @@ func _build_hud() -> void:
 	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	hand_art.size = Vector2(HAND_W, HAND_W)
-	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - BOTTOM_H - HAND_W + 22)
+	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - _bh() - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hand_col.add_child(hand_art)
 
@@ -929,7 +1027,8 @@ func _build_hud() -> void:
 	var bottom := ColorRect.new()
 	bottom.color = UI.INK
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_top = -BOTTOM_H
+	bottom.offset_top = -_bh()
+	bottom_panel = bottom
 	hud.add_child(bottom)
 	_wing(bottom, UI.INK)
 	_rule(bottom, 0)
@@ -942,7 +1041,7 @@ func _build_hud() -> void:
 	bottom.add_child(status_label)
 	# the lantern row teaches its own costs: name, then oil per turn and how far it lights
 	var names := {
-		Fog.Lantern.HOODED: "HOODED\nno oil · unseen",
+		Fog.Lantern.HOODED: "HOODED\n0 oil · unseen",
 		Fog.Lantern.NORMAL: "NORMAL\n1 oil · 2 tiles",
 		Fog.Lantern.BRIGHT: "BRIGHT\n2 oil · 4 tiles",
 	}
@@ -962,6 +1061,11 @@ func _build_hud() -> void:
 	move_buttons["wait"] = _plate("wait", "WAIT", Vector2(14, 228), Vector2(162, 88), act.bind("wait"), bottom)
 	move_buttons["back"] = _plate("back", "BACK", Vector2(188, 228), Vector2(162, 88), act.bind("back"), bottom)
 	move_buttons["guide"] = _plate("guide", "FIELD GUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
+	wait_button = _button("WAIT", Vector2(428, 60), Vector2(98, 56), act.bind("wait"), bottom)
+	_plate_style(wait_button)
+	wait_button.add_theme_font_size_override("font_size", 17)
+	wait_button.add_theme_color_override("font_color", Color("#c9ad78"))
+	_layout_bottom()
 	# item column, left edge above the panel (the lantern hand is low right). Shown when usable.
 	item_buttons["hook"] = _button("HOOK", Vector2.ZERO, Vector2(132, 64), act.bind("hook"), hud)
 	item_buttons["pour"] = _button("POUR OIL\n3 oil", Vector2.ZERO, Vector2(132, 64), act.bind("pour"), hud)
@@ -970,6 +1074,34 @@ func _build_hud() -> void:
 		item_buttons[k].add_theme_font_size_override("font_size", 15)
 		_plate_style(item_buttons[k])
 		item_buttons[k].add_theme_color_override("font_color", Color("#c9ad78"))
+
+
+## Swipe mode: a slim panel, three lantern buttons and WAIT on one row, the view gets the
+## rest. Pad mode: the tall panel with the old move pad. Switch in MENU -> MOVE BUTTONS.
+func _layout_bottom() -> void:
+	bottom_panel.offset_top = -_bh()
+	var x := 14.0
+	for s in [Fog.Lantern.HOODED, Fog.Lantern.NORMAL, Fog.Lantern.BRIGHT]:
+		var b: Button = lantern_buttons[s]
+		b.position = Vector2(x, 60)
+		b.size = Vector2(162 if pad_on else 128, 56)
+		b.add_theme_font_size_override("font_size", 13 if pad_on else 12)
+		x += 174 if pad_on else 138
+	for k in move_buttons:
+		move_buttons[k].visible = pad_on
+	wait_button.visible = not pad_on
+	if cam:
+		_fit_camera()
+	if hand_art:
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22
+	if game:
+		_refresh_hud()
+
+
+func _set_pad(on: bool) -> void:
+	pad_on = on
+	_layout_bottom()
+	_save_hints()
 
 
 ## A move-pad plate: iron face, brass rim, a sign drawn over its caption. `hero` = the big one.
@@ -1155,7 +1287,10 @@ func _draw_map() -> void:
 	for th in game.thralls:
 		if th.get("gone", false):
 			continue   # burned: no square, no last-seen mark
-		if fog.get_state(th.pos) == Fog.LIT:
+		if th.get("lying", false):
+			if fog.get_state(th.pos) != Fog.DARK:   # a body on the stones, nothing more (so it seems)
+				minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(1.5, 3), Vector2(c - 3, c - 6)), Color(UI.DIM, 0.8))
+		elif fog.get_state(th.pos) == Fog.LIT:
 			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
 		elif th.last_seen != null:
 			# last-seen marker: where you saw it, not where it is. It may have moved.
@@ -1202,6 +1337,11 @@ func _refresh_hud() -> void:
 		"cant_pour": "No room to pour there, or not enough oil.",
 		"ignite": "The spark catches. Fire runs along the oil.",
 		"burned": "Something burns in the oil. It doesn't scream.",
+		"crouch": "It crouches, low and still, watching the flame. Move.",
+		"lunge": "It lunges. Two paces gone in a heartbeat. It's on you.",
+		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
+		"roused": "You held it in the high flame too long. It stops shambling.",
+		"blocked_body": "A body lies there, sodden. You'd have to step over it.",
 		"heard": "Somewhere in the dark, something stops, and turns toward the sound.",
 		"cant_spark": "Nothing to light. Look at the oil, lantern lit, 3 tiles or nearer.",
 	}
@@ -1220,7 +1360,7 @@ func _refresh_hud() -> void:
 		item_buttons.hook.visible = game.hook_wear > 0
 		item_buttons.hook.text = "HOOK\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
 		item_buttons.spark.visible = game.slicks.values().has(0)
-		var y: float = _ui_h() - BOTTOM_H - 12 - 64
+		var y: float = _ui_h() - _bh() - 12 - 64
 		for k in ["spark", "pour", "hook"]:
 			if item_buttons[k].visible:
 				item_buttons[k].position = Vector2(14, y)
@@ -1514,6 +1654,7 @@ func _open_menu() -> void:
 		["RESUME", _close_menu],
 		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
 		["REPORT A BUG", func(): _close_menu(); _open_report()],
+		["MOVE BUTTONS: " + ("ON" if pad_on else "OFF"), "pad"],
 		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
 		["SHOW FPS: " + ("ON" if perf.show else "OFF"), "fps"],
 		["GRAPHICS: " + perf.quality_name(), "gfx"],
@@ -1528,7 +1669,12 @@ func _open_menu() -> void:
 		b.add_theme_font_size_override("font_size", 19)
 		if it[0] == "RESUME":
 			UI.lit(b)
-		if it[1] is String and it[1] == "fps":
+		menu_items[it[0].get_slice(":", 0)] = b
+		if it[1] is String and it[1] == "pad":
+			b.pressed.connect(func():
+				_set_pad(not pad_on)
+				b.text = "MOVE BUTTONS: " + ("ON" if pad_on else "OFF"))
+		elif it[1] is String and it[1] == "fps":
 			b.pressed.connect(func():
 				perf.toggle_show()
 				b.text = "SHOW FPS: " + ("ON" if perf.show else "OFF"))
@@ -1649,6 +1795,7 @@ func _load_hints() -> void:
 	if capture_mode or cfg.load("user://lethemoor.cfg") != OK:
 		return
 	hints_on = cfg.get_value("hints", "on", true)
+	pad_on = cfg.get_value("controls", "pad", false)
 	for id in cfg.get_value("hints", "seen", []):
 		seen[id] = true
 
@@ -1660,7 +1807,58 @@ func _save_hints() -> void:
 	cfg.load("user://lethemoor.cfg")   # keep the other sections (audio mute, fps, graphics)
 	cfg.set_value("hints", "on", hints_on)
 	cfg.set_value("hints", "seen", seen.keys())
+	cfg.set_value("controls", "pad", pad_on)
 	cfg.save("user://lethemoor.cfg")
+
+
+## It has you: the thing fills the screen, lunging up out of the dark, a red flash, a shake.
+func _kill_shot() -> void:
+	var stalker: bool = game.killer == "stalker"
+	kill_shot = Control.new()
+	kill_shot.set_anchors_preset(Control.PRESET_FULL_RECT)
+	kill_shot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.add_child(kill_shot)
+	var dark := ColorRect.new()
+	dark.color = Color(0, 0, 0, 0.0)
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	kill_shot.add_child(dark)
+	_wing(kill_shot, Color(0, 0, 0, 0))
+	var face := TextureRect.new()
+	face.texture = _tex("stalker_bride" if stalker else "thrall_dock")
+	for i in game.thralls.size():   # the one that took you, in its own look
+		var th: Dictionary = game.thralls[i]
+		if th.get("kind", "thrall") == game.killer and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1:
+			face.texture = thrall_sprites[i].texture
+			break
+	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_SCALE
+	face.modulate = Color(0.75, 0.7, 0.7) if not stalker else Color(1.1, 1.08, 1.12)
+	kill_shot.add_child(face)
+	var red := ColorRect.new()
+	red.color = Color(0.55, 0.0, 0.02, 0.0)
+	red.set_anchors_preset(Control.PRESET_FULL_RECT)
+	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kill_shot.add_child(red)
+	var h := _ui_h()
+	var e := 0.0
+	const T_KILL := 0.75
+	while e < T_KILL:
+		e += get_process_delta_time()
+		var k := clampf(e / 0.28, 0.0, 1.0)          # it comes up fast, then hangs there
+		var size := lerpf(h * 0.5, h * 2.1, k * k)
+		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 14.0 * (1.0 - e / T_KILL)
+		var tex := face.texture.get_size()
+		face.size = Vector2(size * tex.x / tex.y, size)   # its own shape: nothing cropped off the top
+		# the hood is in the top fifth of the art: keep it in the middle of the screen as it comes
+		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * 0.13) + shake
+		dark.color.a = 0.6 * k
+		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
+		await get_tree().process_frame
+	if capture_mode:
+		await _shot("fp_killshot")
+	kill_shot.queue_free()
+	kill_shot = null
 
 
 func _show_end() -> void:
@@ -1857,7 +2055,7 @@ func _capture_rotate() -> void:
 		await get_tree().process_frame
 	var vis := get_viewport().get_visible_rect().size
 	var turn0: int = game.turn
-	var centred: bool = vis.x > vis.y and absf(move_buttons["forward"].get_global_rect().get_center().x - vis.x / 2.0) < 2.0
+	var centred: bool = vis.x > vis.y and absf(bottom_panel.get_global_rect().get_center().x - vis.x / 2.0) < 2.0
 	await _shot("fp_sideways")
 	await _press(menu_button)
 	var tapped: bool = menu_sheet != null
@@ -1893,16 +2091,21 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	for guard in 200:
 		if game.over() or game.hunter == goal:
 			return last_event
+		var close: bool = _lit_awake().any(func(th): return th.get("kind", "thrall") == "thrall" \
+				and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 2)
+		if close:
+			await _evade()   # it's within lunging reach: get clear before anything else, never turn
+			continue
 		var path: Array = _safe_path(goal)
 		if path.size() < 2:
-			await _press(move_buttons["wait"])   # a thrall sits on every way through: let it move
+			await _evade()   # a thrall sits on every way through: hook it, back off, or let it move
 			continue
 		var d: Vector2i = path[1] - game.hunter
 		if game.facing == d:
-			await _press(move_buttons["forward"])
+			await _go("forward")
 		else:
 			var right := Vector2i(-game.facing.y, game.facing.x)
-			await _press(move_buttons["right" if d == right else "left"])
+			await _go("right" if d == right else "left")
 		if last_event in stop_on:
 			return last_event
 		if card_ok != null and card_ok.text == "PUT IT AWAY":
@@ -1910,13 +2113,63 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	return "gave_up"
 
 
-## Shortest way to `goal` that never steps next to a thrall you can see (what a player does).
+## Lit horrors that are up and about (a corpse lying still isn't one, as far as you know).
+func _lit_awake() -> Array:
+	return game.thralls.filter(func(th): return not th.get("gone", false) and not th.get("lying", false) \
+			and fog.get_state(th.pos) == Fog.LIT)
+
+
+## Something is too close: hook it if it's right ahead, else step to the tile furthest from
+## every horror you can see (backing up keeps your eyes on it), else wait.
+func _evade() -> void:
+	var near: Array = _lit_awake()
+	var ahead: Vector2i = game.hunter + game.facing
+	if game.hook_wear > 0 and near.any(func(th): return th.pos == ahead or th.pos == ahead + game.facing):
+		await _press(item_buttons.hook)
+		return
+	if near.is_empty():
+		await _go("wait")
+		return
+	var best := Vector2i.ZERO
+	var best_d := -1
+	for d: Vector2i in [game.facing, -game.facing, Vector2i(-game.facing.y, game.facing.x), Vector2i(game.facing.y, -game.facing.x)]:
+		var n: Vector2i = game.hunter + d
+		if room.is_wall(n) or game.thrall_at(n) >= 0 or game.burning(n):
+			continue
+		var m := 999
+		for th in near:
+			m = mini(m, absi(th.pos.x - n.x) + absi(th.pos.y - n.y))
+		if m > best_d:
+			best_d = m
+			best = d
+	if best == game.facing:
+		await _go("forward")
+	elif best == -game.facing:
+		await _go("back")
+	else:
+		await _go("wait")
+
+
+## Shortest way to `goal` that keeps two tiles clear of every thrall you can see (they lunge
+## from two) and, if there's another way, round where you last saw one: what a careful player does.
 func _safe_path(goal: Vector2i) -> Array:
+	var round_them := _safe_path_avoiding(goal, true)
+	return round_them if round_them.size() >= 2 else _safe_path_avoiding(goal, false)
+
+
+func _safe_path_avoiding(goal: Vector2i, remembered: bool) -> Array:
 	var bad := {}
 	for th in game.thralls:
-		if fog.get_state(th.pos) == Fog.LIT:
+		if th.get("lying", false) and fog.get_state(th.pos) != Fog.DARK:
+			bad[th.pos] = true   # a body you can see: walk round it
+		elif remembered and th.last_seen != null and not th.get("gone", false) and not th.get("lying", false):
 			for d: Vector2i in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-				bad[th.pos + d] = true
+				bad[th.last_seen + d] = true
+	for th in _lit_awake():
+		for dx in range(-2, 3):
+			for dy in range(-2, 3):
+				if absi(dx) + absi(dy) <= (2 if th.get("kind", "thrall") == "thrall" else 1):
+					bad[th.pos + Vector2i(dx, dy)] = true
 	var prev := {game.hunter: game.hunter}
 	var q: Array[Vector2i] = [game.hunter]
 	while not q.is_empty():
@@ -1933,6 +2186,19 @@ func _safe_path(goal: Vector2i) -> Array:
 				prev[n] = p
 				q.append(n)
 	return []
+
+
+## One move the way a player makes it: a swipe on the view (WAIT is a button), or the
+## move pad's plate when the pad is on.
+func _go(kind: String) -> void:
+	if pad_on:
+		await _press(move_buttons[kind])
+	elif kind == "wait":
+		await _press(wait_button)
+	else:
+		var c := Vector2(_col_x() + UI_W / 2.0, (TOP_H + _ui_h() - _bh()) / 2.0)
+		var d: Vector2 = {"forward": Vector2(0, -1), "back": Vector2(0, 1), "left": Vector2(-1, 0), "right": Vector2(1, 0)}[kind] * 90.0
+		await _swipe_real(c - d, c + d)
 
 
 func _swipe_real(from: Vector2, to: Vector2) -> void:
@@ -1964,7 +2230,8 @@ func _capture() -> void:
 		await _shot("fp_hint")
 		print("HINT ", "PASS" if card_ok != null else "FAIL")
 		await _press(card_ok)
-		await _press(move_buttons["guide"])
+		await _press(menu_button)
+		await _press(menu_items["FIELD GUIDE"])
 		await _shot("fp_guide")
 		print("GUIDE ", "PASS" if guide_sheet != null else "FAIL")
 		guide_sheet.queue_free()
@@ -1995,14 +2262,29 @@ func _capture() -> void:
 		var at: Vector2i = game.hunter
 		var f0: Vector2i = game.facing
 		print("OPEN ", "PASS" if not room.is_wall(at + f0) else "FAIL", " facing=", f0)
-		await _press(move_buttons["forward"])
+		await _go("forward")
 		var cam_ok: bool = cam.position.distance_to(_cam_pos(game.hunter, game.facing)) < 0.05
 		print("FWD ", "PASS" if game.hunter == at + f0 and game.turn == 1 and cam_ok and last_event != "blocked" else "FAIL", " hunter=", game.hunter, " cam_ok=", cam_ok)
-		await _press(move_buttons["right"])
+		await _go("right")
 		print("TURN ", "PASS" if game.facing == Vector2i(-f0.y, f0.x) and game.turn == 2 else "FAIL", " facing=", game.facing)
 		var turn_before: int = game.turn
 		await _swipe_real(Vector2(380, 420), Vector2(240, 430))   # a finger dragged left = turn left
 		print("SWIPE ", "PASS" if game.facing == f0 and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
+		# the old move pad, from the menu: tall panel, plates work; then back to swipes
+		await _press(menu_button)
+		await _press(menu_items["MOVE BUTTONS"])
+		_close_menu()
+		var tall_ok: bool = pad_on and absf(bottom_panel.size.y - PAD_H) < 1.0 and move_buttons["right"].is_visible_in_tree()
+		await _shot("fp_pad")
+		var f1: Vector2i = game.facing
+		await _press(move_buttons["right"])
+		await _press(move_buttons["left"])
+		var plates_ok: bool = game.facing == f1 and game.turn == turn_before + 3
+		await _press(menu_button)
+		await _press(menu_items["MOVE BUTTONS"])
+		_close_menu()
+		var slim_ok: bool = not pad_on and absf(bottom_panel.size.y - SLIM_H) < 1.0 and wait_button.is_visible_in_tree()
+		print("PAD ", "PASS" if tall_ok and plates_ok and slim_ok else "FAIL", " tall=", tall_ok, " plates=", plates_ok, " slim=", slim_ok)
 		await _capture_rotate()
 		var bell: Vector2i = room.bells[0]
 		var shot_horror := false
@@ -2011,9 +2293,17 @@ func _capture() -> void:
 			if why == "horror" and not shot_horror:
 				await _shot("fp_horror")
 				shot_horror = true
+				break
 			elif why != "horror":
 				break
 		print("HORROR ", "PASS" if shot_horror else "FAIL")
+		if not game.over():
+			# from here this checks that real input walks you to the bell; whether the thralls
+			# are fair is the balance bot's job (tools/balance_bot.gd) and the rule tests'
+			for th in game.thralls:
+				th.gone = true
+			_refresh()
+			await _walk_to(bell)
 		await _shot("fp_bell")
 		print("BELL ", "PASS" if game.rang else "FAIL", " grade=", game.grade(), " oil=", game.oil, " turns=", game.turn, " ", game.cause)
 		capture_phase = 1
@@ -2049,7 +2339,7 @@ func _capture() -> void:
 	for i in 6:
 		if game.over():
 			break
-		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands
+		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands (thralls[2]: any thrall will do)
 	await _shot("fp_dead")
 	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
 	await _press(verdict_buttons["fun7"])
@@ -2064,11 +2354,15 @@ func _capture() -> void:
 
 ## Pass 2: walk into the Stalker's corridor and face her with the lantern high.
 func _capture_stalker() -> void:
+	for th in game.thralls:   # her shot alone: the thralls are tested elsewhere
+		if th.kind == "thrall":
+			th.gone = true
+	_refresh()
 	await _walk_to(Vector2i(3, 7))
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
 	await _walk_to(Vector2i(4, 6))
 	while game.facing != Vector2i.RIGHT and not game.over():
-		await _press(move_buttons["right"])
+		await _go("right")
 	var st: Dictionary = game.thralls.filter(func(t): return t.get("kind") == "stalker")[0]
 	await _shot("fp_stalker")
 	print("STALKER ", "PASS" if game.watched(st) and not game.dead else "FAIL", " at=", st.pos, " dead=", game.dead)
@@ -2085,11 +2379,11 @@ func _capture_trap() -> void:
 	var west := kp + Vector2i(1, 0)
 	await _walk_to(west)
 	while game.facing != Vector2i.LEFT and not game.over():
-		await _press(move_buttons["left"])
+		await _go("left")
 	await _press(item_buttons.pour)
-	await _press(move_buttons["forward"])
+	await _go("forward")
 	await _press(item_buttons.pour)
-	await _press(move_buttons["back"])
+	await _go("back")
 	var a: Dictionary = game.thralls[0]
 	a.pos = west + Vector2i(-2, 0)
 	a.target = null
@@ -2099,7 +2393,7 @@ func _capture_trap() -> void:
 	await _shot("fp_trap_fire")
 	print("SLICK ", "PASS" if a.get("gone", false) and not game.dead else "FAIL", " oil=", game.oil)
 	for i in Night.FIRE_TURNS:
-		await _press(move_buttons["wait"])
+		await _go("wait")
 	var b: Dictionary = game.thralls[1]
 	b.pos = west + Vector2i(-2, 0)
 	b.target = null
@@ -2129,5 +2423,14 @@ func _capture_art() -> void:
 		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 		_refresh()
 		await _shot(v[0])
+	# a corpse playing dead two tiles ahead, wet prints leading past it
+	game.hunter = Vector2i(17, 10)
+	game.facing = Vector2i.DOWN
+	game.prints = {Vector2i(17, 11): 9, Vector2i(17, 9): 4}
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	_refresh()
+	await _shot("fp_art_corpse")
+	print("CORPSE ", "PASS" if thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2 else "FAIL")
 	print("ART PASS")
 	get_tree().quit()
