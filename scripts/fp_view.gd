@@ -193,10 +193,10 @@ func _build_world() -> void:
 			if room.is_wall(p):
 				mi.mesh = wall_mesh
 				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
-				m.albedo_texture = _tex("wall_stone" if (x * 3 + y) % 3 else "wall_paper")
+				m.albedo_texture = _tex("wall_granite" if (x * 3 + y) % 3 else "wall_paper")
 				m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
 				m.roughness = 0.9
-				tile_base[p] = Color(0.85, 0.82, 0.92)
+				tile_base[p] = Color(0.72, 0.72, 0.78)   # Canva stone is lit flat: let the lantern do the light
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
