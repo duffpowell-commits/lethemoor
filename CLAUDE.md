@@ -314,9 +314,10 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `user://update.apk` and opens it with `OS.shell_open` (Godot's built-in FileProvider). Android
   always asks to confirm; first time also "allow from this source". CI stamps `version/code` =
   run number, checks the APK has REQUEST_INSTALL_PACKAGES + INTERNET + the right versionCode, and
-  uploads version.json after the APK. **Signing key must never change:** CI signs with the
-  `LM_KEYSTORE_B64` repo secret (alias androiddebugkey, pass android); without it a throwaway key
-  is used and that APK can't update. Old APKs (random key per build) need one last uninstall.
+  uploads version.json after the APK. **Signing key must never change:** the key is committed encrypted
+  (`signing/lethemoor.keystore.enc`, alias androiddebugkey, pass android, cert SHA-256 DE:71:98:0E...)
+  and CI unlocks it with the `LM_KEYSTORE_PASS` repo secret (Duff has the passphrase; the session
+  proxy can't write Actions secrets). Without it a throwaway key is used and that APK can't update. Old APKs (random key per build) need one last uninstall.
   Off-phone check: `LM_UPDATER_TEST=1 LM_UPDATER_CODE=40 LM_UPDATER_URL=<json> LM_UPDATER_SHOT=<png>`
   (`docs/renders/updater_offer.png`).
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with

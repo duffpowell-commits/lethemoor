@@ -10,8 +10,8 @@ extends CanvasLayer
 ## installer via OS.shell_open (Godot's own FileProvider turns the path into a content:// URI).
 ## Android always asks the player to confirm; the first time it also asks to allow Lethemoor
 ## to install apps. The manifest needs REQUEST_INSTALL_PACKAGES (Android preset,
-## custom_permissions) and every build must be signed with the same key (CI secret
-## LM_KEYSTORE_B64), or Android refuses the update.
+## custom_permissions) and every build must be signed with the same key (repo secret
+## LM_KEYSTORE_PASS unlocks signing/lethemoor.keystore.enc), or Android refuses the update.
 ##
 ## Testing off-phone: LM_UPDATER_TEST=1 runs it anywhere; LM_UPDATER_URL points it at another
 ## version.json; LM_UPDATER_CODE pretends to be that build number; LM_UPDATER_SHOT=<png> saves

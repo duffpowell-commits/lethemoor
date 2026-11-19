@@ -81,17 +81,20 @@ jobs:
           mv /tmp/tpl/templates ~/.local/share/godot/export_templates/${GODOT_VERSION/-/.}
       - name: Android SDK paths + signing key
         # Every APK must be signed with the SAME key or Android refuses to update the installed
-        # app (the in-app updater depends on it). The key lives in the LM_KEYSTORE_B64 secret
-        # (base64 of a keystore, alias androiddebugkey, password android). Without the secret
-        # (forks) a throwaway key is made: that APK installs fresh but can't update.
+        # app (the in-app updater depends on it). The key is committed ENCRYPTED in
+        # signing/lethemoor.keystore.enc (alias androiddebugkey, store/key password android);
+        # the LM_KEYSTORE_PASS repo secret unlocks it. Without the secret (forks) a throwaway
+        # key is made: that APK installs fresh but can't update an installed one.
         env:
-          LM_KEYSTORE_B64: ${{ secrets.LM_KEYSTORE_B64 }}
+          LM_KEYSTORE_PASS: ${{ secrets.LM_KEYSTORE_PASS }}
         run: |
-          if [ -n "$LM_KEYSTORE_B64" ]; then
-            echo "$LM_KEYSTORE_B64" | base64 -d > debug.keystore
+          if [ -n "$LM_KEYSTORE_PASS" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/lethemoor.keystore.enc \
+              -out debug.keystore -pass env:LM_KEYSTORE_PASS
+            keytool -list -keystore debug.keystore -storepass android | grep -i "SHA-256"
             echo "Signing with the fixed key"
           else
-            echo "::warning::LM_KEYSTORE_B64 not set: throwaway signing key, this APK can't update an installed one"
+            echo "::warning::LM_KEYSTORE_PASS not set: throwaway signing key, this APK can't update an installed one"
             keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey \
               -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
