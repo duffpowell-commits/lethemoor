@@ -134,6 +134,19 @@ func _tex(name: String) -> Texture2D:
 	return load("res://assets/art/%s.png" % name)
 
 
+## A painted prop as an upright billboard standing on its base, `h` world units tall.
+func _prop_sprite(name: String, h: float) -> Sprite3D:
+	var sp := Sprite3D.new()
+	sp.texture = _tex(name)
+	sp.pixel_size = h / sp.texture.get_height()
+	sp.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+	sp.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	sp.shaded = true
+	sp.offset = Vector2(0, sp.texture.get_height() / 2.0)
+	return sp
+
+
 func _w(p: Vector2i) -> Vector3:
 	return Vector3(p.x, 0, p.y)
 
@@ -228,30 +241,19 @@ func _build_world() -> void:
 		tile_mats[Vector2i(-100 - lp.x, -100 - lp.y)] = post.material_override
 		tile_base[Vector2i(-100 - lp.x, -100 - lp.y)] = iron.albedo_color
 
-	# the bell: a dark frame with a brass bell hanging in it. Brass glows a little: it's the goal.
 	for bp: Vector2i in room.bells:
-		for side in [-0.4, 0.4]:
-			var leg := MeshInstance3D.new()
-			var lm := BoxMesh.new()
-			lm.size = Vector3(0.08, 2.2, 0.08)
-			leg.mesh = lm
-			leg.position = _w(bp) + Vector3(side, 1.1, 0)
-			leg.material_override = iron.duplicate()
-			add_child(leg)
-		var bell := MeshInstance3D.new()
-		var bm := CylinderMesh.new()
-		bm.top_radius = 0.12
-		bm.bottom_radius = 0.3
-		bm.height = 0.42
-		bell.mesh = bm
-		bell.position = _w(bp) + Vector3(0, 1.6, 0)
-		var brass := StandardMaterial3D.new()
-		brass.albedo_color = Color("#8a6a2a")
-		brass.metallic = 0.8
-		brass.roughness = 0.35
-		brass.emission_enabled = true
-		brass.emission = Color("#3a2608")
-		bell.material_override = brass
+		# painted bell (Forge art, keyed) on a short iron rod from above, a touch bright: it's the goal.
+		# No frame legs: from the side a leg sat right in front of the bell.
+		var rod := MeshInstance3D.new()
+		var rm := BoxMesh.new()
+		rm.size = Vector3(0.05, 1.0, 0.05)
+		rod.mesh = rm
+		rod.position = _w(bp) + Vector3(0, 2.4, 0)
+		rod.material_override = iron.duplicate()
+		add_child(rod)
+		var bell := _prop_sprite("prop_bell", 0.95)
+		bell.position = _w(bp) + Vector3(0, 0.95, 0)
+		bell.modulate = Color(1.2, 1.12, 1.0)
 		add_child(bell)
 
 	# letters: a pale page nailed at chest height, facing the open floor. Read under BRIGHT.
@@ -279,44 +281,19 @@ func _build_world() -> void:
 
 	# oil flasks on the floor: small amber glass that catches the lantern
 	for op: Vector2i in room.oil_flasks:
-		var flask := MeshInstance3D.new()
-		var fm2 := CylinderMesh.new()
-		fm2.top_radius = 0.04
-		fm2.bottom_radius = 0.08
-		fm2.height = 0.22
-		flask.mesh = fm2
-		var gm := StandardMaterial3D.new()
-		gm.albedo_color = Color("#a8641c")
-		gm.metallic_specular = 0.9
-		gm.roughness = 0.15
-		flask.material_override = gm
-		flask.position = _w(op) + Vector3(0.15, 0.11, 0.1)
+		var flask := _prop_sprite("prop_flask", 0.3)
+		flask.position = _w(op) + Vector3(0.15, 0, 0.1)
 		add_child(flask)
 		flask_nodes[op] = flask
 
 	# boathooks on the floor: a long dark pole with an iron hook (placeholder, art comes via Foxboard)
 	for kp: Vector2i in room.hooks:
-		var pole := MeshInstance3D.new()
-		var pm3 := BoxMesh.new()
-		pm3.size = Vector3(0.05, 0.05, 0.85)
-		pole.mesh = pm3
-		var wm := StandardMaterial3D.new()
-		wm.albedo_color = Color("#4a3726")
-		wm.roughness = 0.8
-		pole.material_override = wm
-		pole.position = _w(kp) + Vector3(-0.1, 0.03, 0)
-		pole.rotation.y = 0.6
-		var tip := MeshInstance3D.new()
-		var tm := BoxMesh.new()
-		tm.size = Vector3(0.14, 0.04, 0.04)
-		tip.mesh = tm
-		var im := StandardMaterial3D.new()
-		im.albedo_color = Color("#6d6f73")
-		im.metallic = 0.8
-		im.roughness = 0.35
-		tip.material_override = im
-		tip.position = Vector3(0.05, 0, -0.42)
-		pole.add_child(tip)
+		# painted boathook lying flat on the stones
+		var pole := _prop_sprite("prop_boathook", 0.5)
+		pole.billboard = BaseMaterial3D.BILLBOARD_DISABLED
+		pole.offset = Vector2.ZERO
+		pole.rotation = Vector3(-PI / 2, 0.6, 0)
+		pole.position = _w(kp) + Vector3(-0.1, 0.02, 0)
 		add_child(pole)
 		hook_nodes[kp] = pole
 
