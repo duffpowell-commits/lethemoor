@@ -26,17 +26,17 @@ slice passes.
 | Floor prop | 100–400 px tall, standing upright, facing you | `prop_bell.png` 244×384 |
 | HUD hand art | ~660 × 665, lower right corner, transparent | `hand_lantern.png` |
 | Letter paper | ~600 × 800, torn edges, transparent | `assets/art/letters/` |
-| App icon | 1024 × 1024 square, no transparency, must read at 48 px | (missing) |
+| App icon | 1024 × 1024 square, no transparency, must read at 48 px | `app_icon.png` (+ Android 192 / adaptive 432) |
 
 ---
 
 ## Now: for the slice (before and during the Nov 20–28 playtests)
 
 ### P0. Testers see these on day one
-1. **App icon (1024×1024).** The APK and the iPhone home screen still show the default
+1. ~~**App icon (1024×1024).**~~ DONE Nov 19 (`app_icon.png`, Android launcher + adaptive icons, web favicon). The APK and the iPhone home screen still show the default
    Godot robot. It's the first thing a tester sees, and it says "unfinished". Idea: the
    brass lantern, lit, on black, with a thin veil drawn over the glass.
-2. **Sky / ceiling over the alleys (512×512 seamless, or a 2048×512 strip).** Above the walls
+2. ~~**Sky / ceiling over the alleys**~~ DONE Nov 19 (`sky_night.png`, strip baked into a panorama sky). **Sky / ceiling over the alleys (512×512 seamless, or a 2048×512 strip).** Above the walls
    the view is a flat dark-blue void. It's on screen every second of every run.
    Low fog, a moonless overcast sky, or a dripping stone vault: anything that isn't empty.
 3. **Wall tops (512×512 seamless).** The tops of walls are flat colour. Mossy coping stones or
@@ -52,16 +52,16 @@ slice passes.
    dock woman with a shawl over her head. Same faceless rule.
 6. ~~**Oil slick decal (256×256, transparent).**~~ DONE Nov 19 (`decal_oilslick.png`; burning pool `decal_fire.png`, particles kept). The poured-oil puddle is drawn in code as a
    dark blob. A wet black oil pool with a faint rainbow sheen and a ragged edge.
-7. **Fire sprite sheet (8 frames of 128×256 in a row, transparent).** Burning oil is a
+7. ~~**Fire sprite sheet**~~ DONE Nov 19 (`fire_sheet.png`, particle flipbook). **Fire sprite sheet (8 frames of 128×256 in a row, transparent).** Burning oil is a
    code-drawn particle stand-in. The trap is the slice's big "aha" moment, so it should look
    great.
-8. **Lantern hand, hooded and bright (2 more HUD images, same size as `hand_lantern.png`).**
+8. ~~**Lantern hand, hooded and bright**~~ DONE Nov 19 (`hand_lantern_hooded/_bright.png`, swap by lantern). **Lantern hand, hooded and bright (2 more HUD images, same size as `hand_lantern.png`).**
    Today the hand art just dims for HOODED. The shutter should visibly close. BRIGHT
    should show the wick turned up with a bigger flame. Players learn the lantern states by looking at
    the hand.
 9. ~~**Street lamp post (standing prop, ~150 × 600).**~~ DONE Nov 19 (`prop_lamppost.png`). The map has a lamp post that is a grey
    box today. A rusted iron gas lamp, unlit.
-10. **Letter nailed to a wall (prop, ~200 × 260, paper with a nail).** Letters on walls show the
+10. ~~**Letter nailed to a wall**~~ DONE Nov 19 (`letter_nailed.png`). **Letter nailed to a wall (prop, ~200 × 260, paper with a nail).** Letters on walls show the
     in-hand page art. A small folded note pinned with a nail reads better from a distance.
 
 ### P2. Polish for the slice, if the art team has time
