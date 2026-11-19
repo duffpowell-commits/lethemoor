@@ -207,6 +207,10 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   personal; ringing the bell is defying yourself). Reading one pops a parchment page
   (`_show_page`, PUT IT AWAY); read pages are listed again in the FIELD GUIDE. Capture's LETTER
   check now also needs the page up (`fp_letter.png`). Add pages for new maps to `PAGES`.
+  **Each page is its own torn parchment scrap** (Duff: no two notes alike): `assets/art/letters/
+  page_<n>.png` drawn by `tools/gen_letter_pages.py` (water-stained / perfumed + folded / scorched
+  + broken seal), plus per-page ink colour, tilt and width in `PAGES`. Button sits under the paper.
+  Capture renders every page (`fp_letter_2/3.png`, prints PAGES PASS); sheet `fp_letters_sheet.png`.
 - **Done — slice step 4 (Nov 19): noise** (`night.gd` `NOISE`, 5 new tests, 49 total). A sound of
   level N is heard by every horror within N tiles of *walking* distance (round corners, not
   through walls); it heads for the loudest one unless it sees your light (light wins). Walking,

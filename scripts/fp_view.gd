@@ -1001,22 +1001,29 @@ func _show_page(n: int) -> void:
 		modal.queue_free()
 	modal = _sheet(0.7)
 	var pg: Dictionary = Letters.page(n)
+	# a torn scrap of paper, stretched behind the words (it has its own torn rim and stains)
 	var card := PanelContainer.new()
-	var paper := StyleBoxFlat.new()
-	paper.bg_color = Color("#d8c9a3")
-	paper.border_color = Color("#6b5530")
-	paper.set_border_width_all(2)
-	paper.set_corner_radius_all(3)
-	paper.set_content_margin_all(22)
-	paper.shadow_color = Color(0, 0, 0, 0.6)
-	paper.shadow_size = 10
-	card.add_theme_stylebox_override("panel", paper)
-	var ink := Color("#2a1f14")
+	var margins := StyleBoxEmpty.new()
+	margins.set_content_margin_all(0)
+	card.add_theme_stylebox_override("panel", margins)
+	var paper := TextureRect.new()
+	paper.texture = load("res://assets/art/letters/%s.png" % pg.paper)
+	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	paper.stretch_mode = TextureRect.STRETCH_SCALE
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(paper)
+	var pad := MarginContainer.new()
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_" + side, 44)
+	pad.add_theme_constant_override("margin_top", 50)
+	pad.add_theme_constant_override("margin_bottom", 56)
+	card.add_child(pad)
+	var ink: Color = pg.ink
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	card.add_child(box)
-	box.add_child(_label("LETTER %s OF %d" % [Letters.numeral(n), room.letters.size()], 13, Color("#6b5530"), UI.head()))
-	var head := _label(pg.head, 22, Color("#5a1a14"), UI.head())
+	box.add_theme_constant_override("separation", 8)
+	pad.add_child(box)
+	box.add_child(_label("LETTER %s OF %d" % [Letters.numeral(n), room.letters.size()], 13, Color(ink, 0.6), UI.head()))
+	var head := _label(pg.head, 21, pg.head_ink, UI.head())
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(head)
 	var body := _label(pg.body, 20, ink, UI.italic())
@@ -1027,16 +1034,24 @@ func _show_page(n: int) -> void:
 	sign.autowrap_mode = TextServer.AUTOWRAP_WORD
 	sign.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	box.add_child(sign)
+	var w: float = pg.width
+	card.custom_minimum_size.x = w
+	card.position = Vector2((UI_W - w) / 2.0, TOP_H + 26)
+	card.pivot_offset = Vector2(w / 2.0, 300)
+	card.rotation_degrees = pg.tilt
+	modal.add_child(card)
+	# the button sits below the paper, on the dark, so the scrap stays a scrap
 	var ok := Button.new()
 	ok.text = "PUT IT AWAY"
 	ok.focus_mode = Control.FOCUS_NONE
 	ok.custom_minimum_size = Vector2(0, 58)
 	ok.pressed.connect(_close_page)
-	box.add_child(ok)
+	ok.custom_minimum_size.x = 300
+	modal.add_child(ok)
 	card_ok = ok
-	card.custom_minimum_size.x = 480
-	card.position = Vector2((UI_W - 480) / 2.0, TOP_H + 40)
-	modal.add_child(card)
+	await get_tree().process_frame          # let the paper size itself to the words
+	if card_ok == ok:
+		ok.position = Vector2((UI_W - 300) / 2.0, card.position.y + card.size.y + 24)
 
 
 func _close_page() -> void:
@@ -1492,6 +1507,11 @@ func _capture() -> void:
 	print("LETTER ", "PASS" if game.letters_read.size() == 1 and page_up else "FAIL", " at=", letter, " page=", page_up)
 	if page_up:
 		await _press(card_ok)
+	for k in range(1, Letters.PAGES.size()):   # every page is its own scrap: render the rest too
+		_show_page(k)
+		await _shot("fp_letter_%d" % (k + 1))
+		await _press(card_ok)
+	print("PAGES ", "PASS" if modal == null else "FAIL")
 	await _press(lantern_buttons[Fog.Lantern.HOODED])
 	await _shot("fp_hooded")
 	for i in 6:
