@@ -170,6 +170,19 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   https://duffpowell-commits.github.io/lethemoor/** (gh-pages branch, pushed by CI on main).
   Audit with the remaining risks: `/mnt/project-files/lethemoor/audit_2026-11-19.md`
   (sound is in a separate thread; FPS on a real phone still unmeasured).
+- **Done — slice step 3 (Nov 19): boathook + oil-slick trap** (`night.gd`, 12 new tests, 41 total).
+  Boathook = `K` tile (One Night: (8,18), on the direct route, so it costs no detour). `hook()`
+  costs a turn: first enemy 1-2 tiles straight ahead is shoved back a tile and stunned
+  `HOOK_STUN` 2 turns (no move, no grab); each hit bends it, `HOOK_WEAR` 3 hits; a miss costs
+  only the turn. `pour()`: turn + `SLICK_OIL` 3, soaks the tile ahead. `spark()`: turn +
+  `SPARK_OIL` 1, lights soaked tiles that are lit, in view, within 3; fire runs along touching
+  slicks, burns `FIRE_TURNS` 3, lights like NORMAL (so it can freeze the Stalker), blocks you,
+  and anything in it burns (`gone`: stays in `thralls` so view indexes hold; use
+  `live_positions()` for rules). Spark oil under your feet = death. A full trap is ~6 oil
+  (3 + 1 + the lantern's burn on the 2 extra turns). View: HOOK / POUR OIL / SPARK column at the
+  left edge above the panel (keys H/P/F), placeholder slick/fire/hook meshes (art via Foxboard),
+  field-note cards `hook` + `slick`. Capture pass 3 prints HOOKFIND/SLICK/HOOK PASS
+  (`docs/renders/fp_trap_sheet.png`).
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
