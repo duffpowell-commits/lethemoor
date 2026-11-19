@@ -357,7 +357,7 @@ func _build_world() -> void:
 	cam = Camera3D.new()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
 	cam.near = 0.05
-	# The HUD covers the top 72 px and bottom 330 px, so centre the view on the strip
+	# The HUD covers the top bar and the bottom panel (_bh()), so centre the view on the strip
 	# between them: a frustum camera with its centre shifted up.
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	_fit_camera()
@@ -1800,7 +1800,7 @@ func _save_hints() -> void:
 
 ## It has you: the thing fills the screen, lunging up out of the dark, a red flash, a shake.
 func _kill_shot() -> void:
-	var stalker: bool = "Lace" in game.cause
+	var stalker: bool = game.killer == "stalker"
 	kill_shot = Control.new()
 	kill_shot.set_anchors_preset(Control.PRESET_FULL_RECT)
 	kill_shot.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -2130,9 +2130,20 @@ func _evade() -> void:
 
 
 ## Shortest way to `goal` that keeps two tiles clear of every thrall you can see (they lunge
-## from two): what a careful player does.
+## from two) and, if there's another way, round where you last saw one: what a careful player does.
 func _safe_path(goal: Vector2i) -> Array:
+	var round_them := _safe_path_avoiding(goal, true)
+	return round_them if round_them.size() >= 2 else _safe_path_avoiding(goal, false)
+
+
+func _safe_path_avoiding(goal: Vector2i, remembered: bool) -> Array:
 	var bad := {}
+	for th in game.thralls:
+		if th.get("lying", false) and fog.get_state(th.pos) != Fog.DARK:
+			bad[th.pos] = true   # a body you can see: walk round it
+		elif remembered and th.last_seen != null and not th.get("gone", false) and not th.get("lying", false):
+			for d: Vector2i in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				bad[th.last_seen + d] = true
 	for th in _lit_awake():
 		for dx in range(-2, 3):
 			for dy in range(-2, 3):
@@ -2314,6 +2325,10 @@ func _capture() -> void:
 
 ## Pass 2: walk into the Stalker's corridor and face her with the lantern high.
 func _capture_stalker() -> void:
+	for th in game.thralls:   # her shot alone: the thralls are tested elsewhere
+		if th.kind == "thrall":
+			th.gone = true
+	_refresh()
 	await _walk_to(Vector2i(3, 7))
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
 	await _walk_to(Vector2i(4, 6))

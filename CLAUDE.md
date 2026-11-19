@@ -272,7 +272,7 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `GRADES` +15 (S 35 / A 29 / B 23 / C 18) so grades mean the same. `one_night.txt` is now 27x21: the old
   15 columns kept every coordinate (captures, tests, art views still hit the same tiles) plus an east wing
   joined at (14,4) and (14,19), a second road north, 4 more flasks (9 total), 2 more thralls (6 + Stalker).
-  New thralls sit AFTER the old ones in row order so `game.thralls[0..2]` in the capture didn't move.
+  Thrall indexes DO shift with map edits (thralls[2] is now (5,11)): the capture picks by kind or sets positions by hand.
   **Swipes are the controls:** the bottom panel is `SLIM_H` 132 (status + HOODED/NORMAL/BRIGHT + WAIT);
   the view gets ~200 px back. MENU -> MOVE BUTTONS: ON brings back the old pad (`PAD_H` 330), saved in
   `user://lethemoor.cfg` [controls] pad. `_bh()` is the panel height everywhere; `_layout_bottom()` lays

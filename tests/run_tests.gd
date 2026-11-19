@@ -800,3 +800,29 @@ func test_crouch_gives_you_a_turn_to_get_clear() -> void:
 	check("crouch" in n.wait(), "it crouches")
 	var ev: Array = n.step_dir(Vector2i.RIGHT)
 	check(not "lunge" in ev and not th.crouched and not n.dead, "you stepped out of reach: no lunge, the crouch is spent")
+
+
+func test_corpse_never_rises_through_a_wall() -> void:
+	var n = Night.start("#######\n#H#...#\n#.#...#\n#######")
+	n.facing = Vector2i.DOWN
+	var th := _thrall_at(n, Vector2i(3, 1), {lying = true})   # 2 tiles away, a wall between
+	n.wait()
+	check(th.lying, "a wall between you: it stays down")
+
+
+func test_hook_breaks_a_crouch() -> void:
+	var n = Night.start(LONG)
+	n.facing = Vector2i.RIGHT
+	n.hook_wear = 3
+	var th := _thrall_at(n, Vector2i(3, 1))
+	n.wait()
+	check(th.crouched, "it crouches")
+	n.hook()
+	check(not th.crouched, "the hook knocks it out of the crouch")
+
+
+func test_killer_is_recorded() -> void:
+	var n = Night.start("#####\n#HT.#\n#####")
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.step(Vector2i(2, 1))
+	check(n.dead and n.killer == "thrall", "walked into a thrall in the dark: the thrall took you")

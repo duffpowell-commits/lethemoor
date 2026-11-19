@@ -70,6 +70,7 @@ var turn := 0
 var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
+var killer := ""                # what took you: "thrall" or "stalker" ("" = not a horror)
 var rang := false               # rang the bell (One Night's goal): escaped with a grade
 var letters_read: Array = []    # letter tiles read (needs BRIGHT on the tile)
 var flasks_left: Array = []     # oil flasks still on the floor
@@ -212,6 +213,7 @@ func step(p: Vector2i) -> Array:
 		_rise(at, events)   # you trip over a body in the dark, and it isn't dead
 		return _end_turn(events)
 	if at >= 0:
+		killer = thralls[at].get("kind", "thrall")
 		_die("Something was standing in the dark. It was waiting.")
 		events.append("grabbed")
 		return events
@@ -265,6 +267,7 @@ func hook() -> Array:
 		return _end_turn(events)
 	var th: Dictionary = thralls[hit]
 	th.stun = HOOK_STUN
+	th["crouched"] = false
 	var back: Vector2i = th.pos + facing
 	if not room.is_wall(back) and thrall_at(back) < 0:
 		th.pos = back          # shoved back a tile (into fire, if that's what's behind it)
@@ -478,6 +481,7 @@ func _stalker_act(i: int, events: Array) -> void:
 		if watched(th):
 			return
 		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
+			killer = "stalker"
 			_die("Lace, and a cold breath at your neck. You never saw her move.")
 			events.append("taken")
 			return
@@ -515,15 +519,17 @@ func _thralls_act(events: Array) -> void:
 		th.merge({lunge_cd = 0, lit_for = 0, roused = false, lying = false, crouched = false})   # hand-made entries (tests)
 		if th.lying:
 			# playing dead: it waits till you're close and looking elsewhere (you walked past it)
-			if _dist(th.pos) <= CORPSE_WAKE and not in_view(th.pos):
+			if room.reachable(th.pos, CORPSE_WAKE).has(hunter) and not in_view(th.pos):   # walking tiles: never through a wall
 				_rise(i, events)
 			continue
 		if th.lunge_cd > 0:
 			th.lunge_cd -= 1
 		if th.get("stun", 0) > 0:
 			th.stun -= 1       # knocked down by the hook (or still getting up): no move, no grab
+			th.crouched = false   # knocked out of its crouch: the next lunge needs a new tell
 			continue
 		if _dist(th.pos) == 1:
+			killer = "thrall"
 			_die("Cold hands, out of the dark. The lantern rolls away.")
 			events.append("taken")
 			return
@@ -575,6 +581,7 @@ func _thralls_act(events: Array) -> void:
 func _rise(i: int, events: Array) -> void:
 	var th: Dictionary = thralls[i]
 	th.lying = false
+	th.seen = false       # up in your light: that's a horror, with its sting and dread
 	th.target = hunter
 	th.stun = RISE_TURNS
 	th.lunge_cd = LUNGE_COOLDOWN
@@ -589,7 +596,7 @@ func _dist(p: Vector2i) -> int:
 
 ## Too close to hear: a thrall within QUIET_NEAR tiles makes no sound at all.
 func silent(th: Dictionary) -> bool:
-	return th.get("kind", "thrall") == "thrall" and _dist(th.pos) <= QUIET_NEAR
+	return th.get("kind", "thrall") == "thrall" and room.reachable(th.pos, QUIET_NEAR).has(hunter)
 
 
 ## One Night score: oil left plus letters read. Only meaningful once the bell has rung.
