@@ -39,7 +39,7 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 1.7],
 	Fog.Lantern.BRIGHT: [5.6, 2.4],
 }
-const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
@@ -63,6 +63,9 @@ var tile_mats := {}
 var tile_base := {}
 var thrall_nodes: Array = []
 var flask_nodes := {}             # tile -> node, hidden once picked up
+var hook_nodes := {}              # tile -> boathook lying on the floor
+var slick_nodes := {}             # tile -> oil slick / fire on the floor (made as they appear)
+var item_buttons := {}            # HOOK / POUR / SPARK, left edge above the bottom panel
 var letter_mats := {}             # tile -> material, goes pale once read
 var letters_label: Label
 static var capture_phase := 0     # capture runs twice: win at the bell, then a death
@@ -280,6 +283,32 @@ func _build_world() -> void:
 		add_child(flask)
 		flask_nodes[op] = flask
 
+	# boathooks on the floor: a long dark pole with an iron hook (placeholder, art comes via Foxboard)
+	for kp: Vector2i in room.hooks:
+		var pole := MeshInstance3D.new()
+		var pm3 := BoxMesh.new()
+		pm3.size = Vector3(0.05, 0.05, 0.85)
+		pole.mesh = pm3
+		var wm := StandardMaterial3D.new()
+		wm.albedo_color = Color("#4a3726")
+		wm.roughness = 0.8
+		pole.material_override = wm
+		pole.position = _w(kp) + Vector3(-0.1, 0.03, 0)
+		pole.rotation.y = 0.6
+		var tip := MeshInstance3D.new()
+		var tm := BoxMesh.new()
+		tm.size = Vector3(0.14, 0.04, 0.04)
+		tip.mesh = tm
+		var im := StandardMaterial3D.new()
+		im.albedo_color = Color("#6d6f73")
+		im.metallic = 0.8
+		im.roughness = 0.35
+		tip.material_override = im
+		tip.position = Vector3(0.05, 0, -0.42)
+		pole.add_child(tip)
+		add_child(pole)
+		hook_nodes[kp] = pole
+
 	for thrall in game.thralls:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
@@ -367,7 +396,10 @@ func _refresh_fog() -> void:
 		var base: Color = tile_base[p]
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
-		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT
+		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
+	for kp: Vector2i in hook_nodes:
+		hook_nodes[kp].visible = game.hooks_left.has(kp) and fog.get_state(kp) != Fog.DARK
+	_sync_slicks()
 	for fp: Vector2i in flask_nodes:
 		flask_nodes[fp].visible = game.flasks_left.has(fp) and fog.get_state(fp) != Fog.DARK
 	for lp: Vector2i in letter_mats:
@@ -379,6 +411,47 @@ func _refresh_fog() -> void:
 	flame.visible = eff != Fog.Lantern.HOODED
 	if minimap:
 		minimap.queue_redraw()
+
+
+## Oil on the floor: a dark wet patch while soaked, an orange glow with its own light on fire.
+## Placeholder look: Foxboard art replaces it.
+func _sync_slicks() -> void:
+	for p: Vector2i in slick_nodes.keys():
+		if not game.slicks.has(p):
+			slick_nodes[p].queue_free()
+			slick_nodes.erase(p)
+	for p: Vector2i in game.slicks:
+		if not slick_nodes.has(p):
+			var m := MeshInstance3D.new()
+			var pm := PlaneMesh.new()
+			pm.size = Vector2(0.92, 0.92)
+			m.mesh = pm
+			m.material_override = StandardMaterial3D.new()
+			m.position = _w(p) + Vector3(0, 0.012, 0)
+			var fl := OmniLight3D.new()
+			fl.light_color = Color("#ff8a3a")
+			fl.omni_range = 2.6
+			fl.light_energy = 1.6
+			fl.position = Vector3(0, 0.4, 0)
+			m.add_child(fl)
+			add_child(m)
+			slick_nodes[p] = m
+		var node: MeshInstance3D = slick_nodes[p]
+		var mat: StandardMaterial3D = node.material_override
+		var lit_fire: bool = game.burning(p)
+		node.get_child(0).visible = lit_fire
+		node.visible = lit_fire or fog.get_state(p) != Fog.DARK
+		if lit_fire:
+			mat.albedo_color = Color("#7a2a08")
+			mat.emission_enabled = true
+			mat.emission = Color("#ff6a1a")
+			mat.emission_energy_multiplier = 0.9
+		else:
+			var k: float = SHADE[fog.get_state(p)]
+			mat.albedo_color = Color(0.06 * k + 0.02, 0.05 * k + 0.02, 0.03 * k + 0.02)
+			mat.emission_enabled = false
+			mat.metallic_specular = 0.9
+			mat.roughness = 0.08
 
 
 # ---------------------------------------------------------------- actions
@@ -400,10 +473,18 @@ func act(kind: String) -> void:
 		"left": events = game.turn_by(-1)
 		"right": events = game.turn_by(1)
 		"wait": events = game.wait()
+		"hook": events = game.hook()
+		"pour": events = game.pour()
+		"spark": events = game.spark()
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
 		last_event = "blocked"
+		_refresh_hud()
+		return
+	if game.turn == turn0 and not game.over() and kind in ["hook", "pour", "spark"]:
+		busy = false          # nothing to do it with, or nowhere to do it: no turn spent
+		last_event = "cant_" + kind
 		_refresh_hud()
 		return
 	var was_flicker := flicker
@@ -476,6 +557,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_A, KEY_LEFT: act("left")
 			KEY_D, KEY_RIGHT: act("right")
 			KEY_SPACE: act("wait")
+			KEY_H: act("hook")
+			KEY_P: act("pour")
+			KEY_F: act("spark")
 			KEY_ESCAPE: _open_menu() if menu_sheet == null else _close_menu()
 			KEY_1: _set_lantern(Fog.Lantern.HOODED)
 			KEY_2: _set_lantern(Fog.Lantern.NORMAL)
@@ -656,6 +740,12 @@ func _build_hud() -> void:
 	move_buttons["guide"] = _button("FIELD\nGUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
 	move_buttons["guide"].add_theme_color_override("font_color", UI.DIM)
 	move_buttons["forward"].add_theme_font_size_override("font_size", 21)
+	# item column, left edge above the panel (the lantern hand is low right). Shown when usable.
+	item_buttons["hook"] = _button("HOOK", Vector2.ZERO, Vector2(132, 64), act.bind("hook"), hud)
+	item_buttons["pour"] = _button("POUR OIL\n3 oil", Vector2.ZERO, Vector2(132, 64), act.bind("pour"), hud)
+	item_buttons["spark"] = _button("SPARK\n1 oil", Vector2.ZERO, Vector2(132, 64), act.bind("spark"), hud)
+	for k in item_buttons:
+		item_buttons[k].add_theme_font_size_override("font_size", 15)
 
 
 ## Oil: one notch per drop up to the starting 30; more than that and the bar glows.
@@ -743,6 +833,16 @@ func _refresh_hud() -> void:
 		"letter_dim": "Words on a page. Too dim to read. Burn brighter.",
 		"rang": "The bell.",
 		"stalker_moved": "Silk drags on stone. Something moved while you weren't looking.",
+		"hook_found": "A boathook, left on the stones. Long enough to keep them off you.",
+		"hook_hit": "The hook bites and shoves it back. It's down, for now.",
+		"hook_miss": "The hook sweeps empty dark.",
+		"hook_broke": "The hook bends double. It's no use now.",
+		"cant_hook": "You have nothing to swing.",
+		"poured": "Oil glugs onto the stones ahead, black and shining.",
+		"cant_pour": "No room to pour there, or not enough oil.",
+		"ignite": "The spark catches. Fire runs along the oil.",
+		"burned": "Something burns in the oil. It doesn't scream.",
+		"cant_spark": "Nothing to light. Look at the oil, lantern lit, 3 tiles or nearer.",
 	}
 	var s: String = lines[game.setting]
 	if game.oil == 0:
@@ -755,6 +855,15 @@ func _refresh_hud() -> void:
 	if game.turn < 3 and extra == "":
 		s = "Swipe up to walk, down to back away, sideways to turn. Find the bell."
 	status_label.text = s
+	if item_buttons:
+		item_buttons.hook.visible = game.hook_wear > 0
+		item_buttons.hook.text = "HOOK\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
+		item_buttons.spark.visible = game.slicks.values().has(0)
+		var y: float = _ui_h() - BOTTOM_H - 12 - 64
+		for k in ["spark", "pour", "hook"]:
+			if item_buttons[k].visible:
+				item_buttons[k].position = Vector2(14, y)
+				y -= 74
 	for k in lantern_buttons:
 		if k == game.setting:
 			UI.lit(lantern_buttons[k])
@@ -1294,6 +1403,9 @@ func _capture() -> void:
 	if capture_phase == 2:
 		await _capture_stalker()
 		return
+	if capture_phase == 3:
+		await _capture_trap()
+		return
 	var letter: Vector2i = room.letters.reduce(func(a, b): return a if (a - game.hunter).length() < (b - game.hunter).length() else b)
 	var reach: Dictionary = room.reachable(game.hunter, 999)
 	var path: Array = room.path_in(reach, game.hunter, letter)
@@ -1324,4 +1436,39 @@ func _capture_stalker() -> void:
 	var st: Dictionary = game.thralls.filter(func(t): return t.get("kind") == "stalker")[0]
 	await _shot("fp_stalker")
 	print("STALKER ", "PASS" if game.watched(st) and not game.dead else "FAIL", " at=", st.pos, " dead=", game.dead)
+	capture_phase = 3
+	get_tree().reload_current_scene()
+
+
+## Pass 3: pick up the boathook, lay a two-tile oil slick, back off, spark it with a thrall in
+## it, then hook the next one. Thralls are placed by hand so the shot is the same every run.
+func _capture_trap() -> void:
+	var kp: Vector2i = room.hooks[0]
+	await _walk_to(kp)
+	print("HOOKFIND ", "PASS" if game.hook_wear == Night.HOOK_WEAR and item_buttons.hook.visible else "FAIL")
+	var west := kp + Vector2i(1, 0)
+	await _walk_to(west)
+	while game.facing != Vector2i.LEFT and not game.over():
+		await _press(move_buttons["left"])
+	await _press(item_buttons.pour)
+	await _press(move_buttons["forward"])
+	await _press(item_buttons.pour)
+	await _press(move_buttons["back"])
+	var a: Dictionary = game.thralls[0]
+	a.pos = west + Vector2i(-2, 0)
+	a.target = null
+	_refresh()
+	await _shot("fp_trap_oil")
+	await _press(item_buttons.spark)
+	await _shot("fp_trap_fire")
+	print("SLICK ", "PASS" if a.get("gone", false) and not game.dead else "FAIL", " oil=", game.oil)
+	for i in Night.FIRE_TURNS:
+		await _press(move_buttons["wait"])
+	var b: Dictionary = game.thralls[1]
+	b.pos = west + Vector2i(-2, 0)
+	b.target = null
+	_refresh()
+	await _press(item_buttons.hook)
+	await _shot("fp_trap_hook")
+	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
 	get_tree().quit()

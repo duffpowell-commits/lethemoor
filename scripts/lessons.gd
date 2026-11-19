@@ -6,7 +6,7 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 
 ## Danger first: if a thrall and a letter turn up together, the thrall gets the card.
-const ORDER := ["goal", "stalker", "horror", "panic", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
+const ORDER := ["goal", "stalker", "horror", "panic", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
 
 const CARDS := {
 	"goal": ["RING THE BELL",
@@ -29,6 +29,10 @@ const CARDS := {
 		"Walk over it and the lantern drinks it: +10 oil."],
 	"map": ["THE MAP",
 		"Top right is what you remember. A red X marks where you last saw a thrall. It may not be there any more."],
+	"hook": ["THE BOATHOOK",
+		"Tap HOOK to swing at the first thing up to 2 tiles ahead. It's knocked back a tile and can't move for 2 turns.\n\nEvery hit bends the hook. After 3 it's useless. A swing at nothing costs the turn."],
+	"slick": ["OIL SLICK",
+		"POUR soaks the tile in front of you (3 oil). Pour again to make it longer. Back off, keep looking at it, and tap SPARK (1 oil).\n\nThe fire burns 3 turns. Whatever stands in it burns, and you can't walk through it. Don't stand in your own oil."],
 	"panic": ["PANIC",
 		"Your dread filled. Your hands shook and oil spilled. Get back into the light to steady them."],
 }
@@ -56,7 +60,7 @@ static func _now(id: String, game, event: String) -> bool:
 		"dread":
 			return game.dread >= 25
 		"horror":
-			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and fog.get_state(th.pos) == Fog.LIT)
+			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 		"stalker":
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "stalker" and fog.get_state(th.pos) == Fog.LIT)
 		"flicker":
@@ -69,4 +73,8 @@ static func _now(id: String, game, event: String) -> bool:
 			return game.thralls.any(func(th): return th.last_seen != null and fog.get_state(th.pos) != Fog.LIT)
 		"panic":
 			return event == "panic"
+		"hook":
+			return game.get("hook_wear") > 0
+		"slick":
+			return event == "poured" or game.thralls.any(func(th): return not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 	return false

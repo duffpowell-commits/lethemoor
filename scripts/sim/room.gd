@@ -2,6 +2,7 @@ extends RefCounted
 ## A handmade room, parsed from text. Rooms are handmade, not procedural (scope rule).
 ##   # wall   . floor   H hunter start   T thrall   L street lamp (unlit)   E exit
 ##   B bell (ring it: the night is won)   N letter (readable under BRIGHT)   O oil flask (pickup)
+##   K boathook (pickup: reach 2, bends with every hit)
 ##   S stalker (the veiled bride: frozen while you look at it in your light, 2 steps in the dark)
 
 var rows: Array = []
@@ -14,6 +15,7 @@ var exits: Array[Vector2i] = []
 var bells: Array[Vector2i] = []
 var letters: Array[Vector2i] = []
 var oil_flasks: Array[Vector2i] = []
+var hooks: Array[Vector2i] = []
 
 
 static func parse(text: String) -> RefCounted:
@@ -35,6 +37,7 @@ static func parse(text: String) -> RefCounted:
 				"B": r.bells.append(p)
 				"N": r.letters.append(p)
 				"O": r.oil_flasks.append(p)
+				"K": r.hooks.append(p)
 	return r
 
 

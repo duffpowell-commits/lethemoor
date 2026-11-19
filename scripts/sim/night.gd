@@ -27,6 +27,20 @@ const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const FLASK_OIL := 10          # an oil flask found on the floor
 const LETTER_POINTS := 5       # grade: each letter read is worth this much oil
 ## Grade at the bell: oil left + LETTER_POINTS per letter read. [min points, grade]
+## The boathook (`K` on the map): swing it at the first thing 1-2 tiles straight ahead.
+## A hit shoves it back a tile and stuns it for HOOK_STUN turns (it can't move or grab you).
+## Every hit bends it: after HOOK_WEAR hits it's useless. A swing at nothing costs the turn only.
+const HOOK_REACH := 2
+const HOOK_WEAR := 3
+const HOOK_STUN := 2
+## Oil slick + spark. POUR spends SLICK_OIL and soaks the tile in front of you. SPARK spends
+## SPARK_OIL and lights every soaked tile you can see in your light within SPARK_RANGE (fire
+## runs along touching soaked tiles). Fire burns FIRE_TURNS turns, lights the tiles around it
+## like a NORMAL lantern, and anything that stands in it burns. You can't walk into fire.
+const SLICK_OIL := 3
+const SPARK_OIL := 1
+const SPARK_RANGE := 3
+const FIRE_TURNS := 3
 const GRADES := [[20, "S"], [14, "A"], [8, "B"], [3, "C"], [0, "D"]]
 ## How far a thrall notices your lantern (tiles, needs line of sight).
 const NOTICE := {Fog.Lantern.HOODED: 1, Fog.Lantern.NORMAL: 5, Fog.Lantern.BRIGHT: 8}
@@ -47,8 +61,13 @@ var cause := ""                 # why you died, in the game's voice
 var rang := false               # rang the bell (One Night's goal): escaped with a grade
 var letters_read: Array = []    # letter tiles read (needs BRIGHT on the tile)
 var flasks_left: Array = []     # oil flasks still on the floor
+var hooks_left: Array = []      # boathooks still on the floor
+var hook_wear := 0              # hits left in the boathook in your hand (0 = no hook)
+var slicks := {}                # tile -> fire turns left (0 = soaked, not lit yet)
 ## Each thrall: {pos, target (last place it saw your light, or null), seen (in your light now),
-## last_seen (where YOU last saw it, or null: the map's marker, and it can be stale)}
+## last_seen (where YOU last saw it, or null: the map's marker, and it can be stale),
+## stun (turns left knocked down by the boathook), gone (burned: it stays in the list so the
+## view's indexes hold, but it no longer counts for anything)}
 var thralls: Array = []
 
 
@@ -58,12 +77,13 @@ static func start(room_text: String) -> RefCounted:
 	n.fog = n.room.make_fog()
 	n.hunter = n.room.hunter
 	n.flasks_left = n.room.oil_flasks.duplicate()
+	n.hooks_left = n.room.hooks.duplicate()
 	n.facing = n.open_way(n.hunter)
 	for p: Vector2i in n.room.thralls:
-		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall"})
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
 	for p: Vector2i in n.room.stalkers:
-		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "stalker"})
-	n.fog.update([{pos = n.hunter, setting = n.setting}])
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "stalker", stun = 0, gone = false})
+	n.fog.update(n.lights())
 	for th in n.thralls:
 		th.seen = n.fog.get_state(th.pos) == Fog.LIT
 		if th.seen:
@@ -91,15 +111,38 @@ func effective() -> int:
 	return Fog.Lantern.HOODED if oil <= 0 else setting
 
 
+## Every light this turn: your lantern, plus each burning slick (it lights like NORMAL).
+func lights() -> Array:
+	var out: Array = [{pos = hunter, setting = effective()}]
+	for p: Vector2i in slicks:
+		if slicks[p] > 0:
+			out.append({pos = p, setting = Fog.Lantern.NORMAL})
+	return out
+
+
+func burning(p: Vector2i) -> bool:
+	return slicks.get(p, 0) > 0
+
+
 func thrall_at(p: Vector2i) -> int:
 	for i in thralls.size():
-		if thralls[i].pos == p:
+		if thralls[i].pos == p and not thralls[i].get("gone", false):
 			return i
 	return -1
 
 
+## Every entry's position, burned ones too (the view keeps one node per entry).
 func positions() -> Array:
 	return thralls.map(func(th): return th.pos)
+
+
+## Positions of the horrors still walking (rules use these).
+func live_positions(except: int = -1) -> Array:
+	var out: Array = []
+	for i in thralls.size():
+		if i != except and not thralls[i].get("gone", false):
+			out.append(thralls[i].pos)
+	return out
 
 
 func over() -> bool:
@@ -107,7 +150,7 @@ func over() -> bool:
 
 
 func flickers() -> bool:
-	return fog.flickers(hunter, positions())
+	return fog.flickers(hunter, live_positions())
 
 
 func hallucinating() -> bool:
@@ -117,7 +160,7 @@ func hallucinating() -> bool:
 ## Can you take one step onto `p`? (4-way neighbour, floor, no thrall you can SEE there.)
 ## An unseen thrall doesn't block: you walk into it. That's the point of the dark.
 func can_step(p: Vector2i) -> bool:
-	if over() or room.is_wall(p) or (p - hunter).abs().x + (p - hunter).abs().y != 1:
+	if over() or room.is_wall(p) or burning(p) or (p - hunter).abs().x + (p - hunter).abs().y != 1:
 		return false
 	var i := thrall_at(p)
 	return i < 0 or fog.get_state(p) != Fog.LIT
@@ -160,10 +203,94 @@ func wait() -> Array:
 	return _end_turn([])
 
 
+## Swing the boathook down the way you face. Costs a turn. [] if you have no hook.
+func hook() -> Array:
+	if over() or hook_wear <= 0:
+		return []
+	var events: Array = []
+	var hit := -1
+	for r in range(1, HOOK_REACH + 1):
+		var t: Vector2i = hunter + facing * r
+		if room.is_wall(t):
+			break
+		hit = thrall_at(t)
+		if hit >= 0:
+			break
+	if hit < 0:
+		events.append("hook_miss")
+		return _end_turn(events)
+	var th: Dictionary = thralls[hit]
+	th.stun = HOOK_STUN
+	var back: Vector2i = th.pos + facing
+	if not room.is_wall(back) and thrall_at(back) < 0:
+		th.pos = back          # shoved back a tile (into fire, if that's what's behind it)
+	hook_wear -= 1
+	events.append("hook_hit")
+	if hook_wear == 0:
+		events.append("hook_broke")
+	return _end_turn(events)
+
+
+## Pour oil on the tile in front of you. Costs a turn and SLICK_OIL. [] if you can't.
+func pour() -> Array:
+	var t: Vector2i = hunter + facing
+	if over() or oil < SLICK_OIL or room.is_wall(t) or slicks.has(t):
+		return []
+	oil -= SLICK_OIL
+	slicks[t] = 0
+	return _end_turn(["poured"])
+
+
+## Soaked tiles a spark would catch now: lit, in view, within SPARK_RANGE, in line of sight.
+func sparkable() -> Array:
+	var out: Array = []
+	if effective() == Fog.Lantern.HOODED:
+		return out
+	for p: Vector2i in slicks:
+		if slicks[p] == 0 and fog.get_state(p) == Fog.LIT and in_view(p) \
+				and Vector2(p - hunter).length() <= SPARK_RANGE + 0.5 and fog.has_los(hunter, p):
+			out.append(p)
+	return out
+
+
+## Throw a spark from the lantern at the oil. Costs a turn and SPARK_OIL. [] if nothing catches.
+func spark() -> Array:
+	var seeds := sparkable()
+	if over() or seeds.is_empty() or oil < SPARK_OIL:
+		return []
+	oil -= SPARK_OIL
+	var q: Array = seeds.duplicate()
+	while not q.is_empty():
+		var p: Vector2i = q.pop_back()
+		if slicks.get(p, -1) != 0:
+			continue
+		slicks[p] = FIRE_TURNS
+		for d: Vector2i in DIRS:
+			if slicks.get(p + d, -1) == 0:
+				q.append(p + d)
+	var events: Array = ["ignite"]
+	if burning(hunter):
+		_die("The oil under your own boots caught. You burned with it.")
+		events.append("burned_self")
+		return events
+	_burn(events)
+	return _end_turn(events)
+
+
+## Whatever stands in fire burns.
+func _burn(events: Array) -> void:
+	for th in thralls:
+		if not th.get("gone", false) and burning(th.pos):
+			th.gone = true
+			th.seen = false
+			if not events.has("burned"):
+				events.append("burned")
+
+
 ## Change the lantern. Free: costs no turn (the cost is in the next step's oil and dread).
 func set_lantern(s: int) -> void:
 	setting = s
-	fog.update([{pos = hunter, setting = effective()}])
+	fog.update(lights())
 
 
 func _end_turn(events: Array) -> Array:
@@ -179,6 +306,10 @@ func _end_turn(events: Array) -> Array:
 		rang = true
 		events.append("rang")
 		return events
+	if hooks_left.has(hunter):
+		hooks_left.erase(hunter)
+		hook_wear = HOOK_WEAR
+		events.append("hook_found")
 	if flasks_left.has(hunter):
 		flasks_left.erase(hunter)
 		oil += FLASK_OIL
@@ -189,20 +320,26 @@ func _end_turn(events: Array) -> Array:
 			events.append("letter")
 		else:
 			events.append("letter_dim")
-	fog.update([{pos = hunter, setting = effective()}])
+	fog.update(lights())
 	dread += DREAD_LIT if lit else DREAD_DARK
 	_horrors(events)
 	_thralls_act(events)
 	if dead:
 		return events
-	fog.update([{pos = hunter, setting = effective()}])
+	_burn(events)
+	for p: Vector2i in slicks.keys():
+		if slicks[p] > 0:
+			slicks[p] -= 1
+			if slicks[p] == 0:
+				slicks.erase(p)    # burnt out: the oil is gone
+	fog.update(lights())
 	_horrors(events)
 	dread = clampi(dread, 0, DREAD_MAX)
 	if dread >= DREAD_MAX:
 		oil = maxi(0, oil - PANIC_OIL)
 		dread = PANIC_RESET
 		events.append("panic")
-		fog.update([{pos = hunter, setting = effective()}])
+		fog.update(lights())
 	if oil == 0 and lit:
 		events.append("out_of_oil")
 	return events
@@ -211,6 +348,8 @@ func _end_turn(events: Array) -> Array:
 ## A thrall stepping into your light is a horror, once per sighting.
 func _horrors(events: Array) -> void:
 	for th in thralls:
+		if th.get("gone", false):
+			continue
 		var now: bool = fog.get_state(th.pos) == Fog.LIT
 		if now and not th.seen:
 			dread += DREAD_HORROR
@@ -243,6 +382,9 @@ func watched(th: Dictionary) -> bool:
 
 func _stalker_act(i: int, events: Array) -> void:
 	var th: Dictionary = thralls[i]
+	if th.get("stun", 0) > 0:
+		th.stun -= 1
+		return
 	for s in STALKER_STEPS:
 		if watched(th):
 			return
@@ -255,26 +397,34 @@ func _stalker_act(i: int, events: Array) -> void:
 		if th.target == null or th.pos == th.target:
 			th.target = null
 			return
-		var others: Array = positions()
-		others.remove_at(i)
-		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, others)
+		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, live_positions(i))
 		var path: Array = room.path_in(reach, th.pos, th.target)
 		if path.size() < 2:
 			th.target = null
 			return
 		th.pos = path[1]
+		if burning(th.pos):
+			th.gone = true
+			if not events.has("burned"):
+				events.append("burned")
+			return
 		if not events.has("stalker_moved"):
 			events.append("stalker_moved")
-		fog.update([{pos = hunter, setting = effective()}])
+		fog.update(lights())
 
 
 func _thralls_act(events: Array) -> void:
 	for i in thralls.size():
 		var th: Dictionary = thralls[i]
+		if th.get("gone", false):
+			continue
 		if th.get("kind", "thrall") == "stalker":
 			_stalker_act(i, events)
 			if dead:
 				return
+			continue
+		if th.get("stun", 0) > 0:
+			th.stun -= 1       # knocked down by the hook: it can't move or reach for you
 			continue
 		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
 			_die("Cold hands, out of the dark. The lantern rolls away.")
@@ -289,9 +439,7 @@ func _thralls_act(events: Array) -> void:
 			continue
 		if turn % THRALL_EVERY != 0:
 			continue   # shambling: this turn it only lurches in place
-		var others: Array = positions()
-		others.remove_at(i)
-		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, others)
+		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, live_positions(i))
 		var path: Array = room.path_in(reach, th.pos, th.target)
 		if path.size() < 2:
 			th.target = null   # no way through: it gives up

@@ -371,3 +371,141 @@ func test_lessons_teach_in_order() -> void:
 	check(Lessons.due(g, seen, "panic") == "panic", "panic event gets its card")
 	for id in Lessons.ORDER:
 		check(Lessons.CARDS.has(id), "every lesson has a card: " + id)
+
+
+# ---------------------------------------------------------------- boathook + oil slick
+
+const HOOK_HALL := "#########\n#HK...T.#\n#########"
+
+
+func test_boathook_pickup_and_reach() -> void:
+	var n = Night.start(HOOK_HALL)
+	n.facing = Vector2i.RIGHT
+	check(n.hook().is_empty(), "no hook in hand: can't swing, no turn spent")
+	check(n.turn == 0, "a refused swing costs nothing")
+	var ev: Array = n.step(Vector2i(2, 1))
+	check("hook_found" in ev and n.hook_wear == Night.HOOK_WEAR, "walk over the boathook to take it")
+	n.step(Vector2i(3, 1))
+	var th: Dictionary = n.thralls[0]
+	th.pos = Vector2i(5, 1)   # 2 tiles ahead: in reach
+	ev = n.hook()
+	check("hook_hit" in ev, "the hook reaches 2 tiles")
+	check(th.pos == Vector2i(6, 1), "a hit shoves it back a tile")
+	check(n.hook_wear == Night.HOOK_WEAR - 1, "a hit bends the hook")
+	th.pos = Vector2i(6, 1)
+	ev = n.hook()
+	check("hook_miss" in ev and n.hook_wear == Night.HOOK_WEAR - 1, "3 tiles is out of reach: a miss doesn't bend it")
+
+
+func test_boathook_saves_you_when_adjacent() -> void:
+	var n = Night.start("########\n#H.....#\n########")
+	n.thralls.append({pos = Vector2i(2, 1), target = null, seen = true, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.hook_wear = Night.HOOK_WEAR
+	n.facing = Vector2i.RIGHT
+	n.hook()
+	check(not n.dead, "hooked, knocked back and stunned: it can't grab you this turn")
+	check(n.thralls[0].pos == Vector2i(3, 1), "knocked back to 2 tiles")
+	n.wait()
+	check(not n.dead, "still stunned on the next turn")
+
+
+func test_boathook_breaks_after_wear() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.thralls.append({pos = Vector2i(2, 1), target = null, seen = true, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.hook_wear = Night.HOOK_WEAR
+	n.facing = Vector2i.RIGHT
+	var ev: Array = []
+	for i in Night.HOOK_WEAR:
+		n.thralls[0].pos = Vector2i(2, 1)
+		ev = n.hook()
+	check("hook_broke" in ev and n.hook_wear == 0, "it bends useless after HOOK_WEAR hits")
+	check(n.hook().is_empty(), "a broken hook can't swing")
+
+
+func test_boathook_stuns_the_stalker() -> void:
+	var n = Night.start("#########\n#H......#\n#########")
+	n.thralls.append({pos = Vector2i(3, 1), target = Vector2i(1, 1), seen = false, last_seen = null, kind = "stalker", stun = 0, gone = false})
+	n.hook_wear = Night.HOOK_WEAR
+	n.facing = Vector2i.RIGHT
+	n.set_lantern(Fog.Lantern.HOODED)   # dark: she'd normally come 2 steps
+	n.hook()
+	check(n.thralls[0].pos == Vector2i(4, 1), "hooked in the dark: shoved back")
+	n.turn_by(1)
+	check(not n.dead and n.thralls[0].pos == Vector2i(4, 1), "stunned: she can't move even with your back turned")
+
+
+func test_pour_costs_oil_and_soaks_ahead() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	var before: int = n.oil
+	var ev: Array = n.pour()
+	check("poured" in ev, "pour works on open floor")
+	check(n.slicks.get(Vector2i(2, 1), -1) == 0, "the tile ahead is soaked, not burning")
+	check(n.oil == before - Night.SLICK_OIL - 1, "pour costs SLICK_OIL plus the turn's burn")
+	check(n.pour().is_empty(), "can't pour twice on the same tile")
+	n.facing = Vector2i.LEFT
+	check(n.pour().is_empty(), "can't pour onto a wall")
+
+
+func test_slick_trap_burns_a_thrall() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.facing = Vector2i.RIGHT
+	n.pour()                      # soak (2,1)
+	n.step(Vector2i(2, 1))        # walk over it (soaked oil doesn't hurt)
+	n.pour()                      # soak (3,1): a two-tile slick
+	n.step_dir(Vector2i.LEFT)     # back off, facing it
+	check(n.facing == Vector2i.RIGHT and n.hunter == Vector2i(1, 1), "backed off with eyes on the oil")
+	n.thralls.append({pos = Vector2i(3, 1), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	check(n.sparkable().size() >= 1, "lit and in view: the oil can be sparked")
+	var before: int = n.oil
+	var ev: Array = n.spark()
+	check("ignite" in ev and "burned" in ev, "spark: whatever stands in it burns")
+	check(n.thralls[0].gone, "the thrall is gone")
+	check(n.burning(Vector2i(2, 1)) and n.burning(Vector2i(3, 1)), "fire runs along the soaked tiles")
+	check(n.oil == before - Night.SPARK_OIL - 1, "spark costs SPARK_OIL plus the turn's burn")
+	check(not n.can_step(Vector2i(2, 1)), "you can't walk into fire")
+	check(n.thrall_at(Vector2i(3, 1)) == -1, "a burned thrall blocks nothing")
+	for i in Night.FIRE_TURNS:
+		n.wait()
+	check(n.slicks.is_empty(), "the fire burns out after FIRE_TURNS")
+	check(n.can_step(Vector2i(2, 1)), "and the way is open again")
+
+
+func test_fire_kills_what_walks_into_it() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.facing = Vector2i.RIGHT
+	n.pour()
+	n.spark()
+	check(n.burning(Vector2i(2, 1)), "fire on the tile ahead")
+	n.thralls.append({pos = Vector2i(4, 1), target = Vector2i(1, 1), seen = false, last_seen = null, kind = "stalker", stun = 0, gone = false})
+	n.set_lantern(Fog.Lantern.HOODED)
+	check(n.watched(n.thralls[0]), "the fire lights her and you're looking: she's frozen")
+	n.facing = Vector2i.LEFT     # look away: she comes, straight through the fire
+	n.wait()
+	check(n.thralls[0].gone and not n.dead, "the bride walked through fire to reach you and burned")
+
+
+func test_spark_needs_light_and_eyes() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	n.pour()
+	n.turn_by(1)
+	check(n.spark().is_empty(), "can't spark oil you aren't looking at")
+	n.turn_by(-1)
+	n.set_lantern(Fog.Lantern.HOODED)
+	check(n.spark().is_empty(), "hooded: no flame to throw")
+
+
+func test_spark_under_your_own_feet_kills_you() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	n.pour()                    # (2,1)
+	n.step(Vector2i(2, 1))
+	n.pour()                    # (3,1), touching the slick you stand in
+	n.spark()
+	check(n.dead, "fire runs back along the oil to your boots")
+
+
+func test_one_night_has_a_boathook() -> void:
+	var r = Room.parse(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
+	check(r.hooks.size() == 1 and r.reachable(r.hunter, 999).has(r.hooks[0]), "One Night has one reachable boathook")
