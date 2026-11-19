@@ -9,7 +9,7 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 const Room = preload("res://scripts/sim/room.gd")
 
-const START_OIL := 30
+const START_OIL := 45        # One Night: the direct route is ~47 moves with turns; flasks are the margin
 const DREAD_MAX := 100
 const DREAD_DARK := 4          # per turn hooded or out of oil
 const DREAD_LIT := -2          # per turn with the lantern lit

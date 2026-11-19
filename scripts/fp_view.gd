@@ -9,6 +9,8 @@ extends Node3D
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Night = preload("res://scripts/sim/night.gd")
+const Lessons = preload("res://scripts/lessons.gd")
+const UI = preload("res://scripts/ui_style.gd")
 
 const UI_W := 540
 const TOP_H := 72
@@ -68,9 +70,17 @@ var hud: Control
 var hand_art: TextureRect
 const HAND_W := 236.0
 var status_label: Label
-var oil_pips: Array[ColorRect] = []
+var oil_bar: Control
+var dread_bar: Control
+var modal: Control                # title or a field note: blocks moves while it's up
+var guide_sheet: Control
+var card_ok: Button
+var title_begin: Button
+var seen := {}                    # field notes already shown (saved in user://)
+var hints_on := true
+var capture_mode := false
+static var title_done := false    # the title shows once per launch, not on every retry
 var oil_count: Label
-var dread_fill: ColorRect
 var dread_label: Label
 var lantern_buttons := {}
 var move_buttons := {}
@@ -82,11 +92,17 @@ func _ready() -> void:
 	game = Night.start(FileAccess.get_file_as_string(ROOM))
 	room = game.room
 	fog = game.fog
+	capture_mode = "--capture" in OS.get_cmdline_user_args()
+	_load_hints()
 	_build_world()
 	_build_hud()
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
-	if "--capture" in OS.get_cmdline_user_args():
+	if not title_done:
+		_show_title()
+	else:
+		_teach()
+	if capture_mode:
 		_capture.call_deferred()
 
 
@@ -273,9 +289,10 @@ func _build_world() -> void:
 	# between them: a frustum camera with its centre shifted up.
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0))
-	var full_h := cam.size * 960.0 / UI_W
-	var mid := (TOP_H + (960.0 - BOTTOM_H)) / 2.0
-	cam.frustum_offset = Vector2(0, -full_h * (480.0 - mid) / 960.0)
+	var ui_h := _ui_h()            # 960 on a 9:16 screen, taller on modern phones
+	var full_h := cam.size * ui_h / UI_W
+	var mid := (TOP_H + (ui_h - BOTTOM_H)) / 2.0
+	cam.frustum_offset = Vector2(0, -full_h * (ui_h / 2.0 - mid) / ui_h)
 	add_child(cam)
 
 	# her hand and lantern, low right, riding with the camera
@@ -351,7 +368,7 @@ func _refresh_fog() -> void:
 
 ## One action = one turn. The camera glides to the new pose while the thralls glide too.
 func act(kind: String) -> void:
-	if busy or game.over():
+	if busy or game.over() or modal != null or guide_sheet != null:
 		return
 	busy = true
 	last_event = ""
@@ -359,13 +376,15 @@ func act(kind: String) -> void:
 	var from_yaw := cam.rotation.y
 	var from_t: Array = game.positions()
 	var events: Array = []
+	var turn0: int = game.turn
 	match kind:
 		"forward": events = game.step_dir(game.facing)
 		"back": events = game.step_dir(-game.facing)
 		"left": events = game.turn_by(-1)
 		"right": events = game.turn_by(1)
 		"wait": events = game.wait()
-	if events.is_empty() and not game.over() and kind in ["forward", "back"]:
+	# a quiet step returns no events too: only an unspent turn means you hit stone
+	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
 		last_event = "blocked"
 		_refresh_hud()
@@ -393,6 +412,8 @@ func act(kind: String) -> void:
 	busy = false
 	if game.over():
 		_show_end()
+	else:
+		_teach(last_event)
 
 
 ## A swipe in UI pixels. Mostly vertical: step; mostly sideways: turn the way the finger went.
@@ -404,18 +425,20 @@ func swipe(d: Vector2) -> void:
 
 
 func _set_lantern(s: int) -> void:
-	if game.over():
+	if game.over() or modal != null:
 		return
 	game.set_lantern(s)
 	last_event = ""
 	_refresh()
+	_teach()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var press: bool = event is InputEventScreenTouch and event.pressed
 	press = press or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
-	if press and game.over() and end_screen and end_screen.visible:
-		get_tree().reload_current_scene()
+	if event is InputEventKey and event.pressed and modal != null and card_ok != null \
+			and event.keycode in [KEY_ENTER, KEY_SPACE, KEY_KP_ENTER]:
+		card_ok.pressed.emit()
 		return
 	# swipe on the view: up = forward, down = back, left/right = turn (buttons stay as backup)
 	var release: bool = event is InputEventScreenTouch and not event.pressed
@@ -459,16 +482,23 @@ func _process(delta: float) -> void:
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
 		hand_art.modulate = Color(k, k, k)
-		hand_art.position.y = 960 - BOTTOM_H - HAND_W + 22 + sin(t * 2.1) * 2.0
+		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22 + sin(t * 2.1) * 2.0
 
 
 # ---------------------------------------------------------------- HUD
 
-func _label(text: String, size: int, color: Color) -> Label:
+func _ui_h() -> float:
+	return get_viewport().get_visible_rect().size.y
+
+
+func _label(text: String, size: int, color: Color, font: Font = null) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
+	if font:
+		l.add_theme_font_override("font", font)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 
@@ -477,11 +507,22 @@ func _button(text: String, pos: Vector2, size: Vector2, cb: Callable, parent: Co
 	b.text = text
 	b.position = pos
 	b.size = size
-	b.add_theme_font_size_override("font_size", 17)
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(cb)
 	parent.add_child(b)
 	return b
+
+
+## A thin brass rule, the house trim between panels and the view.
+func _rule(parent: Control, y: float, top_edge := false) -> void:
+	var r := ColorRect.new()
+	r.color = UI.BRASS_DIM
+	r.position = Vector2(0, y)
+	r.size = Vector2(UI_W, 1)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if top_edge:
+		r.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	parent.add_child(r)
 
 
 func _build_hud() -> void:
@@ -490,6 +531,7 @@ func _build_hud() -> void:
 	hud = Control.new()
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.theme = UI.theme()
 	layer.add_child(hud)
 
 	var g := Gradient.new()
@@ -507,7 +549,7 @@ func _build_hud() -> void:
 	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	hand_art.size = Vector2(HAND_W, HAND_W)
-	hand_art.position = Vector2(UI_W - HAND_W + 6, 960 - BOTTOM_H - HAND_W + 22)
+	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - BOTTOM_H - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(hand_art)
 
@@ -518,44 +560,41 @@ func _build_hud() -> void:
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(vig)
 
+	# top bar: name, letters, guide button; then the two clocks, oil and dread
 	var top := ColorRect.new()
-	top.color = INK_BLACK
+	top.color = UI.INK
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.size.y = TOP_H
 	hud.add_child(top)
-	var title := _label("ONE NIGHT  ·  THE BELL TOWER", 16, UI_TEXT)
-	title.position = Vector2(14, 8)
+	_rule(top, TOP_H - 1)
+	var title := _label("ONE NIGHT", 17, UI.AMBER, UI.head())
+	title.position = Vector2(14, 7)
 	top.add_child(title)
-	letters_label = _label("", 14, UI_DIM)
-	letters_label.position = Vector2(290, 10)
+	letters_label = _label("", 17, UI.DIM)
+	letters_label.position = Vector2(150, 7)
 	top.add_child(letters_label)
-	var sw := _button("TOP-DOWN", Vector2(UI_W - 124, 6), Vector2(110, 26),
-		func(): get_tree().change_scene_to_file("res://scenes/room3d.tscn"), top)
-	sw.add_theme_font_size_override("font_size", 13)
-	top.add_child(_label("OIL", 16, UI_AMBER))
-	top.get_child(-1).position = Vector2(14, 36)
-	for i in Night.START_OIL:
-		var pip := ColorRect.new()
-		pip.position = Vector2(58 + i * 8, 44)
-		pip.size = Vector2(5, 14)
-		top.add_child(pip)
-		oil_pips.append(pip)
-	oil_count = _label("", 16, UI_AMBER)
-	oil_count.position = Vector2(58 + Night.START_OIL * 8 + 6, 36)
+	var guide := _button("?", Vector2(UI_W - 48, 6), Vector2(36, 30), _open_guide, top)
+	guide.add_theme_font_size_override("font_size", 17)
+	top.add_child(_label("OIL", 14, UI.AMBER, UI.head()))
+	top.get_child(-1).position = Vector2(14, 41)
+	oil_bar = Control.new()
+	oil_bar.position = Vector2(54, 44)
+	oil_bar.size = Vector2(200, 16)
+	oil_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	oil_bar.draw.connect(_draw_oil)
+	top.add_child(oil_bar)
+	oil_count = _label("", 17, UI.AMBER, UI.head())
+	oil_count.position = Vector2(262, 38)
 	top.add_child(oil_count)
-	dread_label = _label("DREAD", 16, UI_DIM)
-	dread_label.position = Vector2(352, 36)
+	dread_label = _label("DREAD", 14, UI.DIM, UI.head())
+	dread_label.position = Vector2(318, 41)
 	top.add_child(dread_label)
-	var track := ColorRect.new()
-	track.color = Color(0.12, 0.14, 0.2)
-	track.position = Vector2(420, 45)
-	track.size = Vector2(104, 12)
-	top.add_child(track)
-	dread_fill = ColorRect.new()
-	dread_fill.color = UI_BLOOD
-	dread_fill.position = Vector2(420, 45)
-	dread_fill.size = Vector2(0, 12)
-	top.add_child(dread_fill)
+	dread_bar = Control.new()
+	dread_bar.position = Vector2(392, 44)
+	dread_bar.size = Vector2(UI_W - 392 - 14, 16)
+	dread_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dread_bar.draw.connect(_draw_dread)
+	top.add_child(dread_bar)
 
 	# corner map: what you remember, drawn small. North is up; the arrow is you.
 	minimap = Control.new()
@@ -566,32 +605,71 @@ func _build_hud() -> void:
 	hud.add_child(minimap)
 
 	var bottom := ColorRect.new()
-	bottom.color = INK_BLACK
+	bottom.color = UI.INK
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_top = -BOTTOM_H
 	hud.add_child(bottom)
-	status_label = _label("", 15, UI_DIM)
-	status_label.position = Vector2(14, 8)
-	status_label.size = Vector2(UI_W - 28, 44)
+	_rule(bottom, 0)
+	status_label = _label("", 19, UI.TEXT, UI.italic())
+	status_label.position = Vector2(16, 8)
+	status_label.size = Vector2(UI_W - 32, 46)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_label.add_theme_constant_override("line_spacing", -3)
 	bottom.add_child(status_label)
-	var names := {Fog.Lantern.HOODED: "HOODED", Fog.Lantern.NORMAL: "NORMAL", Fog.Lantern.BRIGHT: "BRIGHT"}
+	# the lantern row teaches its own costs: name, then oil per turn and how far it lights
+	var names := {
+		Fog.Lantern.HOODED: "HOODED\nno oil · unseen",
+		Fog.Lantern.NORMAL: "NORMAL\n1 oil · 2 tiles",
+		Fog.Lantern.BRIGHT: "BRIGHT\n2 oil · 4 tiles",
+	}
 	var x := 14
 	for s in [Fog.Lantern.HOODED, Fog.Lantern.NORMAL, Fog.Lantern.BRIGHT]:
-		lantern_buttons[s] = _button(names[s], Vector2(x, 58), Vector2(162, 52), _set_lantern.bind(s), bottom)
+		var b := _button(names[s], Vector2(x, 60), Vector2(162, 56), _set_lantern.bind(s), bottom)
+		b.add_theme_font_size_override("font_size", 15)
+		lantern_buttons[s] = b
 		x += 174
-	# move pad: turn left / forward / turn right, then wait / back
-	move_buttons["left"] = _button("TURN L", Vector2(14, 122), Vector2(162, 92), act.bind("left"), bottom)
-	move_buttons["forward"] = _button("FORWARD", Vector2(188, 122), Vector2(162, 92), act.bind("forward"), bottom)
-	move_buttons["right"] = _button("TURN R", Vector2(362, 122), Vector2(162, 92), act.bind("right"), bottom)
-	move_buttons["wait"] = _button("WAIT", Vector2(14, 224), Vector2(162, 92), act.bind("wait"), bottom)
-	move_buttons["back"] = _button("BACK", Vector2(188, 224), Vector2(162, 92), act.bind("back"), bottom)
+	# move pad: turn left / step / turn right, then wait / back / guide
+	move_buttons["left"] = _button("TURN\nLEFT", Vector2(14, 126), Vector2(162, 92), act.bind("left"), bottom)
+	move_buttons["forward"] = _button("STEP", Vector2(188, 126), Vector2(162, 92), act.bind("forward"), bottom)
+	move_buttons["right"] = _button("TURN\nRIGHT", Vector2(362, 126), Vector2(162, 92), act.bind("right"), bottom)
+	move_buttons["wait"] = _button("WAIT", Vector2(14, 228), Vector2(162, 88), act.bind("wait"), bottom)
+	move_buttons["back"] = _button("BACK", Vector2(188, 228), Vector2(162, 88), act.bind("back"), bottom)
+	move_buttons["guide"] = _button("FIELD\nGUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
+	move_buttons["guide"].add_theme_color_override("font_color", UI.DIM)
+	move_buttons["forward"].add_theme_font_size_override("font_size", 21)
+
+
+## Oil: one notch per drop up to the starting 30; more than that and the bar glows.
+func _draw_oil() -> void:
+	var w := oil_bar.size.x
+	var n: int = Night.START_OIL
+	var seg := w / n
+	oil_bar.draw_rect(Rect2(Vector2(-2, -2), oil_bar.size + Vector2(4, 4)), UI.BRASS_DIM, false, 1.0)
+	for i in n:
+		var on: bool = i < game.oil
+		var col := UI.AMBER if on else Color(0.13, 0.15, 0.2)
+		if on and game.oil > n:
+			col = Color(1.0, 0.86, 0.55)
+		oil_bar.draw_rect(Rect2(Vector2(i * seg + 0.5, 0), Vector2(seg - 1.5, oil_bar.size.y)), col)
+
+
+## Dread: a red bar with a notch at the halfway mark, where the flame starts lying.
+func _draw_dread() -> void:
+	var r := Rect2(Vector2.ZERO, dread_bar.size)
+	dread_bar.draw_rect(r, Color(0.1, 0.11, 0.15))
+	var k := float(game.dread) / Night.DREAD_MAX
+	dread_bar.draw_rect(Rect2(Vector2.ZERO, Vector2(r.size.x * k, r.size.y)), UI.BLOOD)
+	var half := r.size.x * float(Night.DREAD_HALLUCINATE) / Night.DREAD_MAX
+	dread_bar.draw_line(Vector2(half, -3), Vector2(half, r.size.y + 3), UI.BRASS, 1.0)
+	dread_bar.draw_rect(Rect2(Vector2(-2, -2), r.size + Vector2(4, 4)), UI.BRASS_DIM, false, 1.0)
 
 
 ## Remembered floor dim, lit floor amber, walls you've seen grey; thralls only if lit now.
 func _draw_map() -> void:
 	var c := MAP_CELL
-	minimap.draw_rect(Rect2(Vector2.ZERO, minimap.size), Color(0, 0, 0, 0.55))
+	minimap.draw_rect(Rect2(Vector2(-3, -3), minimap.size + Vector2(6, 6)), Color(0, 0, 0, 0.6))
+	minimap.draw_rect(Rect2(Vector2(-3, -3), minimap.size + Vector2(6, 6)), UI.BRASS_DIM, false, 1.0)
 	for y in room.size.y:
 		for x in room.size.x:
 			var p := Vector2i(x, y)
@@ -605,33 +683,32 @@ func _draw_map() -> void:
 				col = Color(0.75, 0.5, 0.2) if st == Fog.LIT else Color(0.28, 0.3, 0.36)
 			minimap.draw_rect(Rect2(Vector2(x, y) * c + Vector2(0.5, 0.5), Vector2(c - 1, c - 1)), col)
 			if room.bells.has(p):
-				minimap.draw_circle((Vector2(p) + Vector2(0.5, 0.5)) * c, c * 0.4, UI_AMBER)
+				minimap.draw_circle((Vector2(p) + Vector2(0.5, 0.5)) * c, c * 0.4, UI.AMBER)
 			elif room.letters.has(p) and not game.letters_read.has(p):
-				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2, 1.5), Vector2(c - 4, c - 3)), UI_TEXT)
+				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2, 1.5), Vector2(c - 4, c - 3)), UI.TEXT)
 			elif game.flasks_left.has(p):
 				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2.5, 2.5), Vector2(c - 5, c - 5)), LANTERN)
 	for th in game.thralls:
 		if fog.get_state(th.pos) == Fog.LIT:
-			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI_BLOOD)
+			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
 		elif th.last_seen != null:
 			# last-seen marker: where you saw it, not where it is. It may have moved.
 			var m: Vector2 = Vector2(th.last_seen) * c
-			var dim := Color(UI_BLOOD, 0.55)
+			var dim := Color(UI.BLOOD, 0.55)
 			minimap.draw_line(m + Vector2(2, 2), m + Vector2(c - 2, c - 2), dim, 1.5)
 			minimap.draw_line(m + Vector2(c - 2, 2), m + Vector2(2, c - 2), dim, 1.5)
 	var ctr := (Vector2(game.hunter) + Vector2(0.5, 0.5)) * c
 	var f := Vector2(game.facing)
 	var side := Vector2(-f.y, f.x)
-	minimap.draw_colored_polygon(PackedVector2Array([ctr + f * 4.5, ctr - f * 3 + side * 3.5, ctr - f * 3 - side * 3.5]), UI_TEXT)
+	minimap.draw_colored_polygon(PackedVector2Array([ctr + f * 4.5, ctr - f * 3 + side * 3.5, ctr - f * 3 - side * 3.5]), UI.TEXT)
 
 
 func _refresh_hud() -> void:
 	oil_count.text = str(game.oil)
-	letters_label.text = "LETTERS %d/%d" % [game.letters_read.size(), room.letters.size()]
-	for i in oil_pips.size():
-		oil_pips[i].color = UI_AMBER if i < game.oil else Color(0.2, 0.25, 0.32)
-	dread_fill.size.x = 104.0 * game.dread / Night.DREAD_MAX
-	dread_label.add_theme_color_override("font_color", UI_BLOOD if game.hallucinating() else UI_DIM)
+	letters_label.text = "·  letters %d of %d" % [game.letters_read.size(), room.letters.size()]
+	oil_bar.queue_redraw()
+	dread_bar.queue_redraw()
+	dread_label.add_theme_color_override("font_color", UI.BLOOD if game.hallucinating() else UI.DIM)
 	var lines := {
 		Fog.Lantern.HOODED: "Hooded. Unseen, and blind. The dark gets into you.",
 		Fog.Lantern.NORMAL: "The lantern burns low: two paces of light.",
@@ -658,47 +735,265 @@ func _refresh_hud() -> void:
 	elif flicker or fake_flicker:
 		s = "The flame gutters. Something is near."
 	if game.turn < 3 and extra == "":
-		s = "Swipe up to walk, down to back away, left or right to turn. Find the bell."
+		s = "Swipe up to walk, down to back away, sideways to turn. Find the bell."
 	status_label.text = s
 	for k in lantern_buttons:
-		lantern_buttons[k].modulate = Color(1, 0.85, 0.5) if k == game.setting else Color(0.55, 0.6, 0.7)
+		if k == game.setting:
+			UI.lit(lantern_buttons[k])
+		else:
+			UI.unlit(lantern_buttons[k])
 	if minimap:
 		minimap.queue_redraw()
+
+
+# ---------------------------------------------------------------- title, field notes, guide
+
+## A full-screen sheet over the view: dims the world and eats every tap under it.
+func _sheet(alpha: float) -> ColorRect:
+	var s := ColorRect.new()
+	s.color = Color(0.008, 0.01, 0.018, alpha)
+	s.set_anchors_preset(Control.PRESET_FULL_RECT)
+	s.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.add_child(s)
+	return s
+
+
+func _center(c: Control, parent: Control, y: float, w: float) -> void:
+	c.position = Vector2((UI_W - w) / 2.0, y)
+	c.size.x = w
+	parent.add_child(c)
+
+
+func _show_title() -> void:
+	modal = _sheet(0.8)
+	var bride := TextureRect.new()
+	bride.texture = _tex("bride")
+	bride.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bride.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	bride.modulate = Color(0.5, 0.48, 0.52, 0.55)
+	bride.size = Vector2(UI_W, 560)
+	bride.position = Vector2(0, _ui_h() * 0.5 - 330)
+	bride.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	modal.add_child(bride)
+	var y := _ui_h() * 0.5 - 330
+	var name_l := _label("LETHEMOOR", 58, UI.AMBER, UI.head())
+	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(name_l, modal, y, UI_W)
+	var sub := _label("ONE  NIGHT", 20, UI.TEXT, UI.head())
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(sub, modal, y + 80, UI_W)
+	var tag := _label("Light is life. Oil is time.\nThe dead don't stay gone.", 21, UI.DIM, UI.italic())
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(tag, modal, y + 128, UI_W)
+	var by := _ui_h() * 0.5 + 150
+	var begin := Button.new()
+	begin.text = "BEGIN THE NIGHT"
+	begin.focus_mode = Control.FOCUS_NONE
+	begin.add_theme_font_size_override("font_size", 22)
+	begin.size.y = 72
+	UI.lit(begin)
+	begin.pressed.connect(_begin)
+	_center(begin, modal, by, 340)
+	title_begin = begin
+	var guide := Button.new()
+	guide.text = "FIELD GUIDE"
+	guide.focus_mode = Control.FOCUS_NONE
+	guide.size.y = 54
+	guide.pressed.connect(_open_guide)
+	_center(guide, modal, by + 88, 340)
+	var hints := Button.new()
+	hints.focus_mode = Control.FOCUS_NONE
+	hints.size.y = 54
+	hints.text = "HINTS: " + ("ON" if hints_on else "OFF")
+	hints.pressed.connect(func():
+		hints_on = not hints_on
+		hints.text = "HINTS: " + ("ON" if hints_on else "OFF")
+		_save_hints())
+	_center(hints, modal, by + 152, 340)
+	var foot := _label("Ring the bell before your oil runs out.", 17, UI.DIM, UI.italic())
+	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(foot, modal, _ui_h() - 60, UI_W)
+
+
+func _begin() -> void:
+	title_done = true
+	modal.queue_free()
+	modal = null
+	_teach()
+
+
+## One field note, centred on the view. Tap GOT IT (or Enter) to put it away.
+func _show_card(id: String) -> void:
+	modal = _sheet(0.55)
+	var card := PanelContainer.new()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	card.add_child(box)
+	var kicker := _label("FIELD NOTE", 13, UI.DIM, UI.head())
+	box.add_child(kicker)
+	var head := _label(Lessons.CARDS[id][0], 26, UI.AMBER, UI.head())
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(head)
+	var body := _label(Lessons.CARDS[id][1], 20, UI.TEXT)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.add_theme_constant_override("line_spacing", -2)
+	box.add_child(body)
+	var ok := Button.new()
+	ok.text = "GOT IT"
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.custom_minimum_size = Vector2(0, 58)
+	ok.pressed.connect(_close_card.bind(id))
+	box.add_child(ok)
+	card_ok = ok
+	card.custom_minimum_size.x = 470
+	card.position = Vector2((UI_W - 470) / 2.0, TOP_H + 70)
+	modal.add_child(card)
+
+
+func _close_card(id: String) -> void:
+	seen[id] = true
+	_save_hints()
+	modal.queue_free()
+	modal = null
+	card_ok = null
+	_teach()
+
+
+## Show the next field note that's due, if hints are on and nothing else is up.
+func _teach(event: String = "") -> void:
+	if not hints_on or modal != null or game.over() or not title_done:
+		return
+	var id: String = Lessons.due(game, seen, event)
+	if id != "":
+		_show_card(id)
+
+
+## Every field note in one scroll, any time (top-bar ? or FIELD GUIDE).
+func _open_guide() -> void:
+	if guide_sheet != null:
+		return
+	guide_sheet = _sheet(0.9)
+	var card := PanelContainer.new()
+	card.position = Vector2(20, TOP_H + 20)
+	card.size = Vector2(UI_W - 40, _ui_h() - TOP_H - 60)
+	guide_sheet.add_child(card)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 12)
+	card.add_child(outer)
+	outer.add_child(_label("FIELD GUIDE", 28, UI.AMBER, UI.head()))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	for id: String in Lessons.ORDER:
+		var h := _label(Lessons.CARDS[id][0], 18, UI.AMBER, UI.head())
+		list.add_child(h)
+		var b := _label(Lessons.CARDS[id][1], 18, UI.TEXT)
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD
+		b.custom_minimum_size.x = UI_W - 100
+		list.add_child(b)
+		var gap := Control.new()
+		gap.custom_minimum_size.y = 8
+		list.add_child(gap)
+	list.add_child(_label("GRADES", 18, UI.AMBER, UI.head()))
+	var gl := _label(Lessons.GRADE_LINE, 18, UI.TEXT)
+	gl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	gl.custom_minimum_size.x = UI_W - 100
+	list.add_child(gl)
+	var close := Button.new()
+	close.text = "CLOSE"
+	close.focus_mode = Control.FOCUS_NONE
+	close.custom_minimum_size = Vector2(0, 58)
+	close.pressed.connect(func():
+		guide_sheet.queue_free()
+		guide_sheet = null)
+	outer.add_child(close)
+
+
+func _load_hints() -> void:
+	var cfg := ConfigFile.new()
+	if capture_mode or cfg.load("user://lethemoor.cfg") != OK:
+		return
+	hints_on = cfg.get_value("hints", "on", true)
+	for id in cfg.get_value("hints", "seen", []):
+		seen[id] = true
+
+
+func _save_hints() -> void:
+	if capture_mode:
+		return
+	var cfg := ConfigFile.new()
+	cfg.set_value("hints", "on", hints_on)
+	cfg.set_value("hints", "seen", seen.keys())
+	cfg.save("user://lethemoor.cfg")
 
 
 func _show_end() -> void:
 	if end_screen == null:
 		end_screen = ColorRect.new()
-		end_screen.color = Color(0.01, 0.01, 0.02, 0.84)
+		end_screen.color = Color(0.01, 0.01, 0.02, 0.86)
 		end_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
-		end_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		end_screen.mouse_filter = Control.MOUSE_FILTER_STOP
 		hud.add_child(end_screen)
-		var big := _label("", 34, UI_BLOOD)
+		var card := PanelContainer.new()
+		card.name = "Card"
+		card.custom_minimum_size.x = 480
+		card.position = Vector2(30, _ui_h() * 0.5 - 300)
+		end_screen.add_child(card)
+		var box := VBoxContainer.new()
+		box.name = "Box"
+		box.add_theme_constant_override("separation", 12)
+		card.add_child(box)
+		var big := _label("", 32, UI.BLOOD, UI.head())
 		big.name = "Big"
-		big.position = Vector2(30, 330)
-		big.size = Vector2(UI_W - 60, 50)
 		big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		end_screen.add_child(big)
-		var small := _label("", 17, UI_TEXT)
+		big.autowrap_mode = TextServer.AUTOWRAP_WORD
+		box.add_child(big)
+		var grade := _label("", 96, UI.AMBER, UI.head())
+		grade.name = "Grade"
+		grade.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(grade)
+		var small := _label("", 20, UI.TEXT)
 		small.name = "Small"
-		small.position = Vector2(40, 400)
-		small.size = Vector2(UI_W - 80, 200)
 		small.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		small.autowrap_mode = TextServer.AUTOWRAP_WORD
-		end_screen.add_child(small)
-	var big: Label = end_screen.get_node("Big")
-	var small: Label = end_screen.get_node("Small")
+		box.add_child(small)
+		var again := Button.new()
+		again.text = "WALK THE NIGHT AGAIN"
+		again.focus_mode = Control.FOCUS_NONE
+		again.custom_minimum_size = Vector2(0, 66)
+		again.add_theme_font_size_override("font_size", 19)
+		UI.lit(again)
+		again.pressed.connect(func(): get_tree().reload_current_scene())
+		box.add_child(again)
+		var menu := Button.new()
+		menu.text = "TITLE"
+		menu.focus_mode = Control.FOCUS_NONE
+		menu.custom_minimum_size = Vector2(0, 54)
+		menu.pressed.connect(func():
+			title_done = false
+			get_tree().reload_current_scene())
+		box.add_child(menu)
+	var big: Label = end_screen.get_node("Card/Box/Big")
+	var grade: Label = end_screen.get_node("Card/Box/Grade")
+	var small: Label = end_screen.get_node("Card/Box/Small")
+	grade.visible = game.rang
 	if game.rang:
-		big.text = "THE BELL RINGS  ·  %s" % game.grade()
-		big.add_theme_color_override("font_color", UI_AMBER)
-		small.text = "It rolls out over the drowned quay, and every door in the town hears it.\n\n%d oil left  ·  %d of %d letters read  ·  %d turns\nScore %d\n\nTap to walk the night again." % [game.oil, game.letters_read.size(), room.letters.size(), game.turn, game.points()]
+		big.text = "THE BELL RINGS"
+		big.add_theme_color_override("font_color", UI.AMBER)
+		grade.text = game.grade()
+		small.text = "It rolls out over the drowned quay, and every door in the town hears it.\n\n%d oil left  +  %d letters × 5  =  %d\n%d turns\n\n%s" % [game.oil, game.letters_read.size(), game.points(), game.turn, Lessons.GRADE_LINE]
 	elif game.escaped:
 		big.text = "DAWN"
-		big.add_theme_color_override("font_color", UI_AMBER)
-		small.text = "You reach the water's edge as the sky goes grey.\n\n%d turns  ·  %d oil left\n\nTap to walk the night again." % [game.turn, game.oil]
+		big.add_theme_color_override("font_color", UI.AMBER)
+		small.text = "You reach the water's edge as the sky goes grey.\n\n%d turns  ·  %d oil left" % [game.turn, game.oil]
 	else:
 		big.text = "THE DARK TOOK YOU"
-		small.text = "%s\n\n%d turns  ·  %d oil left\n\nTap to try again." % [game.cause, game.turn, game.oil]
+		small.text = "%s\n\n%d turns  ·  %d oil left" % [game.cause, game.turn, game.oil]
 	end_screen.visible = true
 
 
@@ -799,12 +1094,29 @@ func _capture() -> void:
 	for i in 20:
 		await get_tree().process_frame
 	if capture_phase == 0:
+		await _shot("fp_title")
+		await _press(title_begin)
+		print("TITLE ", "PASS" if title_done else "FAIL")
+		await _shot("fp_hint")
+		print("HINT ", "PASS" if card_ok != null else "FAIL")
+		await _press(card_ok)
+		await _press(move_buttons["guide"])
+		await _shot("fp_guide")
+		print("GUIDE ", "PASS" if guide_sheet != null else "FAIL")
+		guide_sheet.queue_free()
+		guide_sheet = null
+	hints_on = false               # the rest of the capture plays like someone who knows
+	if modal != null:
+		modal.queue_free()
+		modal = null
+	if capture_phase == 0:
 		await _shot("fp_start")
 		var at: Vector2i = game.hunter
 		var f0: Vector2i = game.facing
 		print("OPEN ", "PASS" if not room.is_wall(at + f0) else "FAIL", " facing=", f0)
 		await _press(move_buttons["forward"])
-		print("FWD ", "PASS" if game.hunter == at + f0 and game.turn == 1 else "FAIL", " hunter=", game.hunter)
+		var cam_ok: bool = cam.position.distance_to(_cam_pos(game.hunter, game.facing)) < 0.05
+		print("FWD ", "PASS" if game.hunter == at + f0 and game.turn == 1 and cam_ok and last_event != "blocked" else "FAIL", " hunter=", game.hunter, " cam_ok=", cam_ok)
 		await _press(move_buttons["right"])
 		print("TURN ", "PASS" if game.facing == Vector2i(-f0.y, f0.x) and game.turn == 2 else "FAIL", " facing=", game.facing)
 		var turn_before: int = game.turn

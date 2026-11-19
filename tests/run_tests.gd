@@ -356,3 +356,18 @@ func test_start_facing_open_corridor() -> void:
 	var ahead: Vector2i = g.hunter + g.facing
 	check(not g.room.is_wall(ahead), "start facing a wall")
 	check(g.facing == Vector2i.RIGHT, "one_night starts looking down the long corridor east")
+
+
+func test_lessons_teach_in_order() -> void:
+	var Lessons = load("res://scripts/lessons.gd")
+	var g = Night.start(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
+	var seen := {}
+	check(Lessons.due(g, seen) == "goal", "the first card is the goal")
+	seen["goal"] = true
+	check(Lessons.due(g, seen) == "", "nothing else on turn 0")
+	g.set_lantern(Fog.Lantern.HOODED)
+	check(Lessons.due(g, seen) == "hood", "hooding explains hooding")
+	seen["hood"] = true
+	check(Lessons.due(g, seen, "panic") == "panic", "panic event gets its card")
+	for id in Lessons.ORDER:
+		check(Lessons.CARDS.has(id), "every lesson has a card: " + id)
