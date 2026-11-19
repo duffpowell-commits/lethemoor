@@ -329,6 +329,10 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `tools/gen_map_parchment.py`, drawn as a TextureRect under the map: drawing it with draw_texture_rect lost its alpha in
   the capture), inked walls + hatching, brass compass ring, turns with you (`map_rot`); MENU -> MAP: NORTH UP, saved in
   [controls] map_north_up.
+- **Nightmare thrall (Nov 19, Duff: "make that sprite the most horrifying thing you can"):** `thrall_nightmare` (first in
+  `THRALL_LOOKS`, 2.2 tall via meta `tall`: sack head stitched with fishhooks, ribs torn open, claws) and `thrall_lunge_nightmare`
+  (now `THRALL_LUNGE`: sack mouth split open, ribs like a jaw; lunge + kill shot). Forge's auto magenta key ate dark bodies, so
+  these were rendered WITHOUT `key` and cut out with rembg `isnet-general-use` (pip install "rembg[cpu]"): clean on painted backdrops.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.

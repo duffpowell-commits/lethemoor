@@ -45,8 +45,8 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
-const THRALL_LUNGE := "thrall_lunge"   # reaching for you, sack-mouth open: the lunge and the kill shot
+const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 12.0               # the corner map follows you: ~15 tiles across the disc
@@ -375,7 +375,8 @@ func _build_world() -> void:
 			th.texture = _tex(THRALL_LOOKS[looks % THRALL_LOOKS.size()])
 			looks += 1
 		th.set_meta("look", th.texture)
-		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
+		th.set_meta("tall", 2.2 if th.texture == _tex("thrall_nightmare") else 1.85)   # the nightmare stoops under the lintels
+		th.pixel_size = th.get_meta("tall") / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 		th.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
@@ -893,7 +894,7 @@ func _process(delta: float) -> void:
 				sp.scale = Vector3(1.12, 0.84, 1.0)
 				sp.modulate = Color(0.8, 0.8, 0.82)
 			if not th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
-				_thrall_art(sp, sp.get_meta("look"), 1.85)
+				_thrall_art(sp, sp.get_meta("look"), sp.get_meta("tall", 1.85))
 			sp.position.x = jerk
 	if lunge_hit > 0.0:
 		lunge_hit = maxf(0.0, lunge_hit - delta * 1.6)
