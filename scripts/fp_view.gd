@@ -17,7 +17,8 @@ const Perf = preload("res://scripts/perf.gd")
 
 const UI_W := 540
 const TOP_H := 72
-const BOTTOM_H := 330              # status + lantern row + move pad
+const PAD_H := 330                 # status + lantern row + move pad (MENU -> MOVE BUTTONS: ON)
+const SLIM_H := 132                # status + lantern row + WAIT: swipes move you (the default)
 const WALL_H := 2.4                # tall: walls should loom over you
 const EYE := 0.82                  # eye height in tiles (a tile is ~ a stride)
 const CAM_BACK := 0.32             # stand at the back of the tile so the next one is in view
@@ -102,6 +103,10 @@ var oil_count: Label
 var dread_label: Label
 var lantern_buttons := {}
 var move_buttons := {}
+var wait_button: Button             # WAIT on the lantern row (swipe mode)
+var bottom_panel: ColorRect
+var pad_on := false                # the old move pad; off = swipes are the controls
+var menu_items := {}               # menu label (before any colon) -> button, for the capture
 var minimap: Control
 var end_screen: Control
 
@@ -722,10 +727,15 @@ func _process(delta: float) -> void:
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
 		hand_art.modulate = Color(k, k, k)
-		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22 + sin(t * 2.1) * 2.0
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22 + sin(t * 2.1) * 2.0
 
 
 # ---------------------------------------------------------------- HUD
+
+## Bottom panel height: slim when you move by swiping, tall with the move pad.
+func _bh() -> float:
+	return PAD_H if pad_on else SLIM_H
+
 
 func _ui_h() -> float:
 	return get_viewport().get_visible_rect().size.y
@@ -744,7 +754,7 @@ func _fit_camera() -> void:
 	var vis := get_viewport().get_visible_rect().size
 	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0)) * vis.x / UI_W
 	var full_h := cam.size * vis.y / vis.x
-	var mid := (TOP_H + (vis.y - BOTTOM_H)) / 2.0
+	var mid := (TOP_H + (vis.y - _bh())) / 2.0
 	cam.frustum_offset = Vector2(0, -full_h * (vis.y / 2.0 - mid) / vis.y)
 
 
@@ -770,7 +780,7 @@ func _on_resize() -> void:
 	if perf:
 		perf.offset.x = _col_x()
 	if hand_art:
-		hand_art.position.y = _ui_h() - BOTTOM_H - HAND_W + 22
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22
 	_refresh_hud()                        # the tool buttons sit on the bottom panel
 	if modal != null and is_instance_valid(title_begin) and modal.is_ancestor_of(title_begin):
 		modal.queue_free()                # the title is laid out by height: build it again
@@ -855,7 +865,7 @@ func _build_hud() -> void:
 	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	hand_art.size = Vector2(HAND_W, HAND_W)
-	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - BOTTOM_H - HAND_W + 22)
+	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - _bh() - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hand_col.add_child(hand_art)
 
@@ -916,7 +926,8 @@ func _build_hud() -> void:
 	var bottom := ColorRect.new()
 	bottom.color = UI.INK
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_top = -BOTTOM_H
+	bottom.offset_top = -_bh()
+	bottom_panel = bottom
 	hud.add_child(bottom)
 	_wing(bottom, UI.INK)
 	_rule(bottom, 0)
@@ -929,7 +940,7 @@ func _build_hud() -> void:
 	bottom.add_child(status_label)
 	# the lantern row teaches its own costs: name, then oil per turn and how far it lights
 	var names := {
-		Fog.Lantern.HOODED: "HOODED\nno oil · unseen",
+		Fog.Lantern.HOODED: "HOODED\n0 oil · unseen",
 		Fog.Lantern.NORMAL: "NORMAL\n1 oil · 2 tiles",
 		Fog.Lantern.BRIGHT: "BRIGHT\n2 oil · 4 tiles",
 	}
@@ -949,6 +960,11 @@ func _build_hud() -> void:
 	move_buttons["wait"] = _plate("wait", "WAIT", Vector2(14, 228), Vector2(162, 88), act.bind("wait"), bottom)
 	move_buttons["back"] = _plate("back", "BACK", Vector2(188, 228), Vector2(162, 88), act.bind("back"), bottom)
 	move_buttons["guide"] = _plate("guide", "FIELD GUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
+	wait_button = _button("WAIT", Vector2(428, 60), Vector2(98, 56), act.bind("wait"), bottom)
+	_plate_style(wait_button)
+	wait_button.add_theme_font_size_override("font_size", 17)
+	wait_button.add_theme_color_override("font_color", Color("#c9ad78"))
+	_layout_bottom()
 	# item column, left edge above the panel (the lantern hand is low right). Shown when usable.
 	item_buttons["hook"] = _button("HOOK", Vector2.ZERO, Vector2(132, 64), act.bind("hook"), hud)
 	item_buttons["pour"] = _button("POUR OIL\n3 oil", Vector2.ZERO, Vector2(132, 64), act.bind("pour"), hud)
@@ -957,6 +973,34 @@ func _build_hud() -> void:
 		item_buttons[k].add_theme_font_size_override("font_size", 15)
 		_plate_style(item_buttons[k])
 		item_buttons[k].add_theme_color_override("font_color", Color("#c9ad78"))
+
+
+## Swipe mode: a slim panel, three lantern buttons and WAIT on one row, the view gets the
+## rest. Pad mode: the tall panel with the old move pad. Switch in MENU -> MOVE BUTTONS.
+func _layout_bottom() -> void:
+	bottom_panel.offset_top = -_bh()
+	var x := 14.0
+	for s in [Fog.Lantern.HOODED, Fog.Lantern.NORMAL, Fog.Lantern.BRIGHT]:
+		var b: Button = lantern_buttons[s]
+		b.position = Vector2(x, 60)
+		b.size = Vector2(162 if pad_on else 128, 56)
+		b.add_theme_font_size_override("font_size", 13 if pad_on else 12)
+		x += 174 if pad_on else 138
+	for k in move_buttons:
+		move_buttons[k].visible = pad_on
+	wait_button.visible = not pad_on
+	if cam:
+		_fit_camera()
+	if hand_art:
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22
+	if game:
+		_refresh_hud()
+
+
+func _set_pad(on: bool) -> void:
+	pad_on = on
+	_layout_bottom()
+	_save_hints()
 
 
 ## A move-pad plate: iron face, brass rim, a sign drawn over its caption. `hero` = the big one.
@@ -1207,7 +1251,7 @@ func _refresh_hud() -> void:
 		item_buttons.hook.visible = game.hook_wear > 0
 		item_buttons.hook.text = "HOOK\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
 		item_buttons.spark.visible = game.slicks.values().has(0)
-		var y: float = _ui_h() - BOTTOM_H - 12 - 64
+		var y: float = _ui_h() - _bh() - 12 - 64
 		for k in ["spark", "pour", "hook"]:
 			if item_buttons[k].visible:
 				item_buttons[k].position = Vector2(14, y)
@@ -1497,6 +1541,7 @@ func _open_menu() -> void:
 		["RESUME", _close_menu],
 		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
 		["REPORT A BUG", func(): _close_menu(); _open_report()],
+		["MOVE BUTTONS: " + ("ON" if pad_on else "OFF"), "pad"],
 		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
 		["SHOW FPS: " + ("ON" if perf.show else "OFF"), "fps"],
 		["GRAPHICS: " + perf.quality_name(), "gfx"],
@@ -1511,7 +1556,12 @@ func _open_menu() -> void:
 		b.add_theme_font_size_override("font_size", 19)
 		if it[0] == "RESUME":
 			UI.lit(b)
-		if it[1] is String and it[1] == "fps":
+		menu_items[it[0].get_slice(":", 0)] = b
+		if it[1] is String and it[1] == "pad":
+			b.pressed.connect(func():
+				_set_pad(not pad_on)
+				b.text = "MOVE BUTTONS: " + ("ON" if pad_on else "OFF"))
+		elif it[1] is String and it[1] == "fps":
 			b.pressed.connect(func():
 				perf.toggle_show()
 				b.text = "SHOW FPS: " + ("ON" if perf.show else "OFF"))
@@ -1632,6 +1682,7 @@ func _load_hints() -> void:
 	if capture_mode or cfg.load("user://lethemoor.cfg") != OK:
 		return
 	hints_on = cfg.get_value("hints", "on", true)
+	pad_on = cfg.get_value("controls", "pad", false)
 	for id in cfg.get_value("hints", "seen", []):
 		seen[id] = true
 
@@ -1643,6 +1694,7 @@ func _save_hints() -> void:
 	cfg.load("user://lethemoor.cfg")   # keep the other sections (audio mute, fps, graphics)
 	cfg.set_value("hints", "on", hints_on)
 	cfg.set_value("hints", "seen", seen.keys())
+	cfg.set_value("controls", "pad", pad_on)
 	cfg.save("user://lethemoor.cfg")
 
 
@@ -1840,7 +1892,7 @@ func _capture_rotate() -> void:
 		await get_tree().process_frame
 	var vis := get_viewport().get_visible_rect().size
 	var turn0: int = game.turn
-	var centred: bool = vis.x > vis.y and absf(move_buttons["forward"].get_global_rect().get_center().x - vis.x / 2.0) < 2.0
+	var centred: bool = vis.x > vis.y and absf(bottom_panel.get_global_rect().get_center().x - vis.x / 2.0) < 2.0
 	await _shot("fp_sideways")
 	await _press(menu_button)
 	var tapped: bool = menu_sheet != null
@@ -1878,14 +1930,14 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 			return last_event
 		var path: Array = _safe_path(goal)
 		if path.size() < 2:
-			await _press(move_buttons["wait"])   # a thrall sits on every way through: let it move
+			await _go("wait")   # a thrall sits on every way through: let it move
 			continue
 		var d: Vector2i = path[1] - game.hunter
 		if game.facing == d:
-			await _press(move_buttons["forward"])
+			await _go("forward")
 		else:
 			var right := Vector2i(-game.facing.y, game.facing.x)
-			await _press(move_buttons["right" if d == right else "left"])
+			await _go("right" if d == right else "left")
 		if last_event in stop_on:
 			return last_event
 		if card_ok != null and card_ok.text == "PUT IT AWAY":
@@ -1918,6 +1970,19 @@ func _safe_path(goal: Vector2i) -> Array:
 	return []
 
 
+## One move the way a player makes it: a swipe on the view (WAIT is a button), or the
+## move pad's plate when the pad is on.
+func _go(kind: String) -> void:
+	if pad_on:
+		await _press(move_buttons[kind])
+	elif kind == "wait":
+		await _press(wait_button)
+	else:
+		var c := Vector2(_col_x() + UI_W / 2.0, (TOP_H + _ui_h() - _bh()) / 2.0)
+		var d: Vector2 = {"forward": Vector2(0, -1), "back": Vector2(0, 1), "left": Vector2(-1, 0), "right": Vector2(1, 0)}[kind] * 90.0
+		await _swipe_real(c - d, c + d)
+
+
 func _swipe_real(from: Vector2, to: Vector2) -> void:
 	var xf := get_viewport().get_final_transform()
 	for pair in [[from, true], [to, false]]:
@@ -1947,7 +2012,8 @@ func _capture() -> void:
 		await _shot("fp_hint")
 		print("HINT ", "PASS" if card_ok != null else "FAIL")
 		await _press(card_ok)
-		await _press(move_buttons["guide"])
+		await _press(menu_button)
+		await _press(menu_items["FIELD GUIDE"])
 		await _shot("fp_guide")
 		print("GUIDE ", "PASS" if guide_sheet != null else "FAIL")
 		guide_sheet.queue_free()
@@ -1978,14 +2044,29 @@ func _capture() -> void:
 		var at: Vector2i = game.hunter
 		var f0: Vector2i = game.facing
 		print("OPEN ", "PASS" if not room.is_wall(at + f0) else "FAIL", " facing=", f0)
-		await _press(move_buttons["forward"])
+		await _go("forward")
 		var cam_ok: bool = cam.position.distance_to(_cam_pos(game.hunter, game.facing)) < 0.05
 		print("FWD ", "PASS" if game.hunter == at + f0 and game.turn == 1 and cam_ok and last_event != "blocked" else "FAIL", " hunter=", game.hunter, " cam_ok=", cam_ok)
-		await _press(move_buttons["right"])
+		await _go("right")
 		print("TURN ", "PASS" if game.facing == Vector2i(-f0.y, f0.x) and game.turn == 2 else "FAIL", " facing=", game.facing)
 		var turn_before: int = game.turn
 		await _swipe_real(Vector2(380, 420), Vector2(240, 430))   # a finger dragged left = turn left
 		print("SWIPE ", "PASS" if game.facing == f0 and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
+		# the old move pad, from the menu: tall panel, plates work; then back to swipes
+		await _press(menu_button)
+		await _press(menu_items["MOVE BUTTONS"])
+		_close_menu()
+		var tall_ok: bool = pad_on and absf(bottom_panel.size.y - PAD_H) < 1.0 and move_buttons["right"].is_visible_in_tree()
+		await _shot("fp_pad")
+		var f1: Vector2i = game.facing
+		await _press(move_buttons["right"])
+		await _press(move_buttons["left"])
+		var plates_ok: bool = game.facing == f1 and game.turn == turn_before + 3
+		await _press(menu_button)
+		await _press(menu_items["MOVE BUTTONS"])
+		_close_menu()
+		var slim_ok: bool = not pad_on and absf(bottom_panel.size.y - SLIM_H) < 1.0 and wait_button.is_visible_in_tree()
+		print("PAD ", "PASS" if tall_ok and plates_ok and slim_ok else "FAIL", " tall=", tall_ok, " plates=", plates_ok, " slim=", slim_ok)
 		await _capture_rotate()
 		var bell: Vector2i = room.bells[0]
 		var shot_horror := false
@@ -2032,7 +2113,7 @@ func _capture() -> void:
 	for i in 6:
 		if game.over():
 			break
-		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands
+		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands (thralls[2] = (3,12))
 	await _shot("fp_dead")
 	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
 	await _press(verdict_buttons["fun7"])
@@ -2051,7 +2132,7 @@ func _capture_stalker() -> void:
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
 	await _walk_to(Vector2i(4, 6))
 	while game.facing != Vector2i.RIGHT and not game.over():
-		await _press(move_buttons["right"])
+		await _go("right")
 	var st: Dictionary = game.thralls.filter(func(t): return t.get("kind") == "stalker")[0]
 	await _shot("fp_stalker")
 	print("STALKER ", "PASS" if game.watched(st) and not game.dead else "FAIL", " at=", st.pos, " dead=", game.dead)
@@ -2068,11 +2149,11 @@ func _capture_trap() -> void:
 	var west := kp + Vector2i(1, 0)
 	await _walk_to(west)
 	while game.facing != Vector2i.LEFT and not game.over():
-		await _press(move_buttons["left"])
+		await _go("left")
 	await _press(item_buttons.pour)
-	await _press(move_buttons["forward"])
+	await _go("forward")
 	await _press(item_buttons.pour)
-	await _press(move_buttons["back"])
+	await _go("back")
 	var a: Dictionary = game.thralls[0]
 	a.pos = west + Vector2i(-2, 0)
 	a.target = null
@@ -2082,7 +2163,7 @@ func _capture_trap() -> void:
 	await _shot("fp_trap_fire")
 	print("SLICK ", "PASS" if a.get("gone", false) and not game.dead else "FAIL", " oil=", game.oil)
 	for i in Night.FIRE_TURNS:
-		await _press(move_buttons["wait"])
+		await _go("wait")
 	var b: Dictionary = game.thralls[1]
 	b.pos = west + Vector2i(-2, 0)
 	b.target = null

@@ -10,7 +10,7 @@ const ORDER := ["goal", "stalker", "horror", "panic", "noise", "hook", "slick", 
 
 const CARDS := {
 	"goal": ["RING THE BELL",
-		"The bell hangs somewhere in this ward. Reach it and ring it to end the night.\n\nSwipe up to step, down to back away, left or right to turn, or use the buttons. Every move, even a turn, is one turn. The dark moves when you do."],
+		"The bell hangs somewhere in this ward. Reach it and ring it to end the night.\n\nSwipe up to step, down to back away, left or right to turn. WAIT is beside the lantern. (Rather have buttons? MENU, MOVE BUTTONS.) Every move, even a turn, is one turn. The dark moves when you do."],
 	"oil": ["OIL IS YOUR CLOCK",
 		"The amber bar is your oil. NORMAL burns 1 a turn, BRIGHT burns 2, HOODED burns none. Changing the lantern is free.\n\nThe oil you still have when the bell rings is your score."],
 	"hood": ["HOODED",

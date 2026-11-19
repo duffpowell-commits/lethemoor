@@ -9,7 +9,7 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 const Room = preload("res://scripts/sim/room.gd")
 
-const START_OIL := 45        # One Night: the direct route is ~47 moves with turns; flasks are the margin
+const START_OIL := 60        # One Night: the direct route is ~47 moves with turns; flasks are the margin
 const DREAD_MAX := 100
 const DREAD_DARK := 4          # per turn hooded or out of oil
 const DREAD_LIT := -2          # per turn with the lantern lit
@@ -46,7 +46,7 @@ const FIRE_TURNS := 3
 ## sound, unless it sees your light (light always wins). Plain walking, turning and waiting
 ## are silent, so the old routes play exactly as before; only the tools make noise.
 const NOISE := {"hook_hit": 4, "hook_miss": 3, "pour": 2, "spark": 3, "fire": 3}
-const GRADES := [[20, "S"], [14, "A"], [8, "B"], [3, "C"], [0, "D"]]
+const GRADES := [[35, "S"], [29, "A"], [23, "B"], [18, "C"], [0, "D"]]   # +15 on Nov 19 when start oil went 45 -> 60
 ## How far a thrall notices your lantern (tiles, needs line of sight).
 const NOTICE := {Fog.Lantern.HOODED: 1, Fog.Lantern.NORMAL: 5, Fog.Lantern.BRIGHT: 8}
 

@@ -268,6 +268,16 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   opens with the words; on web via `window.lmQueue` -> `location.href`) or COPY; a copy is kept in
   `user://lethemoor.cfg` [verdicts]. Capture prints VERDICT PASS (`fp_verdict.png`). Oil slick =
   glossy ragged puddle (generated texture), fire = additive flame particles + guttering light.
+- **Done — after the IGN-style review (Nov 19): more oil, bigger map, swipe-first.** START_OIL 45 -> 60;
+  `GRADES` +15 (S 35 / A 29 / B 23 / C 18) so grades mean the same. `one_night.txt` is now 27x21: the old
+  15 columns kept every coordinate (captures, tests, art views still hit the same tiles) plus an east wing
+  joined at (14,4) and (14,19), a second road north, 4 more flasks (9 total), 2 more thralls (6 + Stalker).
+  New thralls sit AFTER the old ones in row order so `game.thralls[0..2]` in the capture didn't move.
+  **Swipes are the controls:** the bottom panel is `SLIM_H` 132 (status + HOODED/NORMAL/BRIGHT + WAIT);
+  the view gets ~200 px back. MENU -> MOVE BUTTONS: ON brings back the old pad (`PAD_H` 330), saved in
+  `user://lethemoor.cfg` [controls] pad. `_bh()` is the panel height everywhere; `_layout_bottom()` lays
+  it out. The capture now moves by real swipes (`_go(kind)`), prints PAD PASS (`fp_pad.png`); bell run:
+  B, 23 oil, 57 turns. Field guide lives in MENU. Sheet: `docs/renders/fp_swipe_sheet.png`.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
