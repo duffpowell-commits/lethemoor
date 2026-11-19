@@ -249,6 +249,13 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   readout every second. Also: floor/wall tiles share ~12 materials (by texture + fog shade)
   instead of one each; `run/max_fps=60` (turn-based, no need for 90/120 Hz); `_save_hints` no
   longer wipes the audio mute (it saved a fresh cfg). Real phone numbers: still from Duff.
+- **Move pad restyle (Nov 19, Duff: "more visually appealing"):** bottom buttons are engraved
+  plates (`_plate` / `_plate_style`: iron face, brass rim, raised lip that drops and glows amber
+  when held) with signs drawn in code (`_glyph` / `_draw_sign`: arrows, curved turn arrows,
+  hourglass, book, flames that grow HOODED -> BRIGHT); no symbol fonts on web. Tool buttons use
+  the same plate. **Web cache:** CI exports `lethemoor-<sha>.*` and copies the page to
+  index.html, so a phone can't mix a new page with an old cached pack. Duff's Nov 19 phone
+  screenshot showed a build from before the playtest pass: an old tab never reloaded.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
