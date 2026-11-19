@@ -58,6 +58,7 @@ static func start(room_text: String) -> RefCounted:
 	n.fog = n.room.make_fog()
 	n.hunter = n.room.hunter
 	n.flasks_left = n.room.oil_flasks.duplicate()
+	n.facing = n.open_way(n.hunter)
 	for p: Vector2i in n.room.thralls:
 		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall"})
 	for p: Vector2i in n.room.stalkers:
@@ -68,6 +69,21 @@ static func start(room_text: String) -> RefCounted:
 		if th.seen:
 			th.last_seen = th.pos
 	return n
+
+
+## The way with the longest run of open floor from `p` (ties: up, down, left, right).
+## You start the night looking down a corridor, never with your nose on a wall.
+func open_way(p: Vector2i) -> Vector2i:
+	var best := Vector2i.UP
+	var best_len := -1
+	for d: Vector2i in DIRS:
+		var n := 0
+		while not room.is_wall(p + d * (n + 1)):
+			n += 1
+		if n > best_len:
+			best = d
+			best_len = n
+	return best
 
 
 ## What the lantern really does this turn: no oil means hooded, whatever the button says.

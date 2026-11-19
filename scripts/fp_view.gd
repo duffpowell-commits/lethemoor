@@ -657,8 +657,8 @@ func _refresh_hud() -> void:
 		s = extra
 	elif flicker or fake_flicker:
 		s = "The flame gutters. Something is near."
-	if game.turn == 0 and extra == "":
-		s += "  Turning costs a turn too."
+	if game.turn < 3 and extra == "":
+		s = "Swipe up to walk, down to back away, left or right to turn. Find the bell."
 	status_label.text = s
 	for k in lantern_buttons:
 		lantern_buttons[k].modulate = Color(1, 0.85, 0.5) if k == game.setting else Color(0.55, 0.6, 0.7)
@@ -736,10 +736,10 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	for guard in 200:
 		if game.over() or game.hunter == goal:
 			return last_event
-		var reach: Dictionary = room.reachable(game.hunter, 999)
-		var path: Array = room.path_in(reach, game.hunter, goal)
+		var path: Array = _safe_path(goal)
 		if path.size() < 2:
-			return "no_path"
+			await _press(move_buttons["wait"])   # a thrall sits on every way through: let it move
+			continue
 		var d: Vector2i = path[1] - game.hunter
 		if game.facing == d:
 			await _press(move_buttons["forward"])
@@ -749,6 +749,31 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 		if last_event in stop_on:
 			return last_event
 	return "gave_up"
+
+
+## Shortest way to `goal` that never steps next to a thrall you can see (what a player does).
+func _safe_path(goal: Vector2i) -> Array:
+	var bad := {}
+	for th in game.thralls:
+		if fog.get_state(th.pos) == Fog.LIT:
+			for d: Vector2i in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				bad[th.pos + d] = true
+	var prev := {game.hunter: game.hunter}
+	var q: Array[Vector2i] = [game.hunter]
+	while not q.is_empty():
+		var p: Vector2i = q.pop_front()
+		if p == goal:
+			var out: Array = [p]
+			while p != game.hunter:
+				p = prev[p]
+				out.push_front(p)
+			return out
+		for d: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			var n := p + d
+			if not prev.has(n) and not room.is_wall(n) and (not bad.has(n) or n == goal):
+				prev[n] = p
+				q.append(n)
+	return []
 
 
 func _swipe_real(from: Vector2, to: Vector2) -> void:
@@ -776,13 +801,15 @@ func _capture() -> void:
 	if capture_phase == 0:
 		await _shot("fp_start")
 		var at: Vector2i = game.hunter
+		var f0: Vector2i = game.facing
+		print("OPEN ", "PASS" if not room.is_wall(at + f0) else "FAIL", " facing=", f0)
 		await _press(move_buttons["forward"])
-		print("FWD ", "PASS" if game.hunter == at + Vector2i.UP and game.turn == 1 else "FAIL", " hunter=", game.hunter)
+		print("FWD ", "PASS" if game.hunter == at + f0 and game.turn == 1 else "FAIL", " hunter=", game.hunter)
 		await _press(move_buttons["right"])
-		print("TURN ", "PASS" if game.facing == Vector2i.RIGHT and game.turn == 2 else "FAIL", " facing=", game.facing)
+		print("TURN ", "PASS" if game.facing == Vector2i(-f0.y, f0.x) and game.turn == 2 else "FAIL", " facing=", game.facing)
 		var turn_before: int = game.turn
 		await _swipe_real(Vector2(380, 420), Vector2(240, 430))   # a finger dragged left = turn left
-		print("SWIPE ", "PASS" if game.facing == Vector2i.UP and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
+		print("SWIPE ", "PASS" if game.facing == f0 and game.turn == turn_before + 1 else "FAIL", " facing=", game.facing)
 		var bell: Vector2i = room.bells[0]
 		var shot_horror := false
 		while not game.over():

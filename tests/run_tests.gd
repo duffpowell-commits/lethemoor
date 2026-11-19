@@ -314,7 +314,8 @@ const HALL := "#########\n#H.....S#\n#########"
 
 
 func test_stalker_frozen_while_watched() -> void:
-	var n = Night.start(HALL)   # facing up by default: turn right to face her
+	var n = Night.start(HALL)
+	n.facing = Vector2i.UP      # start looking at the wall: turn right to face her
 	n.set_lantern(Fog.Lantern.BRIGHT)
 	var at: Vector2i = n.thralls[0].pos
 	check(n.thralls[0].kind == "stalker", "S parses as a stalker")
@@ -329,6 +330,7 @@ func test_stalker_frozen_while_watched() -> void:
 
 func test_stalker_gets_you_when_you_look_away() -> void:
 	var n = Night.start(HALL)
+	n.facing = Vector2i.UP
 	n.set_lantern(Fog.Lantern.BRIGHT)
 	n.turn_by(1)
 	for i in 4:
@@ -347,3 +349,10 @@ func test_in_view_cone() -> void:
 	check(n.in_view(n.hunter + Vector2i(3, 1)), "a little off to the side is in view")
 	check(not n.in_view(n.hunter + Vector2i(0, 1)), "beside you is not")
 	check(not n.in_view(n.hunter + Vector2i(-2, 0)), "behind you is not")
+
+
+func test_start_facing_open_corridor() -> void:
+	var g = Night.start(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
+	var ahead: Vector2i = g.hunter + g.facing
+	check(not g.room.is_wall(ahead), "start facing a wall")
+	check(g.facing == Vector2i.RIGHT, "one_night starts looking down the long corridor east")
