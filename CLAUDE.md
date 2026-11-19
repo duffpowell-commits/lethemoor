@@ -220,6 +220,16 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   it). **Sound hook:** each action resets `noises` ([{pos, level, kind}]) and `heard_by`
   (thrall indexes drawn this turn); event `"heard"` when anything turned toward a sound. Field
   note `noise`. Running / rummaging / ringing levels get added when those actions exist.
+- **Done — phone frame rate (Nov 19):** `scripts/perf.gd` (child of the fp view). MENU -> SHOW FPS
+  (or F3) puts a readout under the top bar: `fps  ms  worst  |  draws  |  quality`, saved in
+  `user://lethemoor.cfg` [perf]. MENU -> GRAPHICS cycles AUTO / HIGH / MEDIUM / LOW. AUTO starts
+  HIGH and steps down one level after 4 s under 45 fps (never back up in a run). MEDIUM = glow
+  off; LOW = also lantern shadows off + 3D at 70% res. Measured in a software-GPU capture run:
+  HIGH ~80 ms/frame, MEDIUM ~47, LOW ~39 (glow was the big cost; resolution barely mattered).
+  Captures force HIGH (`LM_PERF_QUALITY=MEDIUM|LOW` overrides); `LM_PERF_LOG=1` prints the
+  readout every second. Also: floor/wall tiles share ~12 materials (by texture + fog shade)
+  instead of one each; `run/max_fps=60` (turn-based, no need for 90/120 Hz); `_save_hints` no
+  longer wipes the audio mute (it saved a fresh cfg). Real phone numbers: still from Duff.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
