@@ -841,26 +841,161 @@ func _build_hud() -> void:
 		Fog.Lantern.BRIGHT: "BRIGHT\n2 oil · 4 tiles",
 	}
 	var x := 14
+	var glyphs := {Fog.Lantern.HOODED: "hooded", Fog.Lantern.NORMAL: "normal", Fog.Lantern.BRIGHT: "bright"}
 	for s in [Fog.Lantern.HOODED, Fog.Lantern.NORMAL, Fog.Lantern.BRIGHT]:
 		var b := _button(names[s], Vector2(x, 60), Vector2(162, 56), _set_lantern.bind(s), bottom)
-		b.add_theme_font_size_override("font_size", 15)
+		b.add_theme_font_size_override("font_size", 13)
+		b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_glyph(b, glyphs[s], "", Rect2(6, 12, 32, 32))
 		lantern_buttons[s] = b
 		x += 174
-	# move pad: turn left / step / turn right, then wait / back / guide
-	move_buttons["left"] = _button("TURN\nLEFT", Vector2(14, 126), Vector2(162, 92), act.bind("left"), bottom)
-	move_buttons["forward"] = _button("STEP", Vector2(188, 126), Vector2(162, 92), act.bind("forward"), bottom)
-	move_buttons["right"] = _button("TURN\nRIGHT", Vector2(362, 126), Vector2(162, 92), act.bind("right"), bottom)
-	move_buttons["wait"] = _button("WAIT", Vector2(14, 228), Vector2(162, 88), act.bind("wait"), bottom)
-	move_buttons["back"] = _button("BACK", Vector2(188, 228), Vector2(162, 88), act.bind("back"), bottom)
-	move_buttons["guide"] = _button("FIELD\nGUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
-	move_buttons["guide"].add_theme_color_override("font_color", UI.DIM)
-	move_buttons["forward"].add_theme_font_size_override("font_size", 21)
+	# move pad: engraved plates, a drawn sign over a small caption (no symbol fonts on web)
+	move_buttons["left"] = _plate("turn_left", "TURN LEFT", Vector2(14, 126), Vector2(162, 92), act.bind("left"), bottom)
+	move_buttons["forward"] = _plate("step", "STEP", Vector2(188, 126), Vector2(162, 92), act.bind("forward"), bottom, true)
+	move_buttons["right"] = _plate("turn_right", "TURN RIGHT", Vector2(362, 126), Vector2(162, 92), act.bind("right"), bottom)
+	move_buttons["wait"] = _plate("wait", "WAIT", Vector2(14, 228), Vector2(162, 88), act.bind("wait"), bottom)
+	move_buttons["back"] = _plate("back", "BACK", Vector2(188, 228), Vector2(162, 88), act.bind("back"), bottom)
+	move_buttons["guide"] = _plate("guide", "FIELD GUIDE", Vector2(362, 228), Vector2(162, 88), _open_guide, bottom)
 	# item column, left edge above the panel (the lantern hand is low right). Shown when usable.
 	item_buttons["hook"] = _button("HOOK", Vector2.ZERO, Vector2(132, 64), act.bind("hook"), hud)
 	item_buttons["pour"] = _button("POUR OIL\n3 oil", Vector2.ZERO, Vector2(132, 64), act.bind("pour"), hud)
 	item_buttons["spark"] = _button("SPARK\n1 oil", Vector2.ZERO, Vector2(132, 64), act.bind("spark"), hud)
 	for k in item_buttons:
 		item_buttons[k].add_theme_font_size_override("font_size", 15)
+		_plate_style(item_buttons[k])
+		item_buttons[k].add_theme_color_override("font_color", Color("#c9ad78"))
+
+
+## A move-pad plate: iron face, brass rim, a sign drawn over its caption. `hero` = the big one.
+func _plate(kind: String, caption: String, pos: Vector2, size: Vector2, cb: Callable, parent: Control, hero := false) -> Button:
+	var b := _button("", pos, size, cb, parent)
+	_plate_style(b, hero)
+	var icon := 44.0 if hero else 36.0
+	_glyph(b, kind, caption, Rect2((size.x - icon) / 2.0, size.y * 0.42 - icon / 2.0, icon, icon))
+	return b
+
+
+## Iron face, brass rim, a raised lip that drops when pressed.
+func _plate_style(b: Button, hero := false) -> void:
+	var face := Color(0.075, 0.068, 0.06, 0.97) if hero else Color(0.05, 0.05, 0.06, 0.96)
+	var rim := UI.BRASS if hero else Color("#4a3d29")
+	var normal := UI.box(face, rim, 2 if hero else 1, 7)
+	normal.border_width_bottom = 4              # a lip along the bottom: it reads as raised
+	normal.shadow_color = Color(0, 0, 0, 0.55)
+	normal.shadow_size = 4
+	normal.shadow_offset = Vector2(0, 2)
+	var down := UI.box(Color(0.17, 0.11, 0.045, 0.98), UI.AMBER, 2, 7)
+	down.border_width_top = 4                   # pressed in: the lip moves to the top
+	down.shadow_color = Color(1.0, 0.62, 0.2, 0.35)
+	down.shadow_size = 8
+	b.add_theme_stylebox_override("normal", normal)
+	b.add_theme_stylebox_override("hover", normal)
+	b.add_theme_stylebox_override("pressed", down)
+	b.add_theme_stylebox_override("hover_pressed", down)
+
+
+## Draw sign `kind` in `r` on top of button `b` (plus an optional caption under it). Brass at
+## rest, amber while held or lit; follows the button's state on its own.
+func _glyph(b: Button, kind: String, caption: String, r: Rect2) -> void:
+	var g := Control.new()
+	g.set_anchors_preset(Control.PRESET_FULL_RECT)
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(g)
+	b.button_down.connect(g.queue_redraw)
+	b.button_up.connect(g.queue_redraw)
+	b.draw.connect(g.queue_redraw)          # lit / unlit restyles redraw the button
+	g.draw.connect(func():
+		var lit: bool = b.is_pressed() or b.get_theme_color("font_color") == UI.AMBER
+		var col: Color = UI.AMBER if lit else Color("#c9ad78")
+		if kind == "guide" and not lit:
+			col = Color("#8f7a55")      # the guide is help, not a move: quieter brass
+		_draw_sign(g, kind, r, col)
+		if caption != "":
+			var f: Font = UI.head()
+			var fs := 13
+			var w := f.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			g.draw_string(f, Vector2((b.size.x - w) / 2.0, b.size.y - 14), caption, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col.darkened(0.12)))
+
+
+func _draw_sign(c: Control, kind: String, r: Rect2, col: Color) -> void:
+	var m := r.get_center()
+	var u := r.size.x / 2.0           # half size
+	var w := maxf(2.0, u * 0.16)      # stroke
+	match kind:
+		"step", "back":
+			var d := -1.0 if kind == "step" else 1.0
+			var tip := m + Vector2(0, d * u)
+			c.draw_colored_polygon(PackedVector2Array([tip, m + Vector2(-u * 0.75, d * u * 0.05),
+					m + Vector2(-u * 0.28, d * u * 0.05), m + Vector2(-u * 0.28, -d * u * 0.9),
+					m + Vector2(u * 0.28, -d * u * 0.9), m + Vector2(u * 0.28, d * u * 0.05),
+					m + Vector2(u * 0.75, d * u * 0.05)]), col)
+		"turn_left", "turn_right":
+			var sgn := -1.0 if kind == "turn_left" else 1.0
+			var ctr := m + Vector2(0, u * 0.35)
+			var rad := u * 0.72
+			# an arc over the top that bends round to the side you turn to
+			var pts := PackedVector2Array()
+			for i in 17:
+				var a := PI + (PI * 0.85) * i / 16.0     # from the left, over the top
+				var pnt := Vector2(cos(a), sin(a)) * rad
+				pts.append(ctr + Vector2(pnt.x * sgn, pnt.y))
+			c.draw_polyline(pts, col, w, true)
+			var end := pts[pts.size() - 1]
+			var dirv := (end - pts[pts.size() - 2]).normalized()
+			var side := Vector2(-dirv.y, dirv.x)
+			c.draw_colored_polygon(PackedVector2Array([end + dirv * u * 0.42,
+					end + side * u * 0.36, end - side * u * 0.36]), col)
+		"wait":
+			var t := u * 0.62
+			c.draw_line(m + Vector2(-t, -u * 0.95), m + Vector2(t, -u * 0.95), col, w, true)
+			c.draw_line(m + Vector2(-t, u * 0.95), m + Vector2(t, u * 0.95), col, w, true)
+			c.draw_polyline(PackedVector2Array([m + Vector2(-t * 0.85, -u * 0.95), m + Vector2(0, 0),
+					m + Vector2(-t * 0.85, u * 0.95)]), col, w * 0.8, true)
+			c.draw_polyline(PackedVector2Array([m + Vector2(t * 0.85, -u * 0.95), m + Vector2(0, 0),
+					m + Vector2(t * 0.85, u * 0.95)]), col, w * 0.8, true)
+			c.draw_colored_polygon(PackedVector2Array([m + Vector2(-t * 0.6, u * 0.88),
+					m + Vector2(t * 0.6, u * 0.88), m + Vector2(0, u * 0.25)]), col)   # the sand that's run
+		"guide":
+			var h := u * 0.7
+			for sgn in [-1.0, 1.0]:
+				c.draw_colored_polygon(PackedVector2Array([m + Vector2(0, -h * 0.75), m + Vector2(sgn * u, -h),
+						m + Vector2(sgn * u, h * 0.9), m + Vector2(0, h)]), col)
+				for k in 3:   # lines of text on each page
+					var yy := -h * 0.45 + k * h * 0.45
+					c.draw_line(m + Vector2(sgn * u * 0.2, yy), m + Vector2(sgn * u * 0.78, yy - h * 0.08),
+							Color(0.05, 0.05, 0.06), 1.5, true)
+		"hooded", "normal", "bright":
+			var k: float = {"hooded": 0.75, "normal": 1.05, "bright": 1.2}[kind]
+			var base := m + Vector2(0, u * 0.55)
+			var fh := u * 1.25 * k          # flame height
+			var fw := u * 0.62 * k          # half width
+			var fl := PackedVector2Array()
+			for i in 21:                    # left edge up to the tip, curling a little
+				var t := i / 20.0
+				fl.append(base + Vector2(-fw * sin(PI * (0.15 + 0.85 * (1.0 - t))) * (1.0 - t * 0.6) + fw * 0.15 * sin(t * PI * 2.0), -fh * t))
+			for i in range(20, -1, -1):     # and back down the right edge
+				var t := i / 20.0
+				fl.append(base + Vector2(fw * sin(PI * (0.15 + 0.85 * (1.0 - t))) * (1.0 - t * 0.6) + fw * 0.15 * sin(t * PI * 2.0), -fh * t))
+			if kind == "hooded":
+				c.draw_colored_polygon(fl, Color(col, 0.35))      # an ember behind the shutter
+				var hood := PackedVector2Array()
+				for i in 13:
+					var a := PI + PI * i / 12.0
+					hood.append(base + Vector2(cos(a) * u * 0.62, sin(a) * u * 0.62 - u * 0.05))
+				c.draw_colored_polygon(hood, col)                 # the shutter, closed
+				c.draw_line(base + Vector2(-u * 0.75, -u * 0.05), base + Vector2(u * 0.75, -u * 0.05), col, w, true)
+			else:
+				c.draw_colored_polygon(fl, col)
+				var core := PackedVector2Array()
+				for p in fl:
+					core.append(base + (p - base) * Vector2(0.45, 0.5))
+				c.draw_colored_polygon(core, Color(1.0, 0.95, 0.8, 0.85) if col == UI.AMBER else Color(0.05, 0.05, 0.06))
+				if kind == "bright":
+					for i in 5:
+						var a := -PI / 2.0 + (i - 2) * 0.55
+						var dv := Vector2(cos(a), sin(a))
+						var o := base + Vector2(0, -fh * 0.45)
+						c.draw_line(o + dv * (fh * 0.62), o + dv * (fh * 0.85), col, w * 0.8, true)
 
 
 ## Oil: one notch per drop up to the starting 30; more than that and the bar glows.

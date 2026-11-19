@@ -99,7 +99,10 @@ jobs:
         run: |
           echo "${GITHUB_SHA::7} $(date -u +%Y-%m-%d)" > build.txt   # shown in bug reports
           mkdir -p build/web && touch build/.gdignore
-          godot --headless --path . --export-release "Web" build/web/index.html
+          # Files are named per build (lethemoor-<sha>.js/.wasm/.pck) so a phone can never pair a new
+          # page with an old cached engine or pack; index.html is a copy of that build's page.
+          godot --headless --path . --export-release "Web" build/web/lethemoor-${GITHUB_SHA::7}.html
+          cp build/web/lethemoor-${GITHUB_SHA::7}.html build/web/index.html
           ls -la build/web
       - name: Export Android (debug APK)
         env:
