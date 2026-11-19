@@ -183,6 +183,21 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   left edge above the panel (keys H/P/F), placeholder slick/fire/hook meshes (art via Foxboard),
   field-note cards `hook` + `slick`. Capture pass 3 prints HOOKFIND/SLICK/HOOK PASS
   (`docs/renders/fp_trap_sheet.png`).
+- **Done — sound (Nov 19, audit #9):** `scripts/audio.gd` is the autoload `Audio`; the view
+  only calls 4 static hooks (`Sound.hook_night/turn/lantern/track`, `const Sound = preload(...)`
+  so `--check-only` works without autoloads). Bed (`amb_moor`, stereo loop), heartbeat follows
+  dread, flame loop follows the lantern, steps/turn/bump, lantern sounds, oil, letters, bell,
+  death, panic, stingers, flicker whispers, UI clicks (every Button, skipped when the press
+  already made a game sound). Thralls shuffle + Stalker silk in **3D at their tile, seen or
+  not**; bed goes quiet the turn before the Stalker can move (silent bell). 35 clips (~1.2 MB)
+  are **original, synthesized by `tools/gen_audio.py`** (numpy + ffmpeg, one seed per clip;
+  boathook/slick sounds included);
+  `assets/audio/SOURCES.md` lists every clip and must list any new one (a test checks).
+  Reverb is baked in: web plays audio in "sample" mode where bus effects don't run.
+  Web unlock: `html/head_include` in the Web preset wraps AudioContext and resumes it on the
+  first tap/click/key (verified in Chromium: suspended before tap, running after).
+  `LM_AUDIO_LOG=1` prints every sound played (use with the capture run). M mutes (saved).
+  Not yet heard on a real phone: levels are a first mix.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

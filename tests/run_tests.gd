@@ -509,3 +509,52 @@ func test_spark_under_your_own_feet_kills_you() -> void:
 func test_one_night_has_a_boathook() -> void:
 	var r = Room.parse(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
 	check(r.hooks.size() == 1 and r.reachable(r.hunter, 999).has(r.hooks[0]), "One Night has one reachable boathook")
+
+# ---------------------------------------------------------------- sound (scripts/audio.gd)
+
+const Audio = preload("res://scripts/audio.gd")
+
+
+func test_audio_cues_follow_the_sim() -> void:
+	check(Audio.cues("forward", [], true) == ["step"], "a quiet step is a footstep, not a bump")
+	check(Audio.cues("forward", [], false) == ["bump"], "an unspent step is a wall bump")
+	check(Audio.cues("left", [], true) == ["turn"], "turning rustles")
+	check(Audio.cues("wait", [], true) == [], "waiting is silent")
+	check(Audio.cues("forward", ["grabbed"], false) == ["death"], "walking into the dark kills, no bump")
+	check(Audio.cues("forward", ["escaped", "rang"], true) == ["step", "bell"], "the bell, no dawn")
+	check("sting" not in str(Audio.cues("forward", ["oil"], true)), "oil is not a stinger")
+	check(Audio.cues("wait", ["horror", "taken"], true) == ["horror", "death"], "horror then death")
+	check(Audio.cues("hook", ["hook_hit"], true) == ["hook_swing", "hook_hit"], "swing, then the hit")
+	check(Audio.cues("hook", [], false) == [], "no hook in hand: no swing")
+	check(Audio.cues("spark", ["burned"], true) == ["spark", "burned"], "the slick goes up, it burns")
+	check(Audio.cues("spark", ["burned_self"], true) == ["spark", "death"], "you burn with it")
+
+
+func test_audio_every_cue_has_a_clip() -> void:
+	var names := ["amb_moor", "flame_loop", "heartbeat", "turn", "bump", "oil", "letter", "letter_dim",
+		"sting_horror", "sting_dread", "panic", "out_of_oil", "bell", "death", "night_start", "ui_click",
+		"lantern_hood", "lantern_normal", "lantern_bright", "stalker_silk", "whisper",
+		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek"]
+	for i in 4:
+		names.append("step_%d" % i)
+	for i in 3:
+		names.append("shuffle_%d" % i)
+	for n in names:
+		check(ResourceLoader.exists("res://assets/audio/%s.ogg" % n), "clip missing: " + n)
+	var src := FileAccess.get_file_as_string("res://assets/audio/SOURCES.md")
+	for n in names:
+		check(src.contains(n + ".ogg"), "SOURCES.md doesn't list " + n)
+
+
+func test_silent_bell_before_the_stalker_moves() -> void:
+	var g = Night.start("#######\n#H....#\n#.....#\n#....S#\n#######\n")
+	g.facing = Vector2i.RIGHT
+	g.set_lantern(Fog.Lantern.BRIGHT)
+	var st: Dictionary = g.thralls[0]
+	if g.watched(st):
+		check(not Audio.stalker_free(g), "watched in the light: she can't move, no silence")
+	g.facing = Vector2i.LEFT
+	check(not g.watched(st), "turned away")
+	check(Audio.stalker_free(g) == (st.target != null or g._sees_light(st)), "silence = she's free to come")
+	g.thralls[0].target = g.hunter
+	check(Audio.stalker_free(g), "hunting and unwatched: the bed goes quiet")
