@@ -7,7 +7,7 @@ is nothing to credit and nothing to license. Rebuild them all with
 `python3 tools/gen_audio.py` (needs numpy + ffmpeg; one clip: `--only bell`).
 
 Format: Ogg Vorbis, 44.1 kHz, mono except the stereo bed. Reverb is baked in because the web
-build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~1.2 MB.
+build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~1.3 MB.
 
 | Clip | What it is | Plays when |
 |---|---|---|
@@ -41,3 +41,5 @@ build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~
 | pour.ogg | oil glugged onto stone | POUR (oil slick) |
 | ignite.ogg | flint strike, the slick roars up | SPARK |
 | burn_shriek.ogg | a cracked, falling shriek in fire | something burns in the slick |
+| heard_turn.ogg | the drag stops, a pivot, a click in the throat | a horror turns toward a noise (hook, pour, spark, fire), in 3D at its tile |
+| fire_loop.ogg | 5 s loop: oil burning on stone | on every burning tile, in 3D, while it burns |

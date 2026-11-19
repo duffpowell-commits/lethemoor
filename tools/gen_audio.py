@@ -503,6 +503,31 @@ def burn_shriek():
     write("burn_shriek", fade(reverb(voice * 0.5 + fire, 1.8, 0.4)), peak=0.8)
 
 
+def heard_turn():
+    """A horror stops dead and turns toward a sound: the drag cuts off, a wet click in the throat."""
+    dur = 1.2
+    tt = t(dur)
+    drag = fft_filter(noise(dur), lo=300, hi=2200) * np.clip(1 - tt / 0.25, 0, 1) ** 2 * 0.6
+    pivot = fft_filter(noise(dur), lo=900, hi=4000) * np.exp(-np.abs(tt - 0.45) / 0.06) * (0.5 + 0.5 * np.sin(2 * np.pi * 30 * tt)) * 0.5
+    click = fit(np.pad(np.sin(2 * np.pi * 380 * t(0.05)) * env(int(0.05 * SR), 0.001, 0.01), (int(0.62 * SR), 0)), dur)
+    f = 95
+    grunt = sum(np.sin(2 * np.pi * f * k * tt) / k for k in range(1, 6))
+    grunt = fft_filter(grunt, lo=150, hi=800) * np.sin(np.pi * np.clip((tt - 0.65) / 0.45, 0, 1)) ** 2 * 0.35
+    write("heard_turn", fade(reverb(drag + pivot + click * 0.6 + grunt, 1.4, 0.4)), peak=0.75)
+
+
+def fire_loop():
+    """Oil burning on stone: low roar, dense crackle. 5 s loop, played where the fire is."""
+    dur = 6.0
+    tt = t(dur)
+    roar = onepole(noise(dur), 350) * (0.75 + 0.25 * np.sin(2 * np.pi * 0.7 * tt))
+    cr = np.zeros_like(tt)
+    for _ in range(160):
+        pop = fft_filter(noise(0.015), lo=1200, hi=9000) * env(int(0.015 * SR), 0.0005, 0.004)
+        place(cr, pop * rng.uniform(0.1, 0.8) ** 2, rng.uniform(0, dur - 0.05))
+    write("fire_loop", loopify(roar * 0.8 + cr, 1.0), peak=0.7)
+
+
 def main():
     if "--only" in sys.argv:
         names = sys.argv[sys.argv.index("--only") + 1:]
@@ -519,6 +544,7 @@ def main():
         "stalker_silk": stalker_silk, "whisper": whisper, "panic": panic, "night_start": night_start,
         "hook_swing": hook_swing, "hook_hit": hook_hit, "hook_broke": hook_broke, "hook_found": hook_found,
         "pour": pour, "ignite": ignite, "burn_shriek": burn_shriek,
+        "heard_turn": heard_turn, "fire_loop": fire_loop,
     }
     for i in range(4):
         jobs[f"step_{i}"] = lambda i=i: footstep(i)

@@ -23,7 +23,7 @@ extends Node
 const Fog = preload("res://scripts/sim/fog.gd")
 
 const DIR := "res://assets/audio/"
-const LOOPS := ["amb_moor", "flame_loop", "heartbeat"]
+const LOOPS := ["amb_moor", "flame_loop", "heartbeat", "fire_loop"]
 const BED_DB := -6.0
 const QUIET_DB := -30.0           # the bed when the Stalker is about to move
 const FLAME_DB := {Fog.Lantern.HOODED: -80.0, Fog.Lantern.NORMAL: -20.0, Fog.Lantern.BRIGHT: -12.0}
@@ -45,6 +45,7 @@ var was_flicker := false
 var was_haunted := false
 var ended := false
 var tweens := {}
+var fires := {}                  # burning tile -> its crackle (AudioStreamPlayer3D)
 var cue_frame := -1
 var log_cues := OS.has_environment("LM_AUDIO_LOG")   # LM_AUDIO_LOG=1: print every sound played
 static var _me: Node               # the autoload instance, once it's ready
@@ -202,6 +203,7 @@ func night() -> void:
 	was_flicker = false
 	was_haunted = false
 	prev_pos = []
+	fires.clear()     # the old scene freed its players
 	_fade(bed, BED_DB, 3.0)
 	_fade(heart, -80.0, 0.5)
 	sfx("night_start", -6.0)
@@ -279,6 +281,13 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 ## ones hunting you but lurching in place drag a foot now and then. Seen or not: in first
 ## person, the ear is how you know what's behind you.
 func _world_sounds(game) -> void:
+	# a horror that heard a noise (hook, pour, spark, fire) stops and turns toward it,
+	# round corners too: you hear it pivot, further off than a shuffle carries
+	for i in game.get("heard_by"):
+		var hb: Dictionary = game.thralls[i]
+		var hd: float = Vector2(hb.pos - game.hunter).length()
+		if hd <= HEAR + 4.0 and not hb.get("gone", false):
+			at("heard_turn", hb.pos, -2.0 - hd * 0.8, randf_range(0.9, 1.08))
 	for i in game.thralls.size():
 		var th: Dictionary = game.thralls[i]
 		if th.get("gone", false):
@@ -301,6 +310,7 @@ func _world_sounds(game) -> void:
 ## falls silent when the Stalker is free to move, the flame's gutter whispers.
 func track(game) -> void:
 	prev_pos = game.positions()
+	_track_fires(game)
 	if ended or game.over():
 		return
 	# heartbeat: silent when calm, loud and fast at panic
@@ -355,3 +365,34 @@ func _end(bed_db: float) -> void:
 	_fade(bed, bed_db, 2.0)
 	_fade(heart, -80.0, 1.0)
 	_fade(flame, -80.0, 1.0)
+
+
+## A crackle loop sits on every burning tile, for as long as it burns.
+func _track_fires(game) -> void:
+	var scene := get_tree().current_scene
+	var burning := {}
+	for p: Vector2i in game.get("slicks"):
+		if game.burning(p):
+			burning[p] = true
+	for p in fires.keys():
+		if not burning.has(p) or not is_instance_valid(fires[p]):
+			if is_instance_valid(fires[p]):
+				fires[p].queue_free()
+			fires.erase(p)
+	if not (scene is Node3D) or not streams.has("fire_loop"):
+		return
+	for p: Vector2i in burning:
+		if fires.has(p):
+			continue
+		var f := AudioStreamPlayer3D.new()
+		f.stream = streams["fire_loop"]
+		f.volume_db = -6.0
+		f.unit_size = 2.0
+		f.max_distance = HEAR + 3.0
+		f.panning_strength = 1.4
+		f.position = Vector3(p.x, 0.3, p.y)
+		scene.add_child(f)
+		f.play(randf() * 4.0)
+		fires[p] = f
+		if log_cues:
+			print("SOUND3D fire_loop at ", p)

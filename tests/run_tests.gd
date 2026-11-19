@@ -534,7 +534,7 @@ func test_audio_every_cue_has_a_clip() -> void:
 	var names := ["amb_moor", "flame_loop", "heartbeat", "turn", "bump", "oil", "letter", "letter_dim",
 		"sting_horror", "sting_dread", "panic", "out_of_oil", "bell", "death", "night_start", "ui_click",
 		"lantern_hood", "lantern_normal", "lantern_bright", "stalker_silk", "whisper",
-		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek"]
+		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek", "heard_turn", "fire_loop"]
 	for i in 4:
 		names.append("step_%d" % i)
 	for i in 3:
