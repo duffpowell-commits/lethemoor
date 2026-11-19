@@ -198,6 +198,19 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   first tap/click/key (verified in Chromium: suspended before tap, running after).
   `LM_AUDIO_LOG=1` prints every sound played (use with the capture run). M mutes (saved).
   Not yet heard on a real phone: levels are a first mix.
+- **Done — letters content (Nov 19):** `scripts/letters.gd` holds the written pages (Poe voice,
+  <= 80 words each so they fit a phone, tested). Pages come in the order you READ them, not by
+  tile, so the story reads I, II, III however the map reshuffles. One Night's three: a dockhand's
+  wife (her husband came home drowned: the thralls), Ada the bride's wedding-eve note (hints the
+  Stalker rule: "look upon me and I will be still"), and the Watch's sealed order to keep the bell
+  silent so the town keeps forgetting, signed in the Captain's own hand (tone C: the rot is
+  personal; ringing the bell is defying yourself). Reading one pops a parchment page
+  (`_show_page`, PUT IT AWAY); read pages are listed again in the FIELD GUIDE. Capture's LETTER
+  check now also needs the page up (`fp_letter.png`). Add pages for new maps to `PAGES`.
+  **Each page is its own torn parchment scrap** (Duff: no two notes alike): `assets/art/letters/
+  page_<n>.png` drawn by `tools/gen_letter_pages.py` (water-stained / perfumed + folded / scorched
+  + broken seal), plus per-page ink colour, tilt and width in `PAGES`. Button sits under the paper.
+  Capture renders every page (`fp_letter_2/3.png`, prints PAGES PASS); sheet `fp_letters_sheet.png`.
 - **Done — slice step 4 (Nov 19): noise** (`night.gd` `NOISE`, 5 new tests, 49 total). A sound of
   level N is heard by every horror within N tiles of *walking* distance (round corners, not
   through walls); it heads for the loudest one unless it sees your light (light wins). Walking,

@@ -11,6 +11,7 @@ const Fog = preload("res://scripts/sim/fog.gd")
 const Night = preload("res://scripts/sim/night.gd")
 const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing without the autoload
 const Lessons = preload("res://scripts/lessons.gd")
+const Letters = preload("res://scripts/letters.gd")
 const UI = preload("res://scripts/ui_style.gd")
 
 const UI_W := 540
@@ -514,6 +515,8 @@ func act(kind: String) -> void:
 	busy = false
 	if game.over():
 		_show_end()
+	elif "letter" in events:
+		_show_page(game.letters_read.size() - 1)
 	else:
 		_teach(last_event)
 
@@ -991,6 +994,73 @@ func _show_card(id: String) -> void:
 	modal.add_child(card)
 
 
+## A letter you just read, as a page held up to the flame. Always shown (story, not a hint).
+## Tap PUT IT AWAY (or Enter) to go on; any field note that's due comes after.
+func _show_page(n: int) -> void:
+	if modal != null:
+		modal.queue_free()
+	modal = _sheet(0.7)
+	var pg: Dictionary = Letters.page(n)
+	# a torn scrap of paper, stretched behind the words (it has its own torn rim and stains)
+	var card := PanelContainer.new()
+	var margins := StyleBoxEmpty.new()
+	margins.set_content_margin_all(0)
+	card.add_theme_stylebox_override("panel", margins)
+	var paper := TextureRect.new()
+	paper.texture = load("res://assets/art/letters/%s.png" % pg.paper)
+	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	paper.stretch_mode = TextureRect.STRETCH_SCALE
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(paper)
+	var pad := MarginContainer.new()
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_" + side, 44)
+	pad.add_theme_constant_override("margin_top", 50)
+	pad.add_theme_constant_override("margin_bottom", 56)
+	card.add_child(pad)
+	var ink: Color = pg.ink
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	pad.add_child(box)
+	box.add_child(_label("LETTER %s OF %d" % [Letters.numeral(n), room.letters.size()], 13, Color(ink, 0.6), UI.head()))
+	var head := _label(pg.head, 21, pg.head_ink, UI.head())
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(head)
+	var body := _label(pg.body, 20, ink, UI.italic())
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	body.add_theme_constant_override("line_spacing", -3)
+	box.add_child(body)
+	var sign := _label(pg.sign, 19, ink, UI.italic())
+	sign.autowrap_mode = TextServer.AUTOWRAP_WORD
+	sign.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	box.add_child(sign)
+	var w: float = pg.width
+	card.custom_minimum_size.x = w
+	card.position = Vector2((UI_W - w) / 2.0, TOP_H + 26)
+	card.pivot_offset = Vector2(w / 2.0, 300)
+	card.rotation_degrees = pg.tilt
+	modal.add_child(card)
+	# the button sits below the paper, on the dark, so the scrap stays a scrap
+	var ok := Button.new()
+	ok.text = "PUT IT AWAY"
+	ok.focus_mode = Control.FOCUS_NONE
+	ok.custom_minimum_size = Vector2(0, 58)
+	ok.pressed.connect(_close_page)
+	ok.custom_minimum_size.x = 300
+	modal.add_child(ok)
+	card_ok = ok
+	await get_tree().process_frame          # let the paper size itself to the words
+	if card_ok == ok:
+		ok.position = Vector2((UI_W - 300) / 2.0, card.position.y + card.size.y + 24)
+
+
+func _close_page() -> void:
+	modal.queue_free()
+	modal = null
+	card_ok = null
+	_teach("letter")
+
+
 func _close_card(id: String) -> void:
 	seen[id] = true
 	_save_hints()
@@ -1040,6 +1110,17 @@ func _open_guide() -> void:
 		var gap := Control.new()
 		gap.custom_minimum_size.y = 8
 		list.add_child(gap)
+	if not game.letters_read.is_empty():
+		list.add_child(_label("LETTERS READ TONIGHT", 18, UI.AMBER, UI.head()))
+		for n in game.letters_read.size():
+			var pg: Dictionary = Letters.page(n)
+			var lt := _label("%s.  %s\n\n%s" % [Letters.numeral(n), pg.body, pg.sign], 18, UI.TEXT, UI.italic())
+			lt.autowrap_mode = TextServer.AUTOWRAP_WORD
+			lt.custom_minimum_size.x = UI_W - 100
+			list.add_child(lt)
+			var lg := Control.new()
+			lg.custom_minimum_size.y = 8
+			list.add_child(lg)
 	list.add_child(_label("GRADES", 18, UI.AMBER, UI.head()))
 	var gl := _label(Lessons.GRADE_LINE, 18, UI.TEXT)
 	gl.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -1302,6 +1383,8 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 			await _press(move_buttons["right" if d == right else "left"])
 		if last_event in stop_on:
 			return last_event
+		if card_ok != null and card_ok.text == "PUT IT AWAY":
+			await _press(card_ok)   # a letter read on the way: put the page away and go on
 	return "gave_up"
 
 
@@ -1420,7 +1503,15 @@ func _capture() -> void:
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
 	await _walk_to(letter, ["letter"])
 	await _shot("fp_letter")
-	print("LETTER ", "PASS" if game.letters_read.size() == 1 else "FAIL", " at=", letter)
+	var page_up: bool = modal != null and card_ok != null and card_ok.text == "PUT IT AWAY"
+	print("LETTER ", "PASS" if game.letters_read.size() == 1 and page_up else "FAIL", " at=", letter, " page=", page_up)
+	if page_up:
+		await _press(card_ok)
+	for k in range(1, Letters.PAGES.size()):   # every page is its own scrap: render the rest too
+		_show_page(k)
+		await _shot("fp_letter_%d" % (k + 1))
+		await _press(card_ok)
+	print("PAGES ", "PASS" if modal == null else "FAIL")
 	await _press(lantern_buttons[Fog.Lantern.HOODED])
 	await _shot("fp_hooded")
 	for i in 6:
