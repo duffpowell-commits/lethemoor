@@ -45,7 +45,7 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_hooded", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_LOOKS := ["thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
 const THRALL_LUNGE := "thrall_lunge"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -95,6 +95,9 @@ static var capture_phase := 0     # capture runs twice: win at the bell, then a 
 
 var hud: Control
 var hand_art: TextureRect
+var hook_art: TextureRect          # the boathook in your left hand, while you carry one
+var hook_jab := 0.0                # 1 the moment you swing it, easing back
+const HOOK_W := 340.0
 const HAND_W := 236.0
 var status_label: Label
 var oil_bar: Control
@@ -755,6 +758,8 @@ func act(kind: String) -> void:
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 		await get_tree().process_frame
 	turn_events = events
+	if "hook_hit" in events or "hook_miss" in events or "hook_broke" in events:
+		hook_jab = 1.0
 	if "lunge" in events and not game.dead:
 		lunge_hit = 1.0
 	for ev in events:
@@ -908,6 +913,14 @@ func _process(delta: float) -> void:
 		if blood_screen and blood_screen.modulate.a > 0.0 and not kill_shot:
 			blood_screen.modulate.a = 0.0
 	var eff: int = game.effective()
+	if hook_art:   # left hand: the boathook, lit by the lantern in the right; it jabs when you swing
+		hook_art.visible = game.hook_wear > 0 and not game.dead
+		if hook_art.visible:
+			hook_jab = maxf(0.0, hook_jab - delta * 3.0)
+			var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
+			var lk := 0.45 if eff == Fog.Lantern.HOODED else (1.05 if eff == Fog.Lantern.NORMAL else 1.25)
+			hook_art.modulate = Color(lk, lk * 0.96, lk * 0.92)
+			hook_art.position = Vector2(-44 + 30.0 * j, _ui_h() - _bh() - HOOK_W - 50 - 80.0 * j + sin(t * 1.7 + 1.0) * 2.0)
 	if hand_art:
 		var want: String = HAND_ART[eff]
 		if hand_art.get_meta("art", "") != want:
@@ -1067,6 +1080,16 @@ func _build_hud() -> void:
 	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - _bh() - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hand_col.add_child(hand_art)
+	hook_art = TextureRect.new()
+	hook_art.texture = _tex("hand_hook")
+	hook_art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	hook_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hook_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	hook_art.size = Vector2(HOOK_W, HOOK_W)
+	hook_art.position = Vector2(-44, _ui_h() - _bh() - HOOK_W - 50)
+	hook_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hook_art.visible = false
+	hand_col.add_child(hook_art)
 
 	var vig := TextureRect.new()
 	vig.texture = gt

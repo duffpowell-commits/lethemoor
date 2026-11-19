@@ -320,6 +320,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   proxy can't write Actions secrets). Without it a throwaway key is used and that APK can't update. Old APKs (random key per build) need one last uninstall.
   Off-phone check: `LM_UPDATER_TEST=1 LM_UPDATER_CODE=40 LM_UPDATER_URL=<json> LM_UPDATER_SHOT=<png>`
   (`docs/renders/updater_offer.png`).
+- **Scarier update (Nov 19, Duff: "scarier, more fierce, more blood, weapon in the left hand, minimap looks terrible"):**
+  `THRALL_LOOKS` now leads with `thrall_clawed` + `thrall_wired` (Forge, bloody claws, sack hoods; FLUX painted faces, so
+  faces are darkened to a void by hand: faceless rule) and `thrall_hooded`; `thrall_lunge` shows the turn one lunges and in
+  the kill shot. Blood: `fx_blood_screen.png` spatter on lunge (`blood_screen`, by `lunge_hit`) and at the kill, `blood_pool.png`
+  under lying corpses (`pool_nodes`, LIT only), prints tinted blood red (`tools/gen_blood.py`). Left hand: `hand_hook.png`
+  (`hook_art`) shows while `hook_wear > 0`, jabs on hook events. Corner map: round parchment chart (`map_parchment.png`,
+  `tools/gen_map_parchment.py`, drawn as a TextureRect under the map: drawing it with draw_texture_rect lost its alpha in
+  the capture), inked walls + hatching, brass compass ring, turns with you (`map_rot`); MENU -> MAP: NORTH UP, saved in
+  [controls] map_north_up.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
