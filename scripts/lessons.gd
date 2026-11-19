@@ -6,7 +6,7 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 
 ## Danger first: if a thrall and a letter turn up together, the thrall gets the card.
-const ORDER := ["goal", "stalker", "horror", "panic", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
+const ORDER := ["goal", "stalker", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
 
 const CARDS := {
 	"goal": ["RING THE BELL",
@@ -29,6 +29,8 @@ const CARDS := {
 		"Walk over it and the lantern drinks it: +10 oil."],
 	"map": ["THE MAP",
 		"Top right is what you remember. A red X marks where you last saw a thrall. It may not be there any more."],
+	"noise": ["NOISE",
+		"They hear as well as they see. Walking, turning and waiting are quiet. A hook blow carries 4 tiles, a swing at nothing 3, a spark 3, pouring 2, and fire crackles 3 tiles every turn it burns.\n\nWhat hears it comes to look, round corners too. Fire draws them in, and they walk into it."],
 	"hook": ["THE BOATHOOK",
 		"Tap HOOK to swing at the first thing up to 2 tiles ahead. It's knocked back a tile and can't move for 2 turns.\n\nEvery hit bends the hook. After 3 it's useless. A swing at nothing costs the turn."],
 	"slick": ["OIL SLICK",
@@ -73,6 +75,8 @@ static func _now(id: String, game, event: String) -> bool:
 			return game.thralls.any(func(th): return th.last_seen != null and fog.get_state(th.pos) != Fog.LIT)
 		"panic":
 			return event == "panic"
+		"noise":
+			return event == "heard"
 		"hook":
 			return game.get("hook_wear") > 0
 		"slick":
