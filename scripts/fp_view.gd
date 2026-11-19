@@ -42,6 +42,8 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 1.7],
 	Fog.Lantern.BRIGHT: [5.6, 2.4],
 }
+## the painted hand + lantern for each flame: shuttered, steady, roaring
+const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
 const STOP_EVENTS := ["heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
@@ -192,14 +194,22 @@ func _buried(p: Vector2i) -> bool:
 
 func _build_world() -> void:
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#020308")
+	# night sky over the alleys (painted strip baked into a panorama): only seen looking up past the walls
+	var pano := PanoramaSkyMaterial.new()
+	pano.panorama = _tex("sky_night")
+	pano.energy_multiplier = 0.55
+	var sky := Sky.new()
+	sky.sky_material = pano
+	sky.radiance_size = Sky.RADIANCE_SIZE_32
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = DEEP
 	env.ambient_light_energy = 0.35
 	env.fog_enabled = true
 	env.fog_light_color = Color("#0a0f18")
 	env.fog_density = 0.09          # close fog: the corridor dissolves a few tiles out
+	env.fog_sky_affect = 0.35       # but the clouds still show through overhead
 	env.glow_enabled = true
 	env.glow_intensity = 0.9
 	env.glow_bloom = 0.08
@@ -270,10 +280,14 @@ func _build_world() -> void:
 	for np: Vector2i in room.letters:
 		var page := MeshInstance3D.new()
 		var q := QuadMesh.new()
-		q.size = Vector2(0.28, 0.36)
+		q.size = Vector2(0.3, 0.45)
 		page.mesh = q
 		var pm2 := StandardMaterial3D.new()
-		pm2.albedo_color = Color("#b9ab88")
+		pm2.albedo_texture = _tex("letter_nailed")    # torn page on a nail (painted)
+		pm2.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		pm2.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		pm2.albedo_color = Color(0.55, 0.52, 0.48)   # parchment is pale: sink it or BRIGHT blows it out
+		pm2.roughness = 1.0
 		pm2.cull_mode = BaseMaterial3D.CULL_DISABLED
 		page.material_override = pm2
 		# nailed to a wall beside the tile, facing into it (not hanging in your face)
@@ -427,7 +441,7 @@ func _refresh_fog() -> void:
 		flask_nodes[fp].visible = game.flasks_left.has(fp) and fog.get_state(fp) != Fog.DARK
 	for lp: Vector2i in letter_mats:
 		if game.letters_read.has(lp):
-			tile_base[Vector2i(-200 - lp.x, -200 - lp.y)] = Color("#5e5444")   # read: it's spent
+			tile_base[Vector2i(-200 - lp.x, -200 - lp.y)] = Color(0.3, 0.27, 0.23)   # read: it's spent
 	var eff: int = game.effective()
 	light.omni_range = LIGHT[eff][0]
 	light.light_energy = LIGHT[eff][1]
@@ -437,25 +451,7 @@ func _refresh_fog() -> void:
 
 
 ## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
-## with tongues of flame (billboard particles, additive) over it and a light that gutters.
-var _flame: Texture2D
-
-
-## One flame tongue: hot white-yellow core fading out at the edges and the top.
-func _flame_tex() -> Texture2D:
-	if _flame == null:
-		var img := Image.create(32, 64, false, Image.FORMAT_RGBA8)
-		for y in 64:
-			for x in 32:
-				var u := (x - 15.5) / 16.0
-				var v := y / 63.0                       # 0 top, 1 bottom
-				var width := 0.25 + 0.75 * pow(v, 0.6)  # narrow tip, wide base
-				var a := clampf(1.0 - absf(u) / width, 0.0, 1.0) * clampf(v * 1.6, 0.0, 1.0)
-				img.set_pixel(x, y, Color(1, 1, 1, a * a))
-		_flame = ImageTexture.create_from_image(img)
-	return _flame
-
-
+## with tongues of flame (painted flipbook particles, additive) over it and a light that gutters.
 func _make_fire() -> CPUParticles3D:
 	var f := CPUParticles3D.new()
 	f.amount = 22
@@ -489,11 +485,17 @@ func _make_fire() -> CPUParticles3D:
 	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = _flame_tex()
+	m.albedo_texture = _tex("fire_sheet")   # 8 painted flame frames, played as a flipbook
+	m.particles_anim_h_frames = 8
+	m.particles_anim_v_frames = 1
+	m.particles_anim_loop = true
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR   # soft flames, not pixel blocks
 	m.no_depth_test = false
 	q.material = m
 	f.mesh = q
+	f.anim_offset_max = 1.0     # each tongue starts on its own frame
+	f.anim_speed_min = 1.0
+	f.anim_speed_max = 1.6
 	f.position = Vector3(0, 0.02, 0)
 	return f
 
@@ -709,9 +711,14 @@ func _process(delta: float) -> void:
 	if busy:
 		pass
 	var eff: int = game.effective()
+	if hand_art:
+		var want: String = HAND_ART[eff]
+		if hand_art.get_meta("art", "") != want:
+			hand_art.texture = _tex(want)
+			hand_art.set_meta("art", want)
 	if eff == Fog.Lantern.HOODED:
 		if hand_art:
-			hand_art.modulate = Color(0.22, 0.2, 0.2)   # shutter closed: barely a shape
+			hand_art.modulate = Color(0.55, 0.52, 0.52)   # shutter closed: the painted glass is dark already
 		return
 	var base: float = LIGHT[eff][1]
 	var wobble := sin(t * 7.0) * 0.05 + sin(t * 13.0) * 0.04
@@ -2105,7 +2112,8 @@ func _capture_art() -> void:
 	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
-		["fp_art_lamp", Vector2i(9, 12), Vector2i.RIGHT]]
+		["fp_art_lamp", Vector2i(9, 12), Vector2i.RIGHT],
+		["fp_art_letter", Vector2i(7, 4), Vector2i.UP]]
 	for v in views:
 		game.hunter = v[1]
 		game.facing = v[2]
