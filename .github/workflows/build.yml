@@ -88,6 +88,9 @@ jobs:
         env:
           LM_KEYSTORE_PASS: ${{ secrets.LM_KEYSTORE_PASS }}
         run: |
+          # A phone paste can carry a stray newline/space or backticks: the passphrase has none.
+          LM_KEYSTORE_PASS=$(printf '%s' "$LM_KEYSTORE_PASS" | tr -d '[:space:]`')
+          export LM_KEYSTORE_PASS
           if [ -n "$LM_KEYSTORE_PASS" ]; then
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/lethemoor.keystore.enc \
               -out debug.keystore -pass env:LM_KEYSTORE_PASS
