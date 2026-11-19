@@ -156,6 +156,20 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   **Duff, Nov 18 10:40 PM: Foxboard is the preferred art tool** (see project memory `foxboard`):
   new art goes to his Foxboard Shared library first; finished art comes back via Send to game.
   Render sheet: `docs/renders/fp_art_sheet.png`.
+- **Done — playtest pass (Nov 19, after Duff's first phone run):** the "can't move" bug was
+  `act()` reading a quiet step (no events) as a wall bump: camera froze, status said Stone.
+  Now only an unspent turn is a bump. You start facing the longest open run (`night.open_way`).
+  START_OIL 30 -> 45 (direct route is ~47 moves incl. turns). Title screen, one-time field-note
+  cards per system (`scripts/lessons.gd`, tested; seen list + hints toggle in
+  `user://lethemoor.cfg`), field guide, pause MENU, **REPORT A BUG** (title + menu: prefilled
+  GitHub issue or copy-to-clipboard; adds build from CI's `build.txt`, device, game state).
+  HUD restyled (`scripts/ui_style.gd`: Cinzel + IM Fell English, OFL, in `assets/fonts/`;
+  brass trim; lantern buttons show their oil cost). Tall phones fixed (no hardcoded 960).
+  TOP-DOWN button removed. Buried walls skipped, tiles culled past 10. **CI now plays the
+  capture under xvfb** and fails on any FAIL. **Web build for iPhone testers:
+  https://duffpowell-commits.github.io/lethemoor/** (gh-pages branch, pushed by CI on main).
+  Audit with the remaining risks: `/mnt/project-files/lethemoor/audit_2026-11-19.md`
+  (sound is in a separate thread; FPS on a real phone still unmeasured).
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
