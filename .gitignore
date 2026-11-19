@@ -3,3 +3,4 @@ build/
 *.tmp
 debug.keystore
 *.keystore
+build.txt

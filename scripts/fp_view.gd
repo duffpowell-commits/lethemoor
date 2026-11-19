@@ -77,6 +77,11 @@ var modal: Control                # title or a field note: blocks moves while it
 var guide_sheet: Control
 var card_ok: Button
 var title_begin: Button
+var menu_button: Button
+var menu_sheet: Control
+var report_text_box: TextEdit
+var report_sheet: Control
+const REPO := "duffpowell-commits/lethemoor"
 var seen := {}                    # field notes already shown (saved in user://)
 var hints_on := true
 var capture_mode := false
@@ -380,7 +385,7 @@ func _refresh_fog() -> void:
 
 ## One action = one turn. The camera glides to the new pose while the thralls glide too.
 func act(kind: String) -> void:
-	if busy or game.over() or modal != null or guide_sheet != null:
+	if busy or game.over() or modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null:
 		return
 	busy = true
 	last_event = ""
@@ -471,6 +476,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_A, KEY_LEFT: act("left")
 			KEY_D, KEY_RIGHT: act("right")
 			KEY_SPACE: act("wait")
+			KEY_ESCAPE: _open_menu() if menu_sheet == null else _close_menu()
 			KEY_1: _set_lantern(Fog.Lantern.HOODED)
 			KEY_2: _set_lantern(Fog.Lantern.NORMAL)
 			KEY_3: _set_lantern(Fog.Lantern.BRIGHT)
@@ -585,8 +591,8 @@ func _build_hud() -> void:
 	letters_label = _label("", 14, UI.DIM, UI.head())
 	letters_label.position = Vector2(140, 10)
 	top.add_child(letters_label)
-	var guide := _button("?", Vector2(UI_W - 48, 6), Vector2(36, 30), _open_guide, top)
-	guide.add_theme_font_size_override("font_size", 17)
+	menu_button = _button("MENU", Vector2(UI_W - 92, 6), Vector2(80, 30), _open_menu, top)
+	menu_button.add_theme_font_size_override("font_size", 14)
 	top.add_child(_label("OIL", 14, UI.AMBER, UI.head()))
 	top.get_child(-1).position = Vector2(14, 41)
 	oil_bar = Control.new()
@@ -822,9 +828,16 @@ func _show_title() -> void:
 		hints.text = "HINTS: " + ("ON" if hints_on else "OFF")
 		_save_hints())
 	_center(hints, modal, by + 152, 340)
+	var bug := Button.new()
+	bug.text = "REPORT A BUG"
+	bug.focus_mode = Control.FOCUS_NONE
+	bug.size.y = 54
+	bug.add_theme_color_override("font_color", UI.DIM)
+	bug.pressed.connect(_open_report)
+	_center(bug, modal, by + 216, 340)
 	var foot := _label("Ring the bell before your oil runs out.", 17, UI.DIM, UI.italic())
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_center(foot, modal, _ui_h() - 60, UI_W)
+	_center(foot, modal, _ui_h() - 44, UI_W)
 
 
 func _begin() -> void:
@@ -924,6 +937,124 @@ func _open_guide() -> void:
 		guide_sheet.queue_free()
 		guide_sheet = null)
 	outer.add_child(close)
+
+
+## The pause menu (top-bar MENU). The night waits while it's open: nothing moves.
+func _open_menu() -> void:
+	if menu_sheet != null or report_sheet != null:
+		return
+	menu_sheet = _sheet(0.88)
+	var y := TOP_H + 120.0
+	var head := _label("PAUSED", 30, UI.AMBER, UI.head())
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_center(head, menu_sheet, y, UI_W)
+	var items := [
+		["RESUME", _close_menu],
+		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
+		["REPORT A BUG", func(): _close_menu(); _open_report()],
+		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
+		["QUIT TO TITLE", func(): title_done = false; get_tree().reload_current_scene()],
+	]
+	y += 70
+	for it in items:
+		var b := Button.new()
+		b.text = it[0]
+		b.focus_mode = Control.FOCUS_NONE
+		b.size.y = 60
+		b.add_theme_font_size_override("font_size", 19)
+		if it[0] == "RESUME":
+			UI.lit(b)
+		if it[1].is_valid():
+			b.pressed.connect(it[1])
+		else:
+			b.pressed.connect(func():
+				hints_on = not hints_on
+				b.text = "HINTS: " + ("ON" if hints_on else "OFF")
+				_save_hints())
+		_center(b, menu_sheet, y, 360)
+		y += 74
+
+
+func _close_menu() -> void:
+	if menu_sheet:
+		menu_sheet.queue_free()
+		menu_sheet = null
+
+
+## Everything a bug report needs that a tester can't be asked to type.
+func _report_text(note: String) -> String:
+	var build := "dev"
+	if FileAccess.file_exists("res://build.txt"):
+		build = FileAccess.get_file_as_string("res://build.txt").strip_edges()
+	var device := "%s %s, screen %s, UI %s" % [OS.get_name(), OS.get_model_name(),
+		DisplayServer.screen_get_size(), get_viewport().get_visible_rect().size]
+	if OS.has_feature("web"):
+		device += ", " + str(JavaScriptBridge.eval("navigator.userAgent", true))
+	var names := {Fog.Lantern.HOODED: "hooded", Fog.Lantern.NORMAL: "normal", Fog.Lantern.BRIGHT: "bright"}
+	var foes: Array = game.thralls.map(func(th): return "%s %s" % [th.get("kind", "thrall"), th.pos])
+	var state := "tile %s facing %s, turn %d, oil %d, dread %d, lantern %s, letters %d/%d, last event '%s', over %s%s\n%s" % [
+		game.hunter, game.facing, game.turn, game.oil, game.dread, names[game.setting],
+		game.letters_read.size(), room.letters.size(), last_event, game.over(),
+		(" (" + game.cause + ")") if game.dead else "", ", ".join(foes)]
+	return "%s\n\n---\nBuild: %s\nDevice: %s\nState: %s" % [note.strip_edges(), build, device, state]
+
+
+## Bug report: a note box, then send it as a GitHub issue or copy it to text to Duff.
+func _open_report() -> void:
+	if report_sheet != null:
+		return
+	report_sheet = _sheet(0.94)
+	var card := PanelContainer.new()
+	card.position = Vector2(20, TOP_H + 30)
+	card.custom_minimum_size = Vector2(UI_W - 40, 0)
+	report_sheet.add_child(card)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	card.add_child(box)
+	box.add_child(_label("REPORT A BUG", 26, UI.AMBER, UI.head()))
+	var how := _label("What happened, and what did you expect? Where you are, your oil and your phone get added for you.", 18, UI.DIM)
+	how.autowrap_mode = TextServer.AUTOWRAP_WORD
+	box.add_child(how)
+	var note := TextEdit.new()
+	note.custom_minimum_size = Vector2(0, 170)
+	note.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	note.placeholder_text = "I tapped STEP and..."
+	note.add_theme_font_size_override("font_size", 19)
+	note.add_theme_stylebox_override("normal", UI.box(Color(0.07, 0.075, 0.09), UI.BRASS_DIM))
+	note.add_theme_stylebox_override("focus", UI.box(Color(0.07, 0.075, 0.09), UI.BRASS))
+	box.add_child(note)
+	var done := _label("", 17, UI.AMBER)
+	done.autowrap_mode = TextServer.AUTOWRAP_WORD
+	var send := Button.new()
+	send.text = "SEND ON GITHUB"
+	send.focus_mode = Control.FOCUS_NONE
+	send.custom_minimum_size = Vector2(0, 60)
+	UI.lit(send)
+	send.pressed.connect(func():
+		var first := note.text.strip_edges().split("\n")[0].left(60)
+		var title := "Bug: " + (first if first != "" else "(no note)")
+		var url := "https://github.com/%s/issues/new?labels=bug&title=%s&body=%s" % [REPO, title.uri_encode(), _report_text(note.text).uri_encode()]
+		OS.shell_open(url)
+		done.text = "Opened GitHub. Sign in there and press Create to file it.")
+	box.add_child(send)
+	var copy := Button.new()
+	copy.text = "COPY, TO TEXT IT TO DUFF"
+	copy.focus_mode = Control.FOCUS_NONE
+	copy.custom_minimum_size = Vector2(0, 56)
+	copy.pressed.connect(func():
+		DisplayServer.clipboard_set("Lethemoor bug: " + _report_text(note.text))
+		done.text = "Copied. Paste it in a text to Duff.")
+	box.add_child(copy)
+	var cancel := Button.new()
+	cancel.text = "CLOSE"
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.custom_minimum_size = Vector2(0, 52)
+	cancel.pressed.connect(func():
+		report_sheet.queue_free()
+		report_sheet = null)
+	box.add_child(cancel)
+	box.add_child(done)
+	report_text_box = note
 
 
 func _load_hints() -> void:
@@ -1117,6 +1248,17 @@ func _capture() -> void:
 		print("GUIDE ", "PASS" if guide_sheet != null else "FAIL")
 		guide_sheet.queue_free()
 		guide_sheet = null
+		await _press(menu_button)
+		await _shot("fp_menu")
+		print("MENU ", "PASS" if menu_sheet != null else "FAIL")
+		_close_menu()
+		_open_report()
+		report_text_box.text = "Capture test: the camera froze after a step."
+		var rep := _report_text(report_text_box.text)
+		await _shot("fp_report")
+		print("REPORT ", "PASS" if "tile (" in rep and "oil" in rep and "Build:" in rep else "FAIL")
+		report_sheet.queue_free()
+		report_sheet = null
 	hints_on = false               # the rest of the capture plays like someone who knows
 	if modal != null:
 		modal.queue_free()

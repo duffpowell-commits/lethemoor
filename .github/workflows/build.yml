@@ -97,6 +97,7 @@ jobs:
         run: godot --headless --path . --import || true
       - name: Export web
         run: |
+          echo "${GITHUB_SHA::7} $(date -u +%Y-%m-%d)" > build.txt   # shown in bug reports
           mkdir -p build/web && touch build/.gdignore
           godot --headless --path . --export-release "Web" build/web/index.html
           ls -la build/web
