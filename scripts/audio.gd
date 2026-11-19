@@ -310,9 +310,9 @@ func _world_sounds(game) -> void:
 ## falls silent when the Stalker is free to move, the flame's gutter whispers.
 func track(game) -> void:
 	prev_pos = game.positions()
-	_track_fires(game)
 	if ended or game.over():
-		return
+		return   # _end() already silenced the fires
+	_track_fires(game)
 	# heartbeat: silent when calm, loud and fast at panic
 	var k: float = clampf(float(game.dread - HEART_FROM) / float(100 - HEART_FROM), 0.0, 1.0)
 	if game.dread < HEART_FROM:
@@ -365,6 +365,10 @@ func _end(bed_db: float) -> void:
 	_fade(bed, bed_db, 2.0)
 	_fade(heart, -80.0, 1.0)
 	_fade(flame, -80.0, 1.0)
+	for p in fires:   # crackle stops with the night (it kept going over the death screen)
+		if is_instance_valid(fires[p]):
+			fires[p].queue_free()
+	fires.clear()
 
 
 ## A crackle loop sits on every burning tile, for as long as it burns.

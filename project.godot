@@ -5,6 +5,8 @@ config_version=5
 
 [application]
 
+config/quit_on_go_back=false
+
 config/name="Lethemoor: The Last Lantern"
 config/description="Gothic tactics-horror roguelite. Light is life."
 run/main_scene="res://scenes/fp_room.tscn"

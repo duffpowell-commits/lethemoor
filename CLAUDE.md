@@ -220,6 +220,16 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   it). **Sound hook:** each action resets `noises` ([{pos, level, kind}]) and `heard_by`
   (thrall indexes drawn this turn); event `"heard"` when anything turned toward a sound. Field
   note `noise`. Running / rummaging / ringing levels get added when those actions exist.
+- **Audit (Nov 19, evening):** rules + capture were clean; fixed in the view layer: Android
+  Back/back-gesture quit the game instantly (now `quit_on_go_back=false` + `go_back()` closes
+  the top sheet or opens the menu; capture prints BACK PASS), burned horrors stayed on the
+  corner map + in two field-note checks, retry left the flame loop silent (`Sound.hook_night()`
+  now runs before the first `_refresh`), fire crackle kept playing over the death screen,
+  lantern keys worked under the menu/mid-step, frustum assumed a 540-wide screen, bumping fire
+  or a visible horror said "Stone". Still open (not fixed): HUD is laid out once for 540 wide
+  (no `size_changed`, no rotate handling), REPORT A BUG open/copy likely blocked by iPhone
+  Safari (needs a JS gesture hook), only one event per turn reaches `_teach`, painted HUD art
+  uses nearest filtering. The hints-save-wipes-mute bug is fixed in PR #7.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

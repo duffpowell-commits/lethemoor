@@ -108,8 +108,8 @@ func _ready() -> void:
 	_build_world()
 	_build_hud()
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	Sound.hook_night()   # before _refresh: track() needs the new night (retry restarts the flame)
 	_refresh()
-	Sound.hook_night()
 	if not title_done:
 		_show_title()
 	else:
@@ -339,7 +339,7 @@ func _build_world() -> void:
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	cam.size = 2.0 * cam.near * tan(deg_to_rad(FOV / 2.0))
 	var ui_h := _ui_h()            # 960 on a 9:16 screen, taller on modern phones
-	var full_h := cam.size * ui_h / UI_W
+	var full_h := cam.size * ui_h / get_viewport().get_visible_rect().size.x
 	var mid := (TOP_H + (ui_h - BOTTOM_H)) / 2.0
 	cam.frustum_offset = Vector2(0, -full_h * (ui_h / 2.0 - mid) / ui_h)
 	add_child(cam)
@@ -484,7 +484,8 @@ func act(kind: String) -> void:
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
-		last_event = "blocked"
+		var ahead: Vector2i = game.hunter + (game.facing if kind == "forward" else -game.facing)
+		last_event = "blocked_fire" if game.burning(ahead) else ("blocked_horror" if game.thrall_at(ahead) >= 0 else "blocked")
 		_refresh_hud()
 		return
 	if game.turn == turn0 and not game.over() and kind in ["hook", "pour", "spark"]:
@@ -530,7 +531,7 @@ func swipe(d: Vector2) -> void:
 
 
 func _set_lantern(s: int) -> void:
-	if game.over() or modal != null:
+	if busy or game.over() or modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null:
 		return
 	if s != game.setting:
 		Sound.hook_lantern(s)
@@ -538,6 +539,29 @@ func _set_lantern(s: int) -> void:
 	last_event = ""
 	_refresh()
 	_teach()
+
+
+## Android back button / back gesture: close whatever is on top, else pause. Never quits
+## (project.godot has quit_on_go_back off; a stray edge swipe used to end the night).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		go_back()
+
+
+func go_back() -> void:
+	if report_sheet != null:
+		report_sheet.queue_free()
+		report_sheet = null
+	elif guide_sheet != null:
+		guide_sheet.queue_free()
+		guide_sheet = null
+	elif menu_sheet != null:
+		_close_menu()
+	elif modal != null:
+		if card_ok != null:
+			card_ok.pressed.emit()   # field note or letter page: same as its button
+	elif not game.over() and not busy:
+		_open_menu()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -806,6 +830,8 @@ func _draw_map() -> void:
 			elif game.flasks_left.has(p):
 				minimap.draw_rect(Rect2(Vector2(p) * c + Vector2(2.5, 2.5), Vector2(c - 5, c - 5)), LANTERN)
 	for th in game.thralls:
+		if th.get("gone", false):
+			continue   # burned: no square, no last-seen mark
 		if fog.get_state(th.pos) == Fog.LIT:
 			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
 		elif th.last_seen != null:
@@ -837,6 +863,8 @@ func _refresh_hud() -> void:
 		"out_of_oil": "The last of the oil is gone. The dark comes in.",
 		"flicker": "The flame gutters. Something is near.",
 		"blocked": "Stone. You can't go that way.",
+		"blocked_fire": "The oil is burning there. Wait for it to die.",
+		"blocked_horror": "It stands in your way. You will not walk into it.",
 		"oil": "A flask, still corked. The lantern drinks.",
 		"letter": "A letter, nailed to the post. You read it by the high flame.",
 		"letter_dim": "Words on a page. Too dim to read. Burn brighter.",
@@ -1456,8 +1484,14 @@ func _capture() -> void:
 		var rep := _report_text(report_text_box.text)
 		await _shot("fp_report")
 		print("REPORT ", "PASS" if "tile (" in rep and "oil" in rep and "Build:" in rep else "FAIL")
-		report_sheet.queue_free()
-		report_sheet = null
+		# Android back: closes the top sheet, opens the menu in play, closes it again, never quits
+		go_back()
+		var back_closed: bool = report_sheet == null
+		go_back()
+		var back_menu: bool = menu_sheet != null
+		go_back()
+		print("BACK ", "PASS" if back_closed and back_menu and menu_sheet == null \
+				and not ProjectSettings.get_setting("application/config/quit_on_go_back") else "FAIL")
 	hints_on = false               # the rest of the capture plays like someone who knows
 	if modal != null:
 		modal.queue_free()
