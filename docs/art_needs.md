@@ -43,14 +43,14 @@ slice passes.
    broken brick edges. Seen on every screen when walls are low.
 
 ### P1. Makes the slice's systems readable
-4. **The Stalker: a dedicated veiled bride (standing figure).** She currently reuses the
+4. ~~**The Stalker: a dedicated veiled bride (standing figure).**~~ DONE Nov 19 (`stalker_bride.png`, Forge). She currently reuses the
    mockup bride cut out by hand, tinted pale. She is the slice's signature horror and the one
    rule players must learn (she freezes while you look at her), so she must look different
    from every thrall at a glance: tall, pale lace, long veil, dress dragging.
 5. **Two more thrall variants (standing figures).** Every night is now dealt fresh, so four
    identical dock workers reads as copy-paste. A drowned fisherman with net and rope, and a
    dock woman with a shawl over her head. Same faceless rule.
-6. **Oil slick decal (256×256, transparent).** The poured-oil puddle is drawn in code as a
+6. ~~**Oil slick decal (256×256, transparent).**~~ DONE Nov 19 (`decal_oilslick.png`; burning pool `decal_fire.png`, particles kept). The poured-oil puddle is drawn in code as a
    dark blob. A wet black oil pool with a faint rainbow sheen and a ragged edge.
 7. **Fire sprite sheet (8 frames of 128×256 in a row, transparent).** Burning oil is a
    code-drawn particle stand-in. The trap is the slice's big "aha" moment, so it should look
@@ -59,7 +59,7 @@ slice passes.
    Today the hand art just dims for HOODED. The shutter should visibly close. BRIGHT
    should show the wick turned up with a bigger flame. Players learn the lantern states by looking at
    the hand.
-9. **Street lamp post (standing prop, ~150 × 600).** The map has a lamp post that is a grey
+9. ~~**Street lamp post (standing prop, ~150 × 600).**~~ DONE Nov 19 (`prop_lamppost.png`). The map has a lamp post that is a grey
    box today. A rusted iron gas lamp, unlit.
 10. **Letter nailed to a wall (prop, ~200 × 260, paper with a nail).** Letters on walls show the
     in-hand page art. A small folded note pinned with a nail reads better from a distance.
