@@ -22,7 +22,7 @@ const STEP_TIME := 0.2
 const HAND_X := 0.24
 const HAND_Y := -0.2              # low right of the visible strip
 
-const LANTERN := Color("#ff9a3c")
+const LANTERN := Color("#ffbe7a")   # warm but not orange: blue stone has to stay stone
 const DEEP := Color("#0d1420")
 const MOON := Color("#6f8fc4")
 const INK_BLACK := Color("#05070c")
@@ -34,8 +34,8 @@ const SHADE := {Fog.DARK: 0.0, Fog.REMEMBERED: 0.2, Fog.LIT: 1.0}
 ## Lantern light per setting: [range, energy]. Close up, so less energy than top-down.
 const LIGHT := {
 	Fog.Lantern.HOODED: [0.8, 0.25],
-	Fog.Lantern.NORMAL: [3.4, 2.2],
-	Fog.Lantern.BRIGHT: [5.6, 3.0],
+	Fog.Lantern.NORMAL: [3.4, 1.7],
+	Fog.Lantern.BRIGHT: [5.6, 2.4],
 }
 const STOP_EVENTS := ["rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -65,6 +65,8 @@ var letters_label: Label
 static var capture_phase := 0     # capture runs twice: win at the bell, then a death
 
 var hud: Control
+var hand_art: TextureRect
+const HAND_W := 236.0
 var status_label: Label
 var oil_pips: Array[ColorRect] = []
 var oil_count: Label
@@ -134,7 +136,7 @@ func _build_world() -> void:
 
 	var moon := DirectionalLight3D.new()
 	moon.light_color = MOON
-	moon.light_energy = 0.12
+	moon.light_energy = 0.3
 	moon.rotation_degrees = Vector3(-60, -30, 0)
 	add_child(moon)
 
@@ -147,19 +149,19 @@ func _build_world() -> void:
 			var p := Vector2i(x, y)
 			var mi := MeshInstance3D.new()
 			var m := StandardMaterial3D.new()
-			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
 			m.metallic_specular = 0.25
 			if room.is_wall(p):
 				mi.mesh = wall_mesh
 				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
-				m.albedo_texture = _tex("wall_face_%d" % ((x + y) % 2))
-				m.uv1_scale = Vector3(3, 2.4 * 2, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
+				m.albedo_texture = _tex("wall_stone" if (x * 3 + y) % 3 else "wall_paper")
+				m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
 				m.roughness = 0.9
 				tile_base[p] = Color(0.85, 0.82, 0.92)
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				m.albedo_texture = _tex("exit" if p in room.exits else "floor_%d" % ((x * 7 + y * 13) % 4))
+				m.albedo_texture = _tex("exit" if p in room.exits else "floor_wet")
 				m.roughness = 0.65
 				tile_base[p] = Color(1, 1, 1)
 			mi.material_override = m
@@ -215,8 +217,14 @@ func _build_world() -> void:
 		pm2.albedo_color = Color("#b9ab88")
 		pm2.cull_mode = BaseMaterial3D.CULL_DISABLED
 		page.material_override = pm2
-		page.position = _w(np) + Vector3(0, 1.1, 0)
-		page.rotation.y = randf() * TAU
+		# nailed to a wall beside the tile, facing into it (not hanging in your face)
+		var wall_dir := Vector2i.ZERO
+		for d in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN]:
+			if room.is_wall(np + d):
+				wall_dir = d
+				break
+		page.position = _w(np) + Vector3(wall_dir.x, 0, wall_dir.y) * 0.49 + Vector3(0, 1.15, 0)
+		page.rotation.y = atan2(-float(wall_dir.x), -float(wall_dir.y))
 		add_child(page)
 		tile_mats[Vector2i(-200 - np.x, -200 - np.y)] = pm2
 		tile_base[Vector2i(-200 - np.x, -200 - np.y)] = pm2.albedo_color
@@ -243,18 +251,17 @@ func _build_world() -> void:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
-		th.texture = _tex("thrall")
-		th.pixel_size = PX * 3.2         # up close they're big: ~2 tiles tall
+		th.texture = _tex("bride")
+		th.pixel_size = 1.9 / th.texture.get_height()   # ~1.9 tiles tall, cut from Duff's mockup
+		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 		th.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
-		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 		th.shaded = true
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
-		th.modulate = Color(0.6, 0.62, 0.7)
+		th.modulate = Color(0.55, 0.5, 0.48)    # thralls: the same shroud, darker (own art later)
 		if thrall.get("kind", "thrall") == "stalker":
-			# placeholder bride: pale and tall until the real veiled sprite lands
-			th.modulate = Color(1.3, 1.25, 1.4)
-			th.pixel_size = PX * 3.7
+			th.modulate = Color(1.25, 1.22, 1.3)   # the bride: pale, catches the light
+			th.pixel_size = 2.15 / th.texture.get_height()
 		holder.add_child(th)
 		add_child(holder)
 		thrall_nodes.append(holder)
@@ -275,6 +282,7 @@ func _build_world() -> void:
 	hand = Node3D.new()
 	hand.position = Vector3(HAND_X, HAND_Y, -0.55)
 	cam.add_child(hand)
+	hand.visible = false   # the painted hand overlay (HUD) replaces the placeholder box
 	var frame := MeshInstance3D.new()
 	var fb := BoxMesh.new()
 	fb.size = Vector3(0.05, 0.075, 0.05)
@@ -439,6 +447,8 @@ func _process(delta: float) -> void:
 		pass
 	var eff: int = game.effective()
 	if eff == Fog.Lantern.HOODED:
+		if hand_art:
+			hand_art.modulate = Color(0.22, 0.2, 0.2)   # shutter closed: barely a shape
 		return
 	var base: float = LIGHT[eff][1]
 	var wobble := sin(t * 7.0) * 0.05 + sin(t * 13.0) * 0.04
@@ -446,6 +456,10 @@ func _process(delta: float) -> void:
 		wobble -= 0.6 * absf(sin(t * 60.0))
 	light.light_energy = base + wobble
 	hand.position.y = HAND_Y + sin(t * 2.1) * 0.006   # the hand isn't quite steady
+	if hand_art:
+		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
+		hand_art.modulate = Color(k, k, k)
+		hand_art.position.y = 960 - BOTTOM_H - HAND_W + 22 + sin(t * 2.1) * 2.0
 
 
 # ---------------------------------------------------------------- HUD
@@ -487,6 +501,16 @@ func _build_hud() -> void:
 	gt.fill = GradientTexture2D.FILL_RADIAL
 	gt.fill_from = Vector2(0.5, 0.42)
 	gt.fill_to = Vector2(1.0, 0.42)
+	# her gloved hand and the brass lantern, painted, low right of the view (from Duff's mockup)
+	hand_art = TextureRect.new()
+	hand_art.texture = _tex("hand_lantern")
+	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	hand_art.size = Vector2(HAND_W, HAND_W)
+	hand_art.position = Vector2(UI_W - HAND_W + 6, 960 - BOTTOM_H - HAND_W + 22)
+	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(hand_art)
+
 	var vig := TextureRect.new()
 	vig.texture = gt
 	vig.set_anchors_preset(Control.PRESET_FULL_RECT)

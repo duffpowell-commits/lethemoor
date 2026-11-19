@@ -147,6 +147,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   On One Night she guards the letter/flask corridor at (7,6), off the direct bell route.
   Placeholder look: the thrall sprite, pale and taller. Capture pass 2 prints STALKER PASS
   (`fp_stalker.png`). 29 tests.
+- **Art (Nov 19): painted look from Duff's mockup** (`grok_art/2026-11-19-mockup/`, cut by hand
+  in Python): `assets/art/bride.png` (all enemies for now; thralls tinted dark, Stalker pale and
+  taller), `hand_lantern.png` (HUD overlay low right, dims when hooded, breathes with the flame;
+  the 3D placeholder lantern is hidden, its light stays), `wall_stone.png` / `wall_paper.png` /
+  `floor_wet.png` (linear filtering: these are painted, not pixel art). Lantern colour cooled to
+  #ffbe7a and energy lowered so blue stone reads as stone. Letters now hang on an adjacent wall.
+  **Duff, Nov 18 10:40 PM: Foxboard is the preferred art tool** (see project memory `foxboard`):
+  new art goes to his Foxboard Shared library first; finished art comes back via Send to game.
+  Render sheet: `docs/renders/fp_art_sheet.png`.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
