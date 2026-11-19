@@ -278,6 +278,25 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `user://lethemoor.cfg` [controls] pad. `_bh()` is the panel height everywhere; `_layout_bottom()` lays
   it out. The capture now moves by real swipes (`_go(kind)`), prints PAD PASS (`fp_pad.png`); bell run:
   B, 23 oil, 57 turns. Field guide lives in MENU. Sheet: `docs/renders/fp_swipe_sheet.png`.
+- **Done — scarier thralls (Nov 19, Duff: "add all of those ideas").** `night.gd` (8 new tests, 61):
+  **crouch + lunge**: a thrall 2 walking tiles off that sees your light crouches a turn (event `crouch`,
+  the tell), then if you're still 2 off it lunges a tile on any turn (`lunge`), then rests
+  `LUNGE_COOLDOWN` 3. **Rousing**: held under BRIGHT light `ROUSE_LOOK` 2 turns running, it stops
+  shambling (`roused`) till it loses you (NORMAL can't rouse: that made a death spiral). **Silence**:
+  `silent(th)` within `QUIET_NEAR` 3 tiles, no shuffle sound. **Corpses** (`C` tile, `room.corpses`,
+  appended LAST to `thralls` with `lying`): no flicker, no horror, no hearing; rise (`rose`) when you're
+  within `CORPSE_WAKE` 2 and it's outside your view cone, or when you walk into one in the dark (you don't
+  move, you live); rising costs it `RISE_TURNS` 1. Dealt only onto dead ends (`room.dead_end`), never
+  across a corridor. One Night: (17,12) at the end of a flask passage, (17,19) in a south alcove.
+  **Wet prints**: `prints` tile -> turns (`PRINT_TURNS` 10) where a thrall stepped from; the view shows
+  lit ones as glossy decals that fade. View: thralls hunched (squat/wide) and twitch, corpses lie flat,
+  grey body on the corner map, **kill shot** (`_kill_shot`: it fills the screen, red flash, shake,
+  `fp_killshot.png`), new status lines + field notes `lunge` / `rose`, sounds. `GRADE_LINE` fixed to the
+  new bands. **Balance bot** `tools/balance_bot.gd` (`-- 300 [night_script]`, `BOT_FIRST=0` for the
+  handmade night, `BOT_TRACE=1`): careful-but-crude policy. Corpses in corridors took it to 0% wins;
+  the (1,16) thrall made a pincer with (3,12) on the main road, so it moved to (5,11): 54% wins over
+  300 dealt nights, avg 4 oil at the bell (it wanders; a person should do better). Capture bot keeps
+  2 tiles clear and evades (`_evade`); CORPSE PASS (`fp_art_corpse.png`).
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.

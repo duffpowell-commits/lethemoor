@@ -43,7 +43,7 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 1.7],
 	Fog.Lantern.BRIGHT: [5.6, 2.4],
 }
-const STOP_EVENTS := ["heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
@@ -71,6 +71,10 @@ var tile_tex := {}                 # floor/wall tile -> texture name
 var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
 var thrall_nodes: Array = []
+var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
+var print_nodes := {}              # tile -> wet footprints decal on the floor
+var print_tex: Texture2D
+var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
 var hook_nodes := {}              # tile -> boathook lying on the floor
 var slick_nodes := {}             # tile -> oil slick / fire on the floor (made as they appear)
@@ -328,9 +332,13 @@ func _build_world() -> void:
 		if stalker:
 			th.modulate = Color(1.12, 1.1, 1.15)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
+		if not stalker:
+			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
+			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
 		add_child(holder)
 		thrall_nodes.append(holder)
+		thrall_sprites.append(th)
 
 	cam = Camera3D.new()
 	cam.keep_aspect = Camera3D.KEEP_WIDTH
@@ -425,6 +433,8 @@ func _refresh_fog() -> void:
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
+		_pose(i)
+	_sync_prints()
 	for kp: Vector2i in hook_nodes:
 		hook_nodes[kp].visible = game.hooks_left.has(kp) and fog.get_state(kp) != Fog.DARK
 	_sync_slicks()
@@ -439,6 +449,66 @@ func _refresh_fog() -> void:
 	flame.visible = eff != Fog.Lantern.HOODED
 	if minimap:
 		minimap.queue_redraw()
+
+
+## A corpse lies flat on the stones, feet toward the wall; once it gets up it stands like the rest.
+func _pose(i: int) -> void:
+	var sp: Sprite3D = thrall_sprites[i]
+	var lying: bool = game.thralls[i].get("lying", false)
+	sp.billboard = BaseMaterial3D.BILLBOARD_DISABLED if lying else BaseMaterial3D.BILLBOARD_FIXED_Y
+	sp.rotation = Vector3(-PI / 2, 0.9, 0) if lying else Vector3.ZERO
+	sp.position = Vector3(0, 0.03, 0) if lying else Vector3.ZERO
+	sp.offset = Vector2.ZERO if lying else Vector2(0, sp.texture.get_height() / 2.0)
+	sp.modulate = Color(0.55, 0.56, 0.6) if lying else (sp.modulate if game.thralls[i].kind == "stalker" else Color(0.8, 0.8, 0.82))
+
+
+## Two wet bare footprints, drawn once: dark, a little glossy.
+func _print_texture() -> Texture2D:
+	if print_tex:
+		return print_tex
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	for foot in [[Vector2(22, 40), 1.0], [Vector2(42, 22), -1.0]]:
+		var c: Vector2 = foot[0]
+		for y in 64:
+			for x in 64:
+				var q := Vector2(x, y) - c
+				var heel := (q - Vector2(0, 6)).length() < 5.0
+				var sole := Vector2(q.x / 5.5, (q.y + 2.0) / 9.0).length() < 1.0
+				var toes := false
+				for k in 4:
+					toes = toes or (q - Vector2(-4.0 + k * 2.7 * foot[1] * foot[1], -12.5 + absf(k - 1.5))).length() < 1.6
+				if heel or sole or toes:
+					img.set_pixel(x, y, Color(0.02, 0.03, 0.05, 0.85))
+	print_tex = ImageTexture.create_from_image(img)
+	return print_tex
+
+
+## Wet prints show on lit floor while they last (the sim dries them).
+func _sync_prints() -> void:
+	for p: Vector2i in print_nodes.keys():
+		if not game.prints.has(p):
+			print_nodes[p].queue_free()
+			print_nodes.erase(p)
+	for p: Vector2i in game.prints:
+		if not print_nodes.has(p):
+			var m := MeshInstance3D.new()
+			var q := QuadMesh.new()
+			q.size = Vector2(0.55, 0.55)
+			m.mesh = q
+			var mat := StandardMaterial3D.new()
+			mat.albedo_texture = _print_texture()
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.roughness = 0.15                 # wet: it catches the lantern
+			mat.metallic_specular = 0.6
+			m.material_override = mat
+			m.rotation = Vector3(-PI / 2, float(hash(p) % 628) / 100.0, 0)
+			m.position = _w(p) + Vector3(0, 0.012, 0)
+			add_child(m)
+			print_nodes[p] = m
+		print_nodes[p].visible = fog.get_state(p) == Fog.LIT
+		var mat2: StandardMaterial3D = print_nodes[p].material_override
+		mat2.albedo_color = Color(1, 1, 1, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # drying
 
 
 ## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
@@ -592,7 +662,8 @@ func act(kind: String) -> void:
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
 		var ahead: Vector2i = game.hunter + (game.facing if kind == "forward" else -game.facing)
-		last_event = "blocked_fire" if game.burning(ahead) else ("blocked_horror" if game.thrall_at(ahead) >= 0 else "blocked")
+		var who: int = game.thrall_at(ahead)
+		last_event = "blocked_fire" if game.burning(ahead) else ("blocked" if who < 0 else ("blocked_body" if game.thralls[who].get("lying", false) else "blocked_horror"))
 		_refresh_hud()
 		return
 	if game.turn == turn0 and not game.over() and kind in ["hook", "pour", "spark"]:
@@ -621,6 +692,8 @@ func act(kind: String) -> void:
 	if flicker and not was_flicker and last_event not in STOP_EVENTS:
 		last_event = "flicker"
 		_refresh_hud()
+	if game.dead and ("taken" in events or "grabbed" in events):
+		await _kill_shot()
 	busy = false
 	if game.over():
 		_show_end()
@@ -711,6 +784,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	t += delta
 	_flicker_fires()
+	# standing thralls twitch: a jerk of the head now and then, never smooth
+	for i in thrall_sprites.size():
+		var th: Dictionary = game.thralls[i]
+		if th.get("kind", "thrall") == "thrall" and not th.get("lying", false) and thrall_nodes[i].visible:
+			var jerk := 0.0
+			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
+				jerk = 0.05 * sin(t * 90.0 + i)
+			thrall_sprites[i].position.x = jerk
 	if busy:
 		pass
 	var eff: int = game.effective()
@@ -1186,7 +1267,10 @@ func _draw_map() -> void:
 	for th in game.thralls:
 		if th.get("gone", false):
 			continue   # burned: no square, no last-seen mark
-		if fog.get_state(th.pos) == Fog.LIT:
+		if th.get("lying", false):
+			if fog.get_state(th.pos) != Fog.DARK:   # a body on the stones, nothing more (so it seems)
+				minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(1.5, 3), Vector2(c - 3, c - 6)), Color(UI.DIM, 0.8))
+		elif fog.get_state(th.pos) == Fog.LIT:
 			minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(2, 2), Vector2(c - 4, c - 4)), UI.BLOOD)
 		elif th.last_seen != null:
 			# last-seen marker: where you saw it, not where it is. It may have moved.
@@ -1233,6 +1317,11 @@ func _refresh_hud() -> void:
 		"cant_pour": "No room to pour there, or not enough oil.",
 		"ignite": "The spark catches. Fire runs along the oil.",
 		"burned": "Something burns in the oil. It doesn't scream.",
+		"crouch": "It crouches, low and still, watching the flame. Move.",
+		"lunge": "It lunges. Two paces gone in a heartbeat. It's on you.",
+		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
+		"roused": "You held it in the high flame too long. It stops shambling.",
+		"blocked_body": "A body lies there, sodden. You'd have to step over it.",
 		"heard": "Somewhere in the dark, something stops, and turns toward the sound.",
 		"cant_spark": "Nothing to light. Look at the oil, lantern lit, 3 tiles or nearer.",
 	}
@@ -1698,6 +1787,49 @@ func _save_hints() -> void:
 	cfg.save("user://lethemoor.cfg")
 
 
+## It has you: the thing fills the screen, lunging up out of the dark, a red flash, a shake.
+func _kill_shot() -> void:
+	var stalker: bool = "Lace" in game.cause
+	kill_shot = Control.new()
+	kill_shot.set_anchors_preset(Control.PRESET_FULL_RECT)
+	kill_shot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.add_child(kill_shot)
+	var dark := ColorRect.new()
+	dark.color = Color(0, 0, 0, 0.0)
+	dark.set_anchors_preset(Control.PRESET_FULL_RECT)
+	kill_shot.add_child(dark)
+	_wing(kill_shot, Color(0, 0, 0, 0))
+	var face := TextureRect.new()
+	face.texture = _tex("stalker_bride" if stalker else "thrall_dock")
+	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	face.modulate = Color(0.75, 0.7, 0.7) if not stalker else Color(1.1, 1.08, 1.12)
+	kill_shot.add_child(face)
+	var red := ColorRect.new()
+	red.color = Color(0.55, 0.0, 0.02, 0.0)
+	red.set_anchors_preset(Control.PRESET_FULL_RECT)
+	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kill_shot.add_child(red)
+	var h := _ui_h()
+	var e := 0.0
+	const T_KILL := 0.75
+	while e < T_KILL:
+		e += get_process_delta_time()
+		var k := clampf(e / 0.28, 0.0, 1.0)          # it comes up fast, then hangs there
+		var size := lerpf(h * 0.5, h * 2.1, k * k)
+		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 14.0 * (1.0 - e / T_KILL)
+		face.size = Vector2(size * 0.62, size)
+		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.42 - size * 0.32) + shake
+		dark.color.a = 0.6 * k
+		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
+		await get_tree().process_frame
+	if capture_mode:
+		await _shot("fp_killshot")
+	kill_shot.queue_free()
+	kill_shot = null
+
+
 func _show_end() -> void:
 	if end_screen == null:
 		end_screen = ColorRect.new()
@@ -1928,9 +2060,13 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	for guard in 200:
 		if game.over() or game.hunter == goal:
 			return last_event
+		var close: bool = _lit_awake().any(func(th): return absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 2)
+		if close:
+			await _evade()   # it's within lunging reach: get clear before anything else, never turn
+			continue
 		var path: Array = _safe_path(goal)
 		if path.size() < 2:
-			await _go("wait")   # a thrall sits on every way through: let it move
+			await _evade()   # a thrall sits on every way through: hook it, back off, or let it move
 			continue
 		var d: Vector2i = path[1] - game.hunter
 		if game.facing == d:
@@ -1945,13 +2081,52 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	return "gave_up"
 
 
-## Shortest way to `goal` that never steps next to a thrall you can see (what a player does).
+## Lit horrors that are up and about (a corpse lying still isn't one, as far as you know).
+func _lit_awake() -> Array:
+	return game.thralls.filter(func(th): return not th.get("gone", false) and not th.get("lying", false) \
+			and fog.get_state(th.pos) == Fog.LIT)
+
+
+## Something is too close: hook it if it's right ahead, else step to the tile furthest from
+## every horror you can see (backing up keeps your eyes on it), else wait.
+func _evade() -> void:
+	var near: Array = _lit_awake()
+	var ahead: Vector2i = game.hunter + game.facing
+	if game.hook_wear > 0 and near.any(func(th): return th.pos == ahead or th.pos == ahead + game.facing):
+		await _press(item_buttons.hook)
+		return
+	if near.is_empty():
+		await _go("wait")
+		return
+	var best := Vector2i.ZERO
+	var best_d := -1
+	for d: Vector2i in [game.facing, -game.facing, Vector2i(-game.facing.y, game.facing.x), Vector2i(game.facing.y, -game.facing.x)]:
+		var n: Vector2i = game.hunter + d
+		if room.is_wall(n) or game.thrall_at(n) >= 0 or game.burning(n):
+			continue
+		var m := 999
+		for th in near:
+			m = mini(m, absi(th.pos.x - n.x) + absi(th.pos.y - n.y))
+		if m > best_d:
+			best_d = m
+			best = d
+	if best == game.facing:
+		await _go("forward")
+	elif best == -game.facing:
+		await _go("back")
+	else:
+		await _go("wait")
+
+
+## Shortest way to `goal` that keeps two tiles clear of every thrall you can see (they lunge
+## from two): what a careful player does.
 func _safe_path(goal: Vector2i) -> Array:
 	var bad := {}
-	for th in game.thralls:
-		if fog.get_state(th.pos) == Fog.LIT:
-			for d: Vector2i in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
-				bad[th.pos + d] = true
+	for th in _lit_awake():
+		for dx in range(-2, 3):
+			for dy in range(-2, 3):
+				if absi(dx) + absi(dy) <= (2 if th.get("kind", "thrall") == "thrall" else 1):
+					bad[th.pos + Vector2i(dx, dy)] = true
 	var prev := {game.hunter: game.hunter}
 	var q: Array[Vector2i] = [game.hunter]
 	while not q.is_empty():
@@ -2113,7 +2288,7 @@ func _capture() -> void:
 	for i in 6:
 		if game.over():
 			break
-		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands (thralls[2] = (3,12))
+		await _walk_to(game.thralls[2].pos)   # blind, into the dark where it stands (thralls[2]: any thrall will do)
 	await _shot("fp_dead")
 	print("DEATH ", "PASS" if game.dead else "FAIL", " ", game.cause)
 	await _press(verdict_buttons["fun7"])
@@ -2190,5 +2365,14 @@ func _capture_art() -> void:
 		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 		_refresh()
 		await _shot(v[0])
+	# a corpse playing dead two tiles ahead, wet prints leading past it
+	game.hunter = Vector2i(17, 10)
+	game.facing = Vector2i.DOWN
+	game.prints = {Vector2i(17, 11): 9, Vector2i(17, 9): 4}
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	_refresh()
+	await _shot("fp_art_corpse")
+	print("CORPSE ", "PASS" if thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2 else "FAIL")
 	print("ART PASS")
 	get_tree().quit()

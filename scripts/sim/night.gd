@@ -45,6 +45,13 @@ const FIRE_TURNS := 3
 ## of walking distance (it goes round corners, not through walls), which then heads for the
 ## sound, unless it sees your light (light always wins). Plain walking, turning and waiting
 ## are silent, so the old routes play exactly as before; only the tools make noise.
+## Thralls (Nov 19, "make them more intimidating"):
+const LUNGE_COOLDOWN := 3       # 2 tiles off and seeing your light: it crouches a turn, lunges a tile, then rests this long
+const ROUSE_LOOK := 2           # held in BRIGHT light this many turns running: it moves every turn till it loses you
+const QUIET_NEAR := 3           # within this many tiles a thrall makes no sound (silence is the warning)
+const PRINT_TURNS := 10         # a thrall's wet footprints dry after this many turns
+const CORPSE_WAKE := 2          # a corpse gets up when you're this close and it's not in your view cone
+const RISE_TURNS := 1           # getting up costs it this many of its turns
 const NOISE := {"hook_hit": 4, "hook_miss": 3, "pour": 2, "spark": 3, "fire": 3}
 const GRADES := [[35, "S"], [29, "A"], [23, "B"], [18, "C"], [0, "D"]]   # +15 on Nov 19 when start oil went 45 -> 60
 ## How far a thrall notices your lantern (tiles, needs line of sight).
@@ -78,6 +85,8 @@ var heard_by: Array = []        # indexes into `thralls` drawn by a noise this t
 ## stun (turns left knocked down by the boathook), gone (burned: it stays in the list so the
 ## view's indexes hold, but it no longer counts for anything)}
 var thralls: Array = []
+## Wet footprints: tile -> turns until dry. Thralls leave them where they step (the view shows lit ones).
+var prints := {}
 var seed := 0                   # which night was dealt (0 = the map as drawn); testers quote it
 
 
@@ -96,6 +105,10 @@ static func start(room_text: String, seed: int = 0) -> RefCounted:
 		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
 	for p: Vector2i in n.room.stalkers:
 		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "stalker", stun = 0, gone = false})
+	for p: Vector2i in n.room.corpses:   # thralls playing dead: last, so map indexes above stay put
+		n.thralls.append({pos = p, target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false, lying = true})
+	for th in n.thralls:
+		th.merge({lunge_cd = 0, lit_for = 0, roused = false, lying = false, crouched = false})
 	n.fog.update(n.lights())
 	for th in n.thralls:
 		th.seen = n.fog.get_state(th.pos) == Fog.LIT
@@ -150,6 +163,15 @@ func positions() -> Array:
 
 
 ## Positions of the horrors still walking (rules use these).
+## Horrors that give themselves away (flicker, map): standing ones. A corpse lying still doesn't.
+func awake_positions() -> Array:
+	var out: Array = []
+	for th in thralls:
+		if not th.get("gone", false) and not th.get("lying", false):
+			out.append(th.pos)
+	return out
+
+
 func live_positions(except: int = -1) -> Array:
 	var out: Array = []
 	for i in thralls.size():
@@ -163,7 +185,7 @@ func over() -> bool:
 
 
 func flickers() -> bool:
-	return fog.flickers(hunter, live_positions())
+	return fog.flickers(hunter, awake_positions())
 
 
 func hallucinating() -> bool:
@@ -185,7 +207,11 @@ func step(p: Vector2i) -> Array:
 		return []
 	_quiet()
 	var events: Array = []
-	if thrall_at(p) >= 0:
+	var at := thrall_at(p)
+	if at >= 0 and thralls[at].get("lying", false):
+		_rise(at, events)   # you trip over a body in the dark, and it isn't dead
+		return _end_turn(events)
+	if at >= 0:
 		_die("Something was standing in the dark. It was waiting.")
 		events.append("grabbed")
 		return events
@@ -314,7 +340,7 @@ func make_noise(at: Vector2i, kind: String) -> void:
 func _hear(events: Array) -> void:
 	for i in thralls.size():
 		var th: Dictionary = thralls[i]
-		if th.get("gone", false):
+		if th.get("gone", false) or th.get("lying", false):
 			continue
 		var best = null
 		var best_level := 0
@@ -351,6 +377,10 @@ func set_lantern(s: int) -> void:
 func _end_turn(events: Array) -> Array:
 	turn += 1
 	var lit := effective() != Fog.Lantern.HOODED
+	for p: Vector2i in prints.keys():
+		prints[p] -= 1
+		if prints[p] <= 0:
+			prints.erase(p)
 	oil = Fog.burn(oil, effective())
 	if room.exits.has(hunter):
 		escaped = true
@@ -410,7 +440,7 @@ func _horrors(events: Array) -> void:
 		if th.get("gone", false):
 			continue
 		var now: bool = fog.get_state(th.pos) == Fog.LIT
-		if now and not th.seen:
+		if now and not th.seen and not th.get("lying", false):
 			dread += DREAD_HORROR
 			if not events.has("horror"):
 				events.append("horror")
@@ -482,30 +512,84 @@ func _thralls_act(events: Array) -> void:
 			if dead:
 				return
 			continue
-		if th.get("stun", 0) > 0:
-			th.stun -= 1       # knocked down by the hook: it can't move or reach for you
+		th.merge({lunge_cd = 0, lit_for = 0, roused = false, lying = false, crouched = false})   # hand-made entries (tests)
+		if th.lying:
+			# playing dead: it waits till you're close and looking elsewhere (you walked past it)
+			if _dist(th.pos) <= CORPSE_WAKE and not in_view(th.pos):
+				_rise(i, events)
 			continue
-		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
+		if th.lunge_cd > 0:
+			th.lunge_cd -= 1
+		if th.get("stun", 0) > 0:
+			th.stun -= 1       # knocked down by the hook (or still getting up): no move, no grab
+			continue
+		if _dist(th.pos) == 1:
 			_die("Cold hands, out of the dark. The lantern rolls away.")
 			events.append("taken")
 			return
-		if _sees_light(th):
+		var sees := _sees_light(th)
+		if sees:
 			th.target = hunter
+		# a long look stirs it: held in your light ROUSE_LOOK turns running, it stops shambling
+		var stared: bool = effective() == Fog.Lantern.BRIGHT and fog.get_state(th.pos) == Fog.LIT
+		th.lit_for = th.lit_for + 1 if stared else 0   # only the high flame stirs them
+		if th.lit_for >= ROUSE_LOOK and not th.roused and th.target != null:
+			th.roused = true
+			if not events.has("roused"):
+				events.append("roused")
 		if th.target == null:
+			th.roused = false
 			continue
 		if th.pos == th.target:
-			th.target = null
+			th.target = null   # it lost you: it stands where it last saw the light, and calms
+			th.roused = false
 			continue
-		if turn % THRALL_EVERY != 0:
-			continue   # shambling: this turn it only lurches in place
 		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, live_positions(i))
 		var path: Array = room.path_in(reach, th.pos, th.target)
 		if path.size() < 2:
 			th.target = null   # no way through: it gives up
+			th.roused = false
 			continue
+		# the lunge: two tiles off and it sees you, it crouches a turn (the tell), then if you're
+		# still two off it closes the gap in a heartbeat, slow or not
+		var in_reach: bool = sees and th.lunge_cd == 0 and path.size() == 3
+		var lunge: bool = in_reach and th.crouched
+		th.crouched = in_reach and not lunge
+		if th.crouched:
+			if not events.has("crouch"):
+				events.append("crouch")
+			continue   # coiled: it doesn't move this turn
+		if not lunge and not th.roused and turn % THRALL_EVERY != 0:
+			continue   # shambling: this turn it only lurches in place
+		prints[th.pos] = PRINT_TURNS   # drowned things leave wet prints
 		th.pos = path[1]
+		if lunge:
+			th.lunge_cd = LUNGE_COOLDOWN
+			if not events.has("lunge"):
+				events.append("lunge")
 		if not events.has("thrall_moved"):
 			events.append("thrall_moved")
+
+
+## A corpse gets up: it's hunting you now, but rising costs it its next turn.
+func _rise(i: int, events: Array) -> void:
+	var th: Dictionary = thralls[i]
+	th.lying = false
+	th.target = hunter
+	th.stun = RISE_TURNS
+	th.lunge_cd = LUNGE_COOLDOWN
+	if not events.has("rose"):
+		events.append("rose")
+
+
+## Walking distance on the grid ignoring walls (Manhattan) from you to `p`.
+func _dist(p: Vector2i) -> int:
+	return absi(p.x - hunter.x) + absi(p.y - hunter.y)
+
+
+## Too close to hear: a thrall within QUIET_NEAR tiles makes no sound at all.
+func silent(th: Dictionary) -> bool:
+	return th.get("kind", "thrall") == "thrall" and _dist(th.pos) <= QUIET_NEAR
 
 
 ## One Night score: oil left plus letters read. Only meaningful once the bell has rung.
