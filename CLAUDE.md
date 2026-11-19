@@ -256,9 +256,26 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   the same plate. **Web cache:** CI exports `lethemoor-<sha>.*` and copies the page to
   index.html, so a phone can't mix a new page with an old cached pack. Duff's Nov 19 phone
   screenshot showed a build from before the playtest pass: an old tab never reloaded.
-- Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
-  burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
-  remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
+- **Done — slice step 5 (Nov 19): every night dealt fresh + tester verdict.** `room.shuffle(seed)`
+  (via `Night.start(text, seed)`): horrors, flasks and letters move up to `SHUFFLE_REACH` 3 steps
+  from where the map draws them; no horror within `SAFE_START` 7 of the start, next to another,
+  or nearer the start or the bell road than drawn; Stalker never on the road; letters beside a
+  wall. Seed 0 = map as drawn (tests + capture). 3 tests. Measured with a walker bot over 8
+  opening delays: handmade night 50% deaths, dealt nights 62% (77% of seeds play exactly as
+  hard; the rest harder): tune from playtests. Random seed 1-9999 per run; `?night=N` on the
+  web link or `LM_NIGHT=N` replays one; night number on the end card, bug reports, verdicts.
+  **End card verdict:** fun 1-10, play again yes/no, then TEXT IT TO DUFF (`sms:?&body=`, Messages
+  opens with the words; on web via `window.lmQueue` -> `location.href`) or COPY; a copy is kept in
+  `user://lethemoor.cfg` [verdicts]. Capture prints VERDICT PASS (`fp_verdict.png`). Oil slick =
+  glossy ragged puddle (generated texture), fire = additive flame particles + guttering light.
+- **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
+  sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
+  P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
+  Tick items off in the md as art lands.
+- **Slice status (Nov 19):** all slice features built. Left before expanding: one playtest round
+  (Duff Android, Brittany + Madison iPhone) collecting verdicts, FPS and sound notes; tune oil,
+  thrall speed, Stalker spot from it; second round. Kill test by Nov 28: median fun 6+, testers
+  replay. Don't start the full-game systems (safe room, satchel, corpse, Choir) before it passes.
 - Older plan: **M1 = new slice** (pivot doc #12): 2–3 rooms, locked door + key, one Stalker, one safe
   room, real sound. Also: real tile art for 3D, and one-step-per-tap vs the 4-tile placeholder
   move (pivot says step-based; decide with Duff on the phone build).
