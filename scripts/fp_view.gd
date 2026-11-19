@@ -81,6 +81,8 @@ var tile_base := {}
 var thrall_nodes: Array = []
 var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
 var print_nodes := {}              # tile -> wet footprints decal on the floor
+var pool_nodes := {}               # tile -> blood pool decal where a body lay
+var blood_screen: TextureRect      # blood thrown across your sight when one lunges, and at the kill
 var print_tex: Texture2D
 var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
@@ -385,6 +387,22 @@ func _build_world() -> void:
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
 		add_child(holder)
+		if thrall.get("lying", false):   # the dead lie in what ran out of them; the pool stays if they rise
+			var pool := MeshInstance3D.new()
+			var pq := QuadMesh.new()
+			pq.size = Vector2(1.1, 1.1)
+			pool.mesh = pq
+			var pmat := StandardMaterial3D.new()
+			pmat.albedo_texture = _tex("blood_pool")
+			pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			pmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			pmat.roughness = 0.12                # wet: the lantern catches in it
+			pmat.metallic_specular = 0.5
+			pool.material_override = pmat
+			pool.rotation = Vector3(-PI / 2, float(hash(thrall.pos) % 628) / 100.0, 0)
+			pool.position = _w(thrall.pos) + Vector3(0, 0.01, 0)
+			add_child(pool)
+			pool_nodes[thrall.pos] = pool
 		thrall_nodes.append(holder)
 		thrall_sprites.append(th)
 
@@ -563,7 +581,9 @@ func _sync_prints() -> void:
 			print_nodes[p] = m
 		print_nodes[p].visible = fog.get_state(p) == Fog.LIT
 		var mat2: StandardMaterial3D = print_nodes[p].material_override
-		mat2.albedo_color = Color(1, 1, 1, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # drying
+		mat2.albedo_color = Color(0.7, 0.1, 0.08, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # bloody, drying
+	for p: Vector2i in pool_nodes:
+		pool_nodes[p].visible = fog.get_state(p) == Fog.LIT
 
 
 ## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
@@ -877,12 +897,16 @@ func _process(delta: float) -> void:
 			cam.v_offset = randf_range(-1, 1) * 0.04 * minf(lunge_hit, 1.0)
 		if lunge_flash:
 			lunge_flash.modulate.a = minf(lunge_hit, 1.0) * 0.8
+		if blood_screen:   # the spatter hangs on longer than the flash, then runs off
+			blood_screen.modulate.a = minf(lunge_hit * 1.4, 0.95)
 	else:
 		if cam and cam.h_offset != 0.0:
 			cam.h_offset = 0.0
 			cam.v_offset = 0.0
 		if lunge_flash and lunge_flash.modulate.a > 0.0:
 			lunge_flash.modulate.a = 0.0
+		if blood_screen and blood_screen.modulate.a > 0.0 and not kill_shot:
+			blood_screen.modulate.a = 0.0
 	var eff: int = game.effective()
 	if hand_art:
 		var want: String = HAND_ART[eff]
@@ -1067,6 +1091,15 @@ func _build_hud() -> void:
 	lunge_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lunge_flash.modulate.a = 0.0
 	layer.add_child(lunge_flash)
+	blood_screen = TextureRect.new()
+	blood_screen.texture = _tex("fx_blood_screen")
+	blood_screen.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	blood_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blood_screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	blood_screen.stretch_mode = TextureRect.STRETCH_SCALE
+	blood_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	blood_screen.modulate.a = 0.0
+	layer.add_child(blood_screen)
 	layer.add_child(hud)
 	get_viewport().size_changed.connect(func(): _on_resize.call_deferred())
 
@@ -2059,6 +2092,15 @@ func _kill_shot() -> void:
 	red.set_anchors_preset(Control.PRESET_FULL_RECT)
 	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kill_shot.add_child(red)
+	var gore := TextureRect.new()   # and then blood across your eyes
+	gore.texture = _tex("fx_blood_screen")
+	gore.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	gore.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gore.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gore.stretch_mode = TextureRect.STRETCH_SCALE
+	gore.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gore.modulate.a = 0.0
+	kill_shot.add_child(gore)
 	var h := _ui_h()
 	var e := 0.0
 	const T_KILL := 0.75
@@ -2073,6 +2115,7 @@ func _kill_shot() -> void:
 		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * (0.13 if stalker else 0.22)) + shake
 		dark.color.a = 0.6 * k
 		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
+		gore.modulate.a = clampf((e - 0.22) / 0.08, 0.0, 1.0)   # thrown at the moment it reaches you
 		await get_tree().process_frame
 	if capture_mode:
 		await _shot("fp_killshot")
