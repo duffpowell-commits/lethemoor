@@ -246,15 +246,10 @@ func _build_world() -> void:
 	var iron := StandardMaterial3D.new()
 	iron.albedo_color = Color("#20242c")
 	for lp: Vector2i in room.lamps:
-		var post := MeshInstance3D.new()
-		var pm := BoxMesh.new()
-		pm.size = Vector3(0.1, 2.6, 0.1)
-		post.mesh = pm
-		post.position = _w(lp) + Vector3(0, 1.3, 0)
-		post.material_override = iron.duplicate()
+		# painted iron gas lamp, unlit (Forge art, keyed)
+		var post := _prop_sprite("prop_lamppost", 2.5)
+		post.position = _w(lp)
 		add_child(post)
-		tile_mats[Vector2i(-100 - lp.x, -100 - lp.y)] = post.material_override
-		tile_base[Vector2i(-100 - lp.x, -100 - lp.y)] = iron.albedo_color
 
 	for bp: Vector2i in room.bells:
 		# painted bell (Forge art, keyed) on a short iron rod from above, a touch bright: it's the goal.
@@ -317,7 +312,7 @@ func _build_world() -> void:
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
 		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
-		th.texture = _tex("bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
+		th.texture = _tex("stalker_bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
 		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -326,7 +321,7 @@ func _build_world() -> void:
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
 		th.modulate = Color(0.8, 0.8, 0.82)    # thralls: sodden, a touch darker than the lantern says
 		if stalker:
-			th.modulate = Color(1.25, 1.22, 1.3)   # the bride: pale, catches the light
+			th.modulate = Color(1.12, 1.1, 1.15)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
 		holder.add_child(th)
 		add_child(holder)
@@ -441,28 +436,9 @@ func _refresh_fog() -> void:
 		minimap.queue_redraw()
 
 
-## Oil on the floor: a glossy black puddle with a ragged edge while soaked; on fire, tongues
-## of flame (billboard particles, additive) over a glowing pool, with a light that gutters.
-## Drawn in code until Foxboard art lands (docs/art_needs.md: slick decal + flame sheet).
-var _puddle: Texture2D
+## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
+## with tongues of flame (billboard particles, additive) over it and a light that gutters.
 var _flame: Texture2D
-
-
-## A puddle shape: a soft blob with a noisy, ragged rim (alpha only; colour comes from the material).
-func _puddle_tex() -> Texture2D:
-	if _puddle == null:
-		var n := FastNoiseLite.new()
-		n.seed = 7
-		n.frequency = 0.045
-		var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)
-		for y in 128:
-			for x in 128:
-				var d := Vector2(x - 64, y - 64).length() / 64.0
-				var edge := 0.78 + 0.22 * n.get_noise_2d(x, y)
-				var a := clampf((edge - d) * 9.0, 0.0, 1.0)
-				img.set_pixel(x, y, Color(1, 1, 1, a))
-		_puddle = ImageTexture.create_from_image(img)
-	return _puddle
 
 
 ## One flame tongue: hot white-yellow core fading out at the edges and the top.
@@ -535,7 +511,8 @@ func _sync_slicks() -> void:
 			m.mesh = pm
 			var mat := StandardMaterial3D.new()
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat.albedo_texture = _puddle_tex()
+			mat.albedo_texture = _tex("decal_oilslick")   # painted oil (Forge art, keyed)
+			mat.emission_texture = _tex("decal_fire")
 			mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 			mat.metallic = 0.6
 			mat.metallic_specular = 1.0
@@ -561,13 +538,15 @@ func _sync_slicks() -> void:
 		node.get_child(1).emitting = lit_fire
 		node.visible = lit_fire or fog.get_state(p) != Fog.DARK
 		if lit_fire:
-			mat.albedo_color = Color(0.35, 0.1, 0.02, 0.95)
+			mat.albedo_texture = _tex("decal_fire")
+			mat.albedo_color = Color(0.55, 0.5, 0.45, 1)
 			mat.emission_enabled = true
-			mat.emission = Color("#ff5a12")
-			mat.emission_energy_multiplier = 1.4
+			mat.emission = Color(1, 1, 1)
+			mat.emission_energy_multiplier = 0.35   # the pool glows; the flame particles do the rest
 		else:
 			var k: float = SHADE[fog.get_state(p)]
-			mat.albedo_color = Color(0.04 * k + 0.015, 0.035 * k + 0.012, 0.025 * k + 0.01, 0.92)
+			mat.albedo_texture = _tex("decal_oilslick")
+			mat.albedo_color = Color(0.6 * k + 0.2, 0.6 * k + 0.2, 0.6 * k + 0.2, 0.95)
 			mat.emission_enabled = false
 
 
@@ -2121,7 +2100,8 @@ func _capture_art() -> void:
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
 	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
-		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT]]
+		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
+		["fp_art_lamp", Vector2i(9, 12), Vector2i.RIGHT]]
 	for v in views:
 		game.hunter = v[1]
 		game.facing = v[2]
