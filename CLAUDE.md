@@ -226,10 +226,12 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   corner map + in two field-note checks, retry left the flame loop silent (`Sound.hook_night()`
   now runs before the first `_refresh`), fire crackle kept playing over the death screen,
   lantern keys worked under the menu/mid-step, frustum assumed a 540-wide screen, bumping fire
-  or a visible horror said "Stone". Still open (not fixed): HUD is laid out once for 540 wide
-  (no `size_changed`, no rotate handling), REPORT A BUG open/copy likely blocked by iPhone
-  Safari (needs a JS gesture hook), only one event per turn reaches `_teach`, painted HUD art
-  uses nearest filtering. (Hints-save-wipes-mute: fixed by the frame-rate work below.)
+  or a visible horror said "Stone". Also fixed: every event of a turn now reaches `_teach` (`turn_events`),
+  painted HUD art (hand lantern, title bride, letter paper) uses linear filtering, and on web
+  REPORT A BUG queues the open/copy in `window.lmQueue` (head_include) so the NEXT tap runs it
+  inside a real gesture (Safari blocks it otherwise; label says "tap anywhere once more").
+  PRs #7 (frame rate) and #8 (art pass) were merged with this. Still open: HUD is laid out
+  once for 540 wide (no `size_changed`, no rotate handling). (Hints-save-wipes-mute: fixed by the frame-rate work below.)
 - **Done — phone frame rate (Nov 19):** `scripts/perf.gd` (child of the fp view). MENU -> SHOW FPS
   (or F3) puts a readout under the top bar: `fps  ms  worst  |  draws  |  quality`, saved in
   `user://lethemoor.cfg` [perf]. MENU -> GRAPHICS cycles AUTO / HIGH / MEDIUM / LOW. AUTO starts

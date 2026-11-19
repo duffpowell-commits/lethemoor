@@ -87,6 +87,7 @@ var dread_bar: Control
 var modal: Control                # title or a field note: blocks moves while it's up
 var guide_sheet: Control
 var card_ok: Button
+var turn_events: Array = []        # every event of the last turn (field notes check them all)
 var title_begin: Button
 var menu_button: Button
 var menu_sheet: Control
@@ -500,6 +501,7 @@ func act(kind: String) -> void:
 		return
 	busy = true
 	last_event = ""
+	turn_events = []
 	var from_pos := cam.position
 	var from_yaw := cam.rotation.y
 	var from_t: Array = game.positions()
@@ -540,6 +542,7 @@ func act(kind: String) -> void:
 		for j in thrall_nodes.size():
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 		await get_tree().process_frame
+	turn_events = events
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
 			last_event = ev
@@ -716,6 +719,7 @@ func _build_hud() -> void:
 	# her gloved hand and the brass lantern, painted, low right of the view (from Duff's mockup)
 	hand_art = TextureRect.new()
 	hand_art.texture = _tex("hand_lantern")
+	hand_art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	hand_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hand_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 	hand_art.size = Vector2(HAND_W, HAND_W)
@@ -968,6 +972,7 @@ func _show_title() -> void:
 	modal = _sheet(0.93)
 	var bride := TextureRect.new()
 	bride.texture = _tex("bride")
+	bride.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	bride.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bride.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	bride.modulate = Color(0.5, 0.48, 0.52, 0.55)
@@ -1071,6 +1076,7 @@ func _show_page(n: int) -> void:
 	card.add_theme_stylebox_override("panel", margins)
 	var paper := TextureRect.new()
 	paper.texture = load("res://assets/art/letters/%s.png" % pg.paper)
+	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # painted, not pixel art
 	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	paper.stretch_mode = TextureRect.STRETCH_SCALE
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1137,7 +1143,13 @@ func _close_card(id: String) -> void:
 func _teach(event: String = "") -> void:
 	if not hints_on or modal != null or game.over() or not title_done:
 		return
-	var id: String = Lessons.due(game, seen, event)
+	# every event of the last turn gets a chance, not just the headline (panic + out_of_oil
+	# on one turn used to drop the panic card)
+	var id := ""
+	for ev in [event] + turn_events:
+		id = Lessons.due(game, seen, ev)
+		if id != "":
+			break
 	if id != "":
 		_show_card(id)
 
@@ -1302,16 +1314,23 @@ func _open_report() -> void:
 		var first := note.text.strip_edges().split("\n")[0].left(60)
 		var title := "Bug: " + (first if first != "" else "(no note)")
 		var url := "https://github.com/%s/issues/new?labels=bug&title=%s&body=%s" % [REPO, title.uri_encode(), _report_text(note.text).uri_encode()]
-		OS.shell_open(url)
-		done.text = "Opened GitHub. Sign in there and press Create to file it.")
+		if _web_queue("open", url):
+			done.text = "Tap anywhere once more to open GitHub, then sign in and press Create."
+		else:
+			OS.shell_open(url)
+			done.text = "Opened GitHub. Sign in there and press Create to file it.")
 	box.add_child(send)
 	var copy := Button.new()
 	copy.text = "COPY, TO TEXT IT TO DUFF"
 	copy.focus_mode = Control.FOCUS_NONE
 	copy.custom_minimum_size = Vector2(0, 56)
 	copy.pressed.connect(func():
-		DisplayServer.clipboard_set("Lethemoor bug: " + _report_text(note.text))
-		done.text = "Copied. Paste it in a text to Duff.")
+		var text := "Lethemoor bug: " + _report_text(note.text)
+		DisplayServer.clipboard_set(text)
+		if _web_queue("copy", text):
+			done.text = "Tap anywhere once more to copy, then paste it in a text to Duff."
+		else:
+			done.text = "Copied. Paste it in a text to Duff.")
 	box.add_child(copy)
 	var cancel := Button.new()
 	cancel.text = "CLOSE"
@@ -1323,6 +1342,16 @@ func _open_report() -> void:
 	box.add_child(cancel)
 	box.add_child(done)
 	report_text_box = note
+
+
+## Web only: Safari lets a page open a tab or write the clipboard only inside a real tap, and
+## Godot sees the tap a frame after the browser is done with it. So hand the job to the page
+## (export head_include runs `window.lmQueue` on the next tap). False off the web.
+func _web_queue(kind: String, value: String) -> bool:
+	if not OS.has_feature("web"):
+		return false
+	JavaScriptBridge.eval("window.lmQueue={k:%s,v:%s};" % [JSON.stringify(kind), JSON.stringify(value)], true)
+	return true
 
 
 func _load_hints() -> void:
