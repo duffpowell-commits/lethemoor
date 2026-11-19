@@ -189,9 +189,9 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   dread, flame loop follows the lantern, steps/turn/bump, lantern sounds, oil, letters, bell,
   death, panic, stingers, flicker whispers, UI clicks (every Button, skipped when the press
   already made a game sound). Thralls shuffle + Stalker silk in **3D at their tile, seen or
-  not**; bed goes quiet the turn before the Stalker can move (silent bell). 35 clips (~1.2 MB)
+  not**; bed goes quiet the turn before the Stalker can move (silent bell). 37 clips (~1.3 MB)
   are **original, synthesized by `tools/gen_audio.py`** (numpy + ffmpeg, one seed per clip;
-  boathook/slick sounds included);
+  boathook/slick sounds, `heard_turn` at `heard_by` horrors, `fire_loop` on burning tiles);
   `assets/audio/SOURCES.md` lists every clip and must list any new one (a test checks).
   Reverb is baked in: web plays audio in "sample" mode where bus effects don't run.
   Web unlock: `html/head_include` in the Web preset wraps AudioContext and resumes it on the
