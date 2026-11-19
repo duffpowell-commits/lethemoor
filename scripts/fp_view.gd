@@ -45,12 +45,13 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_hooded", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_LOOKS := ["thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
 const THRALL_LUNGE := "thrall_lunge"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
-const MAP_CELL := 13.0               # the corner map follows you: ~15 x 12 tiles around you
-const MAP_SIZE := Vector2(196, 160)
+const MAP_CELL := 12.0               # the corner map follows you: ~15 tiles across the disc
+const MAP_R := 88.0                  # radius of the round chart
+const MAP_SIZE := Vector2(196, 196)
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
 
 var game
@@ -80,6 +81,8 @@ var tile_base := {}
 var thrall_nodes: Array = []
 var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
 var print_nodes := {}              # tile -> wet footprints decal on the floor
+var pool_nodes := {}               # tile -> blood pool decal where a body lay
+var blood_screen: TextureRect      # blood thrown across your sight when one lunges, and at the kill
 var print_tex: Texture2D
 var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
@@ -92,6 +95,9 @@ static var capture_phase := 0     # capture runs twice: win at the bell, then a 
 
 var hud: Control
 var hand_art: TextureRect
+var hook_art: TextureRect          # the boathook in your left hand, while you carry one
+var hook_jab := 0.0                # 1 the moment you swing it, easing back
+const HOOK_W := 340.0
 const HAND_W := 236.0
 var status_label: Label
 var oil_bar: Control
@@ -119,6 +125,8 @@ var bottom_panel: ColorRect
 var pad_on := false                # the old move pad; off = swipes are the controls
 var menu_items := {}               # menu label (before any colon) -> button, for the capture
 var minimap: Control
+var map_rot := 0.0                  # the chart turns so what's ahead is up (unless NORTH UP)
+var map_north_up := false
 var end_screen: Control
 
 
@@ -382,6 +390,22 @@ func _build_world() -> void:
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
 		add_child(holder)
+		if thrall.get("lying", false):   # the dead lie in what ran out of them; the pool stays if they rise
+			var pool := MeshInstance3D.new()
+			var pq := QuadMesh.new()
+			pq.size = Vector2(1.1, 1.1)
+			pool.mesh = pq
+			var pmat := StandardMaterial3D.new()
+			pmat.albedo_texture = _tex("blood_pool")
+			pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			pmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			pmat.roughness = 0.12                # wet: the lantern catches in it
+			pmat.metallic_specular = 0.5
+			pool.material_override = pmat
+			pool.rotation = Vector3(-PI / 2, float(hash(thrall.pos) % 628) / 100.0, 0)
+			pool.position = _w(thrall.pos) + Vector3(0, 0.01, 0)
+			add_child(pool)
+			pool_nodes[thrall.pos] = pool
 		thrall_nodes.append(holder)
 		thrall_sprites.append(th)
 
@@ -560,7 +584,9 @@ func _sync_prints() -> void:
 			print_nodes[p] = m
 		print_nodes[p].visible = fog.get_state(p) == Fog.LIT
 		var mat2: StandardMaterial3D = print_nodes[p].material_override
-		mat2.albedo_color = Color(1, 1, 1, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # drying
+		mat2.albedo_color = Color(0.7, 0.1, 0.08, clampf(game.prints[p] / 4.0, 0.25, 1.0))   # bloody, drying
+	for p: Vector2i in pool_nodes:
+		pool_nodes[p].visible = fog.get_state(p) == Fog.LIT
 
 
 ## Oil on the floor: a painted black puddle while soaked; on fire, the painted burning pool
@@ -732,6 +758,8 @@ func act(kind: String) -> void:
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
 		await get_tree().process_frame
 	turn_events = events
+	if "hook_hit" in events or "hook_miss" in events or "hook_broke" in events:
+		hook_jab = 1.0
 	if "lunge" in events and not game.dead:
 		lunge_hit = 1.0
 	for ev in events:
@@ -832,6 +860,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	t += delta
+	if minimap and game:   # the chart swings round to keep what's ahead at the top
+		var want := 0.0 if map_north_up else Vector2(game.facing).angle_to(Vector2.UP)
+		if absf(angle_difference(map_rot, want)) > 0.002:
+			map_rot = want if capture_mode else lerp_angle(map_rot, want, 1.0 - exp(-delta * 9.0))
+			minimap.queue_redraw()
 	_flicker_fires()
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
 		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
@@ -869,13 +902,25 @@ func _process(delta: float) -> void:
 			cam.v_offset = randf_range(-1, 1) * 0.04 * minf(lunge_hit, 1.0)
 		if lunge_flash:
 			lunge_flash.modulate.a = minf(lunge_hit, 1.0) * 0.8
+		if blood_screen:   # the spatter hangs on longer than the flash, then runs off
+			blood_screen.modulate.a = minf(lunge_hit * 1.4, 0.95)
 	else:
 		if cam and cam.h_offset != 0.0:
 			cam.h_offset = 0.0
 			cam.v_offset = 0.0
 		if lunge_flash and lunge_flash.modulate.a > 0.0:
 			lunge_flash.modulate.a = 0.0
+		if blood_screen and blood_screen.modulate.a > 0.0 and not kill_shot:
+			blood_screen.modulate.a = 0.0
 	var eff: int = game.effective()
+	if hook_art:   # left hand: the boathook, lit by the lantern in the right; it jabs when you swing
+		hook_art.visible = game.hook_wear > 0 and not game.dead
+		if hook_art.visible:
+			hook_jab = maxf(0.0, hook_jab - delta * 3.0)
+			var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
+			var lk := 0.45 if eff == Fog.Lantern.HOODED else (1.05 if eff == Fog.Lantern.NORMAL else 1.25)
+			hook_art.modulate = Color(lk, lk * 0.96, lk * 0.92)
+			hook_art.position = Vector2(-44 + 30.0 * j, _ui_h() - _bh() - HOOK_W - 50 - 80.0 * j + sin(t * 1.7 + 1.0) * 2.0)
 	if hand_art:
 		var want: String = HAND_ART[eff]
 		if hand_art.get_meta("art", "") != want:
@@ -1035,6 +1080,16 @@ func _build_hud() -> void:
 	hand_art.position = Vector2(UI_W - HAND_W + 6, _ui_h() - _bh() - HAND_W + 22)
 	hand_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hand_col.add_child(hand_art)
+	hook_art = TextureRect.new()
+	hook_art.texture = _tex("hand_hook")
+	hook_art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	hook_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hook_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	hook_art.size = Vector2(HOOK_W, HOOK_W)
+	hook_art.position = Vector2(-44, _ui_h() - _bh() - HOOK_W - 50)
+	hook_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hook_art.visible = false
+	hand_col.add_child(hook_art)
 
 	var vig := TextureRect.new()
 	vig.texture = gt
@@ -1059,6 +1114,15 @@ func _build_hud() -> void:
 	lunge_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lunge_flash.modulate.a = 0.0
 	layer.add_child(lunge_flash)
+	blood_screen = TextureRect.new()
+	blood_screen.texture = _tex("fx_blood_screen")
+	blood_screen.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	blood_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blood_screen.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	blood_screen.stretch_mode = TextureRect.STRETCH_SCALE
+	blood_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	blood_screen.modulate.a = 0.0
+	layer.add_child(blood_screen)
 	layer.add_child(hud)
 	get_viewport().size_changed.connect(func(): _on_resize.call_deferred())
 
@@ -1099,13 +1163,22 @@ func _build_hud() -> void:
 	dread_bar.draw.connect(_draw_dread)
 	top.add_child(dread_bar)
 
-	# corner map: what you remember, drawn small. North is up; the arrow is you.
+	# corner map: what you remember, on a round scrap of chart that turns with you.
 	minimap = Control.new()
 	minimap.size = MAP_SIZE
-	minimap.clip_contents = true
-	minimap.position = Vector2(UI_W - 14 - minimap.size.x, TOP_H + 10)
+	minimap.position = Vector2(UI_W - 10 - minimap.size.x, TOP_H + 8)
 	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	minimap.draw.connect(_draw_map)
+	var paper := TextureRect.new()   # the chart paper sits under the drawing (a node: its round alpha holds)
+	paper.texture = _tex("map_parchment")
+	paper.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	paper.stretch_mode = TextureRect.STRETCH_SCALE
+	paper.size = Vector2(MAP_R, MAP_R) * 2.0
+	paper.position = minimap.position + minimap.size / 2.0 - Vector2(MAP_R, MAP_R)
+	paper.modulate = Color(0.82, 0.78, 0.74)
+	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(paper)
 	hud.add_child(minimap)
 
 	var bottom := ColorRect.new()
@@ -1345,81 +1418,125 @@ func _draw_dread() -> void:
 	dread_bar.draw_rect(Rect2(Vector2(-2, -2), r.size + Vector2(4, 4)), UI.BRASS_DIM, false, 1.0)
 
 
-## The corner map: a scrap of chart. Walls you've seen as stone blocks (lit ones edged pale), floor
-## you remember in slate, floor in your light warm. Small drawn signs for the bell, letters, flasks,
-## lamps and the boathook; thralls only where lit now, a red X where you last saw one. You are the
-## arrow, with a faint wedge for what you're facing.
+## The corner map: a round scrap of old chart under a brass ring. By default it turns with you
+## (what's ahead is always up) and the brass N runs round the ring; MENU -> MAP: NORTH UP pins it.
+## Floor you remember is worn pale paper, floor in your light glows warm, walls are inked edges with
+## hatching behind them, all fading out toward the rim. Thralls lit now are blood blots; a red ink X
+## marks where you last saw one. You are the brass arrow in the middle, a faint wedge ahead.
+func _map_xf(v: Vector2) -> Vector2:   # grid point -> point on the map disc
+	var hc := Vector2(game.hunter) + Vector2(0.5, 0.5)
+	return minimap.size / 2.0 + (v - hc).rotated(map_rot) * MAP_CELL
+
+
+func _map_fade(q: Vector2) -> float:   # 1 near you, 0 at the rim
+	return clampf((MAP_R - 6.0 - q.distance_to(minimap.size / 2.0)) / 26.0, 0.0, 1.0)
+
+
+func _map_quad(v: Vector2, inset: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for k: Vector2 in [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]:
+		pts.append(_map_xf(v + Vector2(inset, inset) + k * (1.0 - 2.0 * inset)))
+	minimap.draw_colored_polygon(pts, col)
+
+
 func _draw_map() -> void:
 	var c := MAP_CELL
-	var frame := Rect2(Vector2.ZERO, minimap.size)
-	minimap.draw_rect(frame, Color(0.02, 0.025, 0.035, 0.82))
-	# you sit in the middle; the chart slides under you
-	var o: Vector2 = (minimap.size / 2.0 - (Vector2(game.hunter) + Vector2(0.5, 0.5)) * c).round()
-	minimap.draw_set_transform(o)
-	var x0 := maxi(0, int(floor(-o.x / c)))
-	var y0 := maxi(0, int(floor(-o.y / c)))
-	var x1 := mini(room.size.x, int(ceil((minimap.size.x - o.x) / c)))
-	var y1 := mini(room.size.y, int(ceil((minimap.size.y - o.y) / c)))
-	for y in range(y0, y1):
-		for x in range(x0, x1):
+	var mid := minimap.size / 2.0
+	var ink := Color(0.16, 0.1, 0.06)
+	var reach := int(ceil(MAP_R / c)) + 1
+	var h: Vector2i = game.hunter
+	for y in range(maxi(0, h.y - reach), mini(room.size.y, h.y + reach + 1)):
+		for x in range(maxi(0, h.x - reach), mini(room.size.x, h.x + reach + 1)):
 			var p := Vector2i(x, y)
 			var st: int = fog.get_state(p)
 			if st == Fog.DARK:
 				continue
-			var r := Rect2(Vector2(x, y) * c, Vector2(c, c))
+			var q := _map_xf(Vector2(p) + Vector2(0.5, 0.5))
+			var fade := _map_fade(q)
+			if fade <= 0.0:
+				continue
 			var lit := st == Fog.LIT
 			if room.is_wall(p):
-				minimap.draw_rect(r, Color(0.2, 0.22, 0.28) if lit else Color(0.12, 0.13, 0.17))
-				# a pale edge on each side that faces open floor: the walls read as a plan, not a grid
+				# hatching on wall that borders known floor, an inked edge where it meets it
+				var edges := []
 				for d: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 					var n := p + d
 					if n.x < 0 or n.y < 0 or n.x >= room.size.x or n.y >= room.size.y or room.is_wall(n):
 						continue
-					if fog.get_state(n) == Fog.DARK:
-						continue
-					var edge := Color(0.62, 0.6, 0.55) if lit else Color(0.36, 0.37, 0.4)
-					var a2 := r.position + Vector2(c, c) * 0.5 + Vector2(d) * c * 0.5
-					var t2 := Vector2(-d.y, d.x) * c * 0.5
-					minimap.draw_line(a2 - t2, a2 + t2, edge, 1.6)
+					if fog.get_state(n) != Fog.DARK:
+						edges.append(d)
+				if edges.is_empty():
+					continue
+				var hatch := Color(ink, 0.22 * fade)
+				for k in 3:
+					var t := 0.2 + 0.3 * k
+					minimap.draw_line(_map_xf(Vector2(p) + Vector2(t - 0.15, 0.9)), _map_xf(Vector2(p) + Vector2(t + 0.25, 0.1)), hatch, 1.0, true)
+				for d: Vector2i in edges:
+					var a2 := Vector2(p) + Vector2(0.5, 0.5) + Vector2(d) * 0.5
+					var t2 := Vector2(-d.y, d.x) * 0.5
+					minimap.draw_line(_map_xf(a2 - t2), _map_xf(a2 + t2), Color(ink, 0.9 * fade), 2.0, true)
 			else:
-				var col := Color(0.55, 0.36, 0.14) if lit else Color(0.2, 0.22, 0.27)
-				minimap.draw_rect(r.grow(-0.5), col)
+				_map_quad(Vector2(p), -0.02, Color(0.86, 0.78, 0.6, 0.55 * fade))
+				if lit:
+					_map_quad(Vector2(p), -0.02, Color(1.0, 0.72, 0.32, 0.38 * fade))
 				if game.prints.has(p) and lit:   # wet prints: something walked here
-					minimap.draw_circle(r.get_center() + Vector2(-2, 1), 1.6, Color(0.1, 0.12, 0.16))
-					minimap.draw_circle(r.get_center() + Vector2(2, -2), 1.6, Color(0.1, 0.12, 0.16))
-			_map_sign(p, r)
+					minimap.draw_circle(q + Vector2(-2, 1), 1.5, Color(ink, 0.7 * fade))
+					minimap.draw_circle(q + Vector2(2, -2), 1.5, Color(ink, 0.7 * fade))
+	for y in range(maxi(0, h.y - reach), mini(room.size.y, h.y + reach + 1)):
+		for x in range(maxi(0, h.x - reach), mini(room.size.x, h.x + reach + 1)):
+			var p := Vector2i(x, y)
+			if fog.get_state(p) == Fog.DARK:
+				continue
+			var q := _map_xf(Vector2(p) + Vector2(0.5, 0.5))
+			if _map_fade(q) > 0.3:
+				_map_sign(p, Rect2(q - Vector2(c, c) / 2.0, Vector2(c, c)))
 	for th in game.thralls:
 		if th.get("gone", false):
-			continue   # burned: no square, no last-seen mark
+			continue   # burned: no mark
 		if th.get("lying", false):
 			if fog.get_state(th.pos) != Fog.DARK:   # a body on the stones, nothing more (so it seems)
-				minimap.draw_rect(Rect2(Vector2(th.pos) * c + Vector2(1.5, 3), Vector2(c - 3, c - 6)), Color(UI.DIM, 0.8))
+				var bq := _map_xf(Vector2(th.pos) + Vector2(0.5, 0.5))
+				minimap.draw_rect(Rect2(bq - Vector2(c * 0.36, c * 0.18), Vector2(c * 0.72, c * 0.36)), Color(ink, 0.6 * _map_fade(bq)))
 		elif fog.get_state(th.pos) == Fog.LIT:
-			var tc := (Vector2(th.pos) + Vector2(0.5, 0.5)) * c
-			minimap.draw_circle(tc, c * 0.48, Color(UI.BLOOD, 0.35))
-			minimap.draw_circle(tc, c * 0.3, UI.BLOOD)
+			var tc := _map_xf(Vector2(th.pos) + Vector2(0.5, 0.5))
+			var blood := Color(0.55, 0.03, 0.04)
+			minimap.draw_circle(tc, c * 0.62, Color(blood, 0.25))
+			minimap.draw_circle(tc, c * 0.38, blood)
+			minimap.draw_circle(tc + Vector2(c * 0.3, c * 0.28), c * 0.14, blood)    # spatter
+			minimap.draw_circle(tc + Vector2(-c * 0.34, c * 0.12), c * 0.1, blood)
+			minimap.draw_line(tc + Vector2(0, c * 0.3), tc + Vector2(0, c * 0.75), blood, 1.6)   # a drip
 		elif th.last_seen != null:
-			# last-seen marker: where you saw it, not where it is. It may have moved.
-			var m: Vector2 = Vector2(th.last_seen) * c
-			var dim := Color(UI.BLOOD, 0.6)
-			minimap.draw_line(m + Vector2(2, 2), m + Vector2(c - 2, c - 2), dim, 1.5)
-			minimap.draw_line(m + Vector2(c - 2, 2), m + Vector2(2, c - 2), dim, 1.5)
-	var ctr := (Vector2(game.hunter) + Vector2(0.5, 0.5)) * c
-	var f := Vector2(game.facing)
+			# last seen: where you saw it, not where it is. It may have moved.
+			var m := _map_xf(Vector2(th.last_seen) + Vector2(0.5, 0.5))
+			var red := Color(0.55, 0.03, 0.04, 0.75 * _map_fade(m))
+			minimap.draw_line(m + Vector2(-4, -4), m + Vector2(4, 4), red, 2.0, true)
+			minimap.draw_line(m + Vector2(4, -4), m + Vector2(-4, 4), red, 2.0, true)
+	# you: the brass arrow, the way you face as a faint wedge of light
+	var f := Vector2(game.facing).rotated(map_rot)
 	var side := Vector2(-f.y, f.x)
-	var reach: float = c * 2.6
-	minimap.draw_colored_polygon(PackedVector2Array([ctr, ctr + (f + side * 0.85) * reach, ctr + f * reach * 1.15, ctr + (f - side * 0.85) * reach]), Color(1.0, 0.8, 0.45, 0.13))
-	var arrow := PackedVector2Array([ctr + f * 7.0, ctr - f * 5.0 + side * 5.5, ctr - f * 2.0, ctr - f * 5.0 - side * 5.5])
-	minimap.draw_colored_polygon(arrow, UI.TEXT)
+	var wr: float = c * 3.0
+	minimap.draw_colored_polygon(PackedVector2Array([mid, mid + (f + side * 0.8) * wr, mid + f * wr * 1.1, mid + (f - side * 0.8) * wr]), Color(1.0, 0.75, 0.35, 0.22))
+	var arrow := PackedVector2Array([mid + f * 8.0, mid - f * 6.0 + side * 6.0, mid - f * 2.5, mid - f * 6.0 - side * 6.0])
+	minimap.draw_colored_polygon(arrow, UI.AMBER)
 	arrow.append(arrow[0])
-	minimap.draw_polyline(arrow, Color(0, 0, 0, 0.8), 1.2)
-	minimap.draw_set_transform(Vector2.ZERO)
-	# brass frame on top, a north mark top left
-	minimap.draw_rect(frame.grow(-0.75), UI.BRASS_DIM, false, 1.5)
-	for k in [Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]:
-		minimap.draw_circle(frame.position + Vector2(3, 3) + (frame.size - Vector2(6, 6)) * k, 2.5, UI.BRASS_DIM)
-	var nm := Vector2(8, 8)
-	minimap.draw_colored_polygon(PackedVector2Array([nm + Vector2(4, 0), nm + Vector2(8, 9), nm + Vector2(0, 9)]), UI.BRASS)
+	minimap.draw_polyline(arrow, Color(0.12, 0.07, 0.03), 1.4, true)
+	# the brass ring: two rims, tick marks every 30 degrees, the N riding round as you turn
+	minimap.draw_arc(mid, MAP_R + 1.0, 0, TAU, 64, Color(0.05, 0.04, 0.03), 7.0, true)
+	minimap.draw_arc(mid, MAP_R + 1.0, 0, TAU, 64, UI.BRASS, 4.0, true)
+	minimap.draw_arc(mid, MAP_R - 1.5, 0, TAU, 64, Color(UI.AMBER, 0.35), 1.0, true)
+	minimap.draw_arc(mid, MAP_R + 4.0, 0, TAU, 64, UI.BRASS_DIM, 1.2, true)
+	for k in 12:
+		var ang := map_rot + TAU * k / 12.0
+		var dv := Vector2(0, -1).rotated(ang)
+		minimap.draw_line(mid + dv * (MAP_R - 4.0), mid + dv * (MAP_R + 1.0), Color(0.1, 0.07, 0.04), 1.4 if k % 3 == 0 else 0.8, true)
+	var nv := Vector2(0, -1).rotated(map_rot)
+	var np := mid + nv * (MAP_R + 1.0)
+	minimap.draw_circle(np, 8.0, Color(0.06, 0.04, 0.03))
+	minimap.draw_circle(np, 6.6, UI.BRASS)
+	# a drawn N (no fonts needed): two uprights and a diagonal, kept upright on screen
+	var u := Vector2(0, -1) * 3.2
+	var r2 := Vector2(1, 0) * 2.4
+	minimap.draw_polyline(PackedVector2Array([np - r2 - u, np - r2 + u, np + r2 - u, np + r2 + u]), Color(0.1, 0.06, 0.03), 1.6, true)
 
 
 ## One small drawn sign on a map tile (no symbol fonts on web).
@@ -1795,6 +1912,7 @@ func _open_menu() -> void:
 		["FIELD GUIDE", func(): _close_menu(); _open_guide()],
 		["REPORT A BUG", func(): _close_menu(); _open_report()],
 		["MOVE BUTTONS: " + ("ON" if pad_on else "OFF"), "pad"],
+		["MAP: " + ("NORTH UP" if map_north_up else "TURNS WITH YOU"), "map"],
 		["HINTS: " + ("ON" if hints_on else "OFF"), Callable()],
 		["SHOW FPS: " + ("ON" if perf.show else "OFF"), "fps"],
 		["GRAPHICS: " + perf.quality_name(), "gfx"],
@@ -1814,6 +1932,11 @@ func _open_menu() -> void:
 			b.pressed.connect(func():
 				_set_pad(not pad_on)
 				b.text = "MOVE BUTTONS: " + ("ON" if pad_on else "OFF"))
+		elif it[1] is String and it[1] == "map":
+			b.pressed.connect(func():
+				map_north_up = not map_north_up
+				_save_hints()
+				b.text = "MAP: " + ("NORTH UP" if map_north_up else "TURNS WITH YOU"))
 		elif it[1] is String and it[1] == "fps":
 			b.pressed.connect(func():
 				perf.toggle_show()
@@ -1936,6 +2059,7 @@ func _load_hints() -> void:
 		return
 	hints_on = cfg.get_value("hints", "on", true)
 	pad_on = cfg.get_value("controls", "pad", false)
+	map_north_up = cfg.get_value("controls", "map_north_up", false)
 	for id in cfg.get_value("hints", "seen", []):
 		seen[id] = true
 
@@ -1948,6 +2072,7 @@ func _save_hints() -> void:
 	cfg.set_value("hints", "on", hints_on)
 	cfg.set_value("hints", "seen", seen.keys())
 	cfg.set_value("controls", "pad", pad_on)
+	cfg.set_value("controls", "map_north_up", map_north_up)
 	cfg.save("user://lethemoor.cfg")
 
 
@@ -1990,6 +2115,15 @@ func _kill_shot() -> void:
 	red.set_anchors_preset(Control.PRESET_FULL_RECT)
 	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kill_shot.add_child(red)
+	var gore := TextureRect.new()   # and then blood across your eyes
+	gore.texture = _tex("fx_blood_screen")
+	gore.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	gore.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gore.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gore.stretch_mode = TextureRect.STRETCH_SCALE
+	gore.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gore.modulate.a = 0.0
+	kill_shot.add_child(gore)
 	var h := _ui_h()
 	var e := 0.0
 	const T_KILL := 0.75
@@ -2004,6 +2138,7 @@ func _kill_shot() -> void:
 		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * (0.13 if stalker else 0.22)) + shake
 		dark.color.a = 0.6 * k
 		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
+		gore.modulate.a = clampf((e - 0.22) / 0.08, 0.0, 1.0)   # thrown at the moment it reaches you
 		await get_tree().process_frame
 	if capture_mode:
 		await _shot("fp_killshot")
