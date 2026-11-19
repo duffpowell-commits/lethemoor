@@ -79,10 +79,22 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates
           unzip -q tpl.tpz -d /tmp/tpl
           mv /tmp/tpl/templates ~/.local/share/godot/export_templates/${GODOT_VERSION/-/.}
-      - name: Android SDK paths + debug keystore
+      - name: Android SDK paths + signing key
+        # Every APK must be signed with the SAME key or Android refuses to update the installed
+        # app (the in-app updater depends on it). The key lives in the LM_KEYSTORE_B64 secret
+        # (base64 of a keystore, alias androiddebugkey, password android). Without the secret
+        # (forks) a throwaway key is made: that APK installs fresh but can't update.
+        env:
+          LM_KEYSTORE_B64: ${{ secrets.LM_KEYSTORE_B64 }}
         run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey \
-            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          if [ -n "$LM_KEYSTORE_B64" ]; then
+            echo "$LM_KEYSTORE_B64" | base64 -d > debug.keystore
+            echo "Signing with the fixed key"
+          else
+            echo "::warning::LM_KEYSTORE_B64 not set: throwaway signing key, this APK can't update an installed one"
+            keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey \
+              -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
           mkdir -p ~/.config/godot
           cat > ~/.config/godot/editor_settings-4.5.tres <<TRES
           [gd_resource type="EditorSettings" format=3]
@@ -98,7 +110,12 @@ jobs:
         run: godot --headless --path . --import || true
       - name: Export web
         run: |
-          echo "${GITHUB_SHA::7} $(date -u +%Y-%m-%d)" > build.txt   # shown in bug reports
+          echo "${GITHUB_SHA::7} $(date -u +%Y-%m-%d) #${{ github.run_number }}" > build.txt   # shown in bug reports
+          # Build number: the in-app updater (scripts/updater.gd) compares this with the dev
+          # release's version.json; Android needs version/code to rise for an update.
+          echo "${{ github.run_number }}" > build_code.txt
+          sed -i 's/^version\/code=.*/version\/code=${{ github.run_number }}/; s/^version\/name=.*/version\/name="0.1.${{ github.run_number }}"/' export_presets.cfg
+          grep -n "^version/" export_presets.cfg
           mkdir -p build/web && touch build/.gdignore
           # Files are named per build (lethemoor-<sha>.js/.wasm/.pck) so a phone can never pair a new
           # page with an old cached engine or pack; index.html is a copy of that build's page.
@@ -116,6 +133,14 @@ jobs:
           grep -A8 "configuration errors" export.log || true
           test -f build/android/lethemoor.apk
           ls -la build/android
+      - name: Check the APK can update itself
+        run: |
+          AAPT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)aapt
+          $AAPT dump badging build/android/lethemoor.apk | grep -E "^package:"
+          $AAPT dump permissions build/android/lethemoor.apk | tee perms.txt
+          grep -q "REQUEST_INSTALL_PACKAGES" perms.txt
+          grep -q "android.permission.INTERNET" perms.txt
+          $AAPT dump badging build/android/lethemoor.apk | grep -q "versionCode='${{ github.run_number }}'"
       - uses: actions/upload-artifact@v4
         with:
           name: lethemoor-web
@@ -133,6 +158,9 @@ jobs:
           (cd build/web && zip -qr ../lethemoor-web.zip .)
           gh release view dev >/dev/null 2>&1 || gh release create dev --prerelease --title "Latest dev build" --notes "Rebuilt on every push to main."
           gh release upload dev build/android/lethemoor.apk build/lethemoor-web.zip --clobber
+          # version.json goes up LAST, so a phone never sees a build number before its APK is there.
+          echo "{\"code\": ${{ github.run_number }}, \"sha\": \"${GITHUB_SHA::7}\"}" > build/version.json
+          gh release upload dev build/version.json --clobber
           gh release edit dev --notes "Rebuilt on every push to main. Last: ${GITHUB_SHA::7}"
       - name: Publish web build to GitHub Pages (main only)
         # Brittany's link: https://duffpowell-commits.github.io/lethemoor/ (plays in iPhone Safari).
