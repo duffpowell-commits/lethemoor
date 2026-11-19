@@ -40,7 +40,7 @@ const LIGHT := {
 	Fog.Lantern.NORMAL: [3.4, 1.7],
 	Fog.Lantern.BRIGHT: [5.6, 2.4],
 }
-const STOP_EVENTS := ["hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
 const VIEW_RANGE := 10.0           # tiles further than this aren't drawn (fog hides them)
@@ -848,6 +848,7 @@ func _refresh_hud() -> void:
 		"cant_pour": "No room to pour there, or not enough oil.",
 		"ignite": "The spark catches. Fire runs along the oil.",
 		"burned": "Something burns in the oil. It doesn't scream.",
+		"heard": "Somewhere in the dark, something stops, and turns toward the sound.",
 		"cant_spark": "Nothing to light. Look at the oil, lantern lit, 3 tiles or nearer.",
 	}
 	var s: String = lines[game.setting]

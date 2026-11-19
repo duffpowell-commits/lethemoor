@@ -198,6 +198,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   first tap/click/key (verified in Chromium: suspended before tap, running after).
   `LM_AUDIO_LOG=1` prints every sound played (use with the capture run). M mutes (saved).
   Not yet heard on a real phone: levels are a first mix.
+- **Done — slice step 4 (Nov 19): noise** (`night.gd` `NOISE`, 5 new tests, 49 total). A sound of
+  level N is heard by every horror within N tiles of *walking* distance (round corners, not
+  through walls); it heads for the loudest one unless it sees your light (light wins). Walking,
+  turning and waiting are silent, so plain routes play exactly as before (capture bell run
+  unchanged: B, 10 oil, 55 turns). Levels: hook hit 4, hook miss 3, spark 3, pour 2, each burning
+  tile 3 per turn (fire lures them into it; with shamblers and 3-turn fire only close ones make
+  it). **Sound hook:** each action resets `noises` ([{pos, level, kind}]) and `heard_by`
+  (thrall indexes drawn this turn); event `"heard"` when anything turned toward a sound. Field
+  note `noise`. Running / rummaging / ringing levels get added when those actions exist.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.

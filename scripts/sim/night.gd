@@ -41,6 +41,11 @@ const SLICK_OIL := 3
 const SPARK_OIL := 1
 const SPARK_RANGE := 3
 const FIRE_TURNS := 3
+## Noise: loud actions draw horrors. A sound of level N is heard by every horror within N tiles
+## of walking distance (it goes round corners, not through walls), which then heads for the
+## sound, unless it sees your light (light always wins). Plain walking, turning and waiting
+## are silent, so the old routes play exactly as before; only the tools make noise.
+const NOISE := {"hook_hit": 4, "hook_miss": 3, "pour": 2, "spark": 3, "fire": 3}
 const GRADES := [[20, "S"], [14, "A"], [8, "B"], [3, "C"], [0, "D"]]
 ## How far a thrall notices your lantern (tiles, needs line of sight).
 const NOTICE := {Fog.Lantern.HOODED: 1, Fog.Lantern.NORMAL: 5, Fog.Lantern.BRIGHT: 8}
@@ -64,6 +69,10 @@ var flasks_left: Array = []     # oil flasks still on the floor
 var hooks_left: Array = []      # boathooks still on the floor
 var hook_wear := 0              # hits left in the boathook in your hand (0 = no hook)
 var slicks := {}                # tile -> fire turns left (0 = soaked, not lit yet)
+## This turn's sounds, for the sound layer: [{pos, level, kind}] (kind is a NOISE key).
+## Reset at the start of every action. Horrors that turned toward one are in `heard_by`.
+var noises: Array = []
+var heard_by: Array = []        # indexes into `thralls` drawn by a noise this turn
 ## Each thrall: {pos, target (last place it saw your light, or null), seen (in your light now),
 ## last_seen (where YOU last saw it, or null: the map's marker, and it can be stale),
 ## stun (turns left knocked down by the boathook), gone (burned: it stays in the list so the
@@ -170,6 +179,7 @@ func can_step(p: Vector2i) -> bool:
 func step(p: Vector2i) -> Array:
 	if not can_step(p):
 		return []
+	_quiet()
 	var events: Array = []
 	if thrall_at(p) >= 0:
 		_die("Something was standing in the dark. It was waiting.")
@@ -192,6 +202,7 @@ func step_dir(d: Vector2i) -> Array:
 func turn_by(side: int) -> Array:
 	if over():
 		return []
+	_quiet()
 	facing = Vector2i(-facing.y, facing.x) if side > 0 else Vector2i(facing.y, -facing.x)
 	return _end_turn([])
 
@@ -200,6 +211,7 @@ func turn_by(side: int) -> Array:
 func wait() -> Array:
 	if over():
 		return []
+	_quiet()
 	return _end_turn([])
 
 
@@ -207,6 +219,7 @@ func wait() -> Array:
 func hook() -> Array:
 	if over() or hook_wear <= 0:
 		return []
+	_quiet()
 	var events: Array = []
 	var hit := -1
 	for r in range(1, HOOK_REACH + 1):
@@ -218,6 +231,7 @@ func hook() -> Array:
 			break
 	if hit < 0:
 		events.append("hook_miss")
+		make_noise(hunter, "hook_miss")
 		return _end_turn(events)
 	var th: Dictionary = thralls[hit]
 	th.stun = HOOK_STUN
@@ -226,6 +240,7 @@ func hook() -> Array:
 		th.pos = back          # shoved back a tile (into fire, if that's what's behind it)
 	hook_wear -= 1
 	events.append("hook_hit")
+	make_noise(hunter, "hook_hit")
 	if hook_wear == 0:
 		events.append("hook_broke")
 	return _end_turn(events)
@@ -236,8 +251,10 @@ func pour() -> Array:
 	var t: Vector2i = hunter + facing
 	if over() or oil < SLICK_OIL or room.is_wall(t) or slicks.has(t):
 		return []
+	_quiet()
 	oil -= SLICK_OIL
 	slicks[t] = 0
+	make_noise(hunter, "pour")
 	return _end_turn(["poured"])
 
 
@@ -258,7 +275,9 @@ func spark() -> Array:
 	var seeds := sparkable()
 	if over() or seeds.is_empty() or oil < SPARK_OIL:
 		return []
+	_quiet()
 	oil -= SPARK_OIL
+	make_noise(hunter, "spark")
 	var q: Array = seeds.duplicate()
 	while not q.is_empty():
 		var p: Vector2i = q.pop_back()
@@ -275,6 +294,38 @@ func spark() -> Array:
 		return events
 	_burn(events)
 	return _end_turn(events)
+
+
+func _quiet() -> void:
+	noises = []
+	heard_by = []
+
+
+## Record a sound this turn. Horrors react to it in _end_turn, before they act.
+func make_noise(at: Vector2i, kind: String) -> void:
+	noises.append({pos = at, level = NOISE[kind], kind = kind})
+
+
+## Every horror in earshot of this turn's sounds heads for the loudest one it heard.
+func _hear(events: Array) -> void:
+	for i in thralls.size():
+		var th: Dictionary = thralls[i]
+		if th.get("gone", false):
+			continue
+		var best = null
+		var best_level := 0
+		for nz in noises:
+			if nz.level <= best_level:
+				continue
+			var reach: Dictionary = room.reachable(th.pos, nz.level)
+			if reach.has(nz.pos):
+				best = nz.pos
+				best_level = nz.level
+		if best != null and th.target != best:
+			th.target = best
+			heard_by.append(i)
+	if not heard_by.is_empty():
+		events.append("heard")
 
 
 ## Whatever stands in fire burns.
@@ -323,6 +374,10 @@ func _end_turn(events: Array) -> Array:
 	fog.update(lights())
 	dread += DREAD_LIT if lit else DREAD_DARK
 	_horrors(events)
+	for p: Vector2i in slicks:
+		if slicks[p] > 0:
+			make_noise(p, "fire")   # fire crackles: it draws them in, and they walk into it
+	_hear(events)
 	_thralls_act(events)
 	if dead:
 		return events

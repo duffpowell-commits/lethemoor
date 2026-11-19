@@ -558,3 +558,69 @@ func test_silent_bell_before_the_stalker_moves() -> void:
 	check(Audio.stalker_free(g) == (st.target != null or g._sees_light(st)), "silence = she's free to come")
 	g.thralls[0].target = g.hunter
 	check(Audio.stalker_free(g), "hunting and unwatched: the bed goes quiet")
+
+# ---------------------------------------------------------------- noise
+
+func test_walking_is_silent() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.thralls.append({pos = Vector2i(5, 1), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.facing = Vector2i.UP
+	n.step(Vector2i(2, 1))
+	n.turn_by(1)
+	n.wait()
+	check(n.noises.is_empty() and n.heard_by.is_empty(), "steps, turns and waits make no sound")
+	check(n.thralls[0].target == null, "so nothing comes")
+
+
+func test_hook_swing_is_heard_round_corners() -> void:
+	# the thrall is round a corner, 3 tiles of walking away
+	var n = Night.start("#######\n#H..#.#\n###...#\n#######")
+	n.thralls.append({pos = Vector2i(3, 2), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.hook_wear = Night.HOOK_WEAR
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.facing = Vector2i.UP
+	var ev: Array = n.hook()       # swing at the wall: a miss, level 3
+	check("hook_miss" in ev and "heard" in ev, "the clatter is heard")
+	check(n.heard_by == [0] and n.thralls[0].target == n.hunter, "it heads for where the sound was")
+
+
+func test_quiet_pour_not_heard_far() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.thralls.append({pos = Vector2i(6, 1), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.set_lantern(Fog.Lantern.HOODED)
+	n.facing = Vector2i.RIGHT
+	var ev: Array = n.pour()
+	check(n.noises.size() == 1 and n.noises[0].kind == "pour", "pouring makes a sound")
+	check(not "heard" in ev and n.thralls[0].target == null, "but 5 tiles off it isn't heard (level 2)")
+
+
+func test_fire_lures_them_in() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.facing = Vector2i.RIGHT
+	n.pour()
+	n.step(Vector2i(2, 1))
+	n.pour()                      # (3,1)
+	n.step_dir(Vector2i.LEFT)
+	n.thralls.append({pos = Vector2i(4, 1), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.set_lantern(Fog.Lantern.NORMAL)
+	n.spark()
+	check(n.thralls[0].target != null, "the fire's crackle (3 tiles) draws it")
+	n.set_lantern(Fog.Lantern.HOODED)   # hide: only the fire calls it
+	for i in 3:
+		if not n.dead:
+			n.wait()
+	check(n.thralls[0].gone and not n.dead, "it walked into the fire and burned")
+
+
+func test_light_beats_noise() -> void:
+	var n = Night.start("##########\n#H.......#\n##########")
+	n.thralls.append({pos = Vector2i(4, 1), target = null, seen = false, last_seen = null, kind = "thrall", stun = 0, gone = false})
+	n.hook_wear = Night.HOOK_WEAR
+	n.facing = Vector2i.LEFT
+	n.set_lantern(Fog.Lantern.NORMAL)
+	n.make_noise(Vector2i(7, 1), "hook_hit")
+	n._hear([])
+	check(n.thralls[0].target == Vector2i(7, 1), "a sound alone sends it to the sound")
+	n.wait()
+	check(n.thralls[0].target == n.hunter, "but once it sees your lantern it comes for you")
