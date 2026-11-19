@@ -558,3 +558,13 @@ func test_silent_bell_before_the_stalker_moves() -> void:
 	check(Audio.stalker_free(g) == (st.target != null or g._sees_light(st)), "silence = she's free to come")
 	g.thralls[0].target = g.hunter
 	check(Audio.stalker_free(g), "hunting and unwatched: the bed goes quiet")
+func test_every_letter_has_a_page_that_fits_a_phone() -> void:
+	var Letters = load("res://scripts/letters.gd")
+	var r = Room.parse(FileAccess.get_file_as_string("res://rooms/one_night.txt"))
+	check(Letters.PAGES.size() >= r.letters.size(), "One Night has a written page for every letter on the map")
+	for pg: Dictionary in Letters.PAGES:
+		check(pg.head != "" and pg.body != "" and pg.sign != "", "page has a heading, body and signature")
+		check(pg.body.split(" ", false).size() <= 80, "page body fits a phone (<= 80 words): " + pg.head)
+		check(not ("AI" in pg.body.split(" ")), "no out-of-world text")
+	check(Letters.page(99) == Letters.PAGES[-1], "reading past the last page repeats the last")
+	check(Letters.page(0) == Letters.PAGES[0], "first letter read is always page one")

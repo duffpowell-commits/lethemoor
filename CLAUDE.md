@@ -198,6 +198,15 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   first tap/click/key (verified in Chromium: suspended before tap, running after).
   `LM_AUDIO_LOG=1` prints every sound played (use with the capture run). M mutes (saved).
   Not yet heard on a real phone: levels are a first mix.
+- **Done — letters content (Nov 19):** `scripts/letters.gd` holds the written pages (Poe voice,
+  <= 80 words each so they fit a phone, tested). Pages come in the order you READ them, not by
+  tile, so the story reads I, II, III however the map reshuffles. One Night's three: a dockhand's
+  wife (her husband came home drowned: the thralls), Ada the bride's wedding-eve note (hints the
+  Stalker rule: "look upon me and I will be still"), and the Watch's sealed order to keep the bell
+  silent so the town keeps forgetting, signed in the Captain's own hand (tone C: the rot is
+  personal; ringing the bell is defying yourself). Reading one pops a parchment page
+  (`_show_page`, PUT IT AWAY); read pages are listed again in the FIELD GUIDE. Capture's LETTER
+  check now also needs the page up (`fp_letter.png`). Add pages for new maps to `PAGES`.
 - Next: **M1c** (review doc): Stalker (moves 2 when unlit, frozen when lit), throw oil (3 oil,
   burns 3 turns), one lamp to light (4 oil, safe zone + autosave), last-seen markers in
   remembered tiles. Then M1d (3–5 rooms, key + door, corpse carry-over), art pass, web cut.
