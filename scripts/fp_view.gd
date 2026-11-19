@@ -45,6 +45,7 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
+const THRALL_LOOKS := ["thrall_dock", "thrall_netmender", "thrall_dockwoman"]
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 7.0
@@ -330,12 +331,17 @@ func _build_world() -> void:
 		add_child(pole)
 		hook_nodes[kp] = pole
 
+	var looks := 0
 	for thrall in game.thralls:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
 		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
-		th.texture = _tex("stalker_bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
+		if stalker:
+			th.texture = _tex("stalker_bride")
+		else:   # the drowned of the quay, in turn: dock worker, net-mender, dock woman
+			th.texture = _tex(THRALL_LOOKS[looks % THRALL_LOOKS.size()])
+			looks += 1
 		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -1812,6 +1818,11 @@ func _kill_shot() -> void:
 	_wing(kill_shot, Color(0, 0, 0, 0))
 	var face := TextureRect.new()
 	face.texture = _tex("stalker_bride" if stalker else "thrall_dock")
+	for i in game.thralls.size():   # the one that took you, in its own look
+		var th: Dictionary = game.thralls[i]
+		if th.get("kind", "thrall") == game.killer and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1:
+			face.texture = thrall_sprites[i].texture
+			break
 	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -2393,7 +2404,9 @@ func _capture_art() -> void:
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
 		["fp_art_lamp", Vector2i(9, 12), Vector2i.RIGHT],
-		["fp_art_letter", Vector2i(7, 4), Vector2i.UP]]
+		["fp_art_letter", Vector2i(7, 4), Vector2i.UP],
+		["fp_art_thrall_b", Vector2i(5, 12), Vector2i.LEFT],
+		["fp_art_thrall_c", Vector2i(3, 16), Vector2i.LEFT]]
 	for v in views:
 		game.hunter = v[1]
 		game.facing = v[2]
