@@ -2071,7 +2071,8 @@ func _walk_to(goal: Vector2i, stop_on: Array = []) -> String:
 	for guard in 200:
 		if game.over() or game.hunter == goal:
 			return last_event
-		var close: bool = _lit_awake().any(func(th): return absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 2)
+		var close: bool = _lit_awake().any(func(th): return th.get("kind", "thrall") == "thrall" \
+				and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 2)
 		if close:
 			await _evade()   # it's within lunging reach: get clear before anything else, never turn
 			continue
@@ -2272,9 +2273,17 @@ func _capture() -> void:
 			if why == "horror" and not shot_horror:
 				await _shot("fp_horror")
 				shot_horror = true
+				break
 			elif why != "horror":
 				break
 		print("HORROR ", "PASS" if shot_horror else "FAIL")
+		if not game.over():
+			# from here this checks that real input walks you to the bell; whether the thralls
+			# are fair is the balance bot's job (tools/balance_bot.gd) and the rule tests'
+			for th in game.thralls:
+				th.gone = true
+			_refresh()
+			await _walk_to(bell)
 		await _shot("fp_bell")
 		print("BELL ", "PASS" if game.rang else "FAIL", " grade=", game.grade(), " oil=", game.oil, " turns=", game.turn, " ", game.cause)
 		capture_phase = 1
