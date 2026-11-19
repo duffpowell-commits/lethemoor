@@ -78,11 +78,15 @@ var heard_by: Array = []        # indexes into `thralls` drawn by a noise this t
 ## stun (turns left knocked down by the boathook), gone (burned: it stays in the list so the
 ## view's indexes hold, but it no longer counts for anything)}
 var thralls: Array = []
+var seed := 0                   # which night was dealt (0 = the map as drawn); testers quote it
 
 
-static func start(room_text: String) -> RefCounted:
+## `seed` deals the night (room.shuffle): 0 = the map exactly as drawn (tests, captures).
+static func start(room_text: String, seed: int = 0) -> RefCounted:
 	var n = load("res://scripts/sim/night.gd").new()
 	n.room = Room.parse(room_text)
+	n.room.shuffle(seed)
+	n.seed = seed
 	n.fog = n.room.make_fog()
 	n.hunter = n.room.hunter
 	n.flasks_left = n.room.oil_flasks.duplicate()
