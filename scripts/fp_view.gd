@@ -201,13 +201,15 @@ func _build_world() -> void:
 			if room.is_wall(p):
 				mi.mesh = wall_mesh
 				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
-				tile_tex[p] = "wall_stone" if (x * 3 + y) % 3 else "wall_paper"
-				tile_base[p] = Color(0.85, 0.82, 0.92)
+				var stone: bool = (x * 3 + y) % 3 != 0
+				tile_tex[p] = "wall_granite" if stone else "wall_damask"
+				# Canva art is lit flat: let the lantern do the light. Paper is paler, so sink it more.
+				tile_base[p] = Color(0.72, 0.72, 0.78) if stone else Color(0.5, 0.48, 0.46)
 			else:
 				mi.mesh = floor_mesh
 				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				tile_tex[p] = "exit" if p in room.exits else "floor_wet"
-				tile_base[p] = Color(1, 1, 1)
+				tile_tex[p] = "exit" if p in room.exits else "floor_stone"
+				tile_base[p] = Color(0.58, 0.58, 0.62)   # the flagstone art is lit flat: sink it into the dark
 			add_child(mi)
 			tile_nodes[p] = mi
 
@@ -320,15 +322,16 @@ func _build_world() -> void:
 		var holder := Node3D.new()
 		holder.position = _w(thrall.pos)
 		var th := Sprite3D.new()
-		th.texture = _tex("bride")
-		th.pixel_size = 1.9 / th.texture.get_height()   # ~1.9 tiles tall, cut from Duff's mockup
+		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
+		th.texture = _tex("bride" if stalker else "thrall_dock")   # thrall = drowned dock worker
+		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 		th.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		th.shaded = true
 		th.offset = Vector2(0, th.texture.get_height() / 2.0)
-		th.modulate = Color(0.55, 0.5, 0.48)    # thralls: the same shroud, darker (own art later)
-		if thrall.get("kind", "thrall") == "stalker":
+		th.modulate = Color(0.8, 0.8, 0.82)    # thralls: sodden, a touch darker than the lantern says
+		if stalker:
 			th.modulate = Color(1.25, 1.22, 1.3)   # the bride: pale, catches the light
 			th.pixel_size = 2.15 / th.texture.get_height()
 		holder.add_child(th)
@@ -406,6 +409,9 @@ func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
 	if tex.begins_with("wall"):
 		m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
 		m.roughness = 0.9
+	elif tex == "floor_stone":
+		m.uv1_scale = Vector3(3, 2, 1)   # BoxMesh UVs are a 3x2 atlas: one full slab set per tile
+		m.roughness = 0.45                # wet stone: the lantern glints off it
 	else:
 		m.roughness = 0.65
 	m.albedo_color = Color(base.r * k, base.g * k, base.b * k)
@@ -1568,6 +1574,9 @@ func _capture() -> void:
 	if capture_phase == 3:
 		await _capture_trap()
 		return
+	if capture_phase == 4:
+		await _capture_art()
+		return
 	var letter: Vector2i = room.letters.reduce(func(a, b): return a if (a - game.hunter).length() < (b - game.hunter).length() else b)
 	var reach: Dictionary = room.reachable(game.hunter, 999)
 	var path: Array = room.path_in(reach, game.hunter, letter)
@@ -1638,7 +1647,26 @@ func _capture_trap() -> void:
 	b.pos = west + Vector2i(-2, 0)
 	b.target = null
 	_refresh()
+	await _shot("fp_thrall")   # art check: a thrall two tiles ahead, in the lantern's reach
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
 	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
+	capture_phase = 4
+	get_tree().reload_current_scene()
+
+
+## Pass 4 (art only, no checks): stand in fixed spots with the lantern high and look at the props.
+func _capture_art() -> void:
+	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
+	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
+		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
+		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT]]
+	for v in views:
+		game.hunter = v[1]
+		game.facing = v[2]
+		game.fog.update(game.lights())
+		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+		_refresh()
+		await _shot(v[0])
+	print("ART PASS")
 	get_tree().quit()
