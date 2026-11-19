@@ -45,7 +45,8 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_LOOKS := ["thrall_hooded", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_LUNGE := "thrall_lunge"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 13.0               # the corner map follows you: ~15 x 12 tiles around you
@@ -362,9 +363,10 @@ func _build_world() -> void:
 		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
 		if stalker:
 			th.texture = _tex("stalker_bride")
-		else:   # the drowned of the quay, in turn: dock worker, net-mender, dock woman
+		else:   # the drowned of the quay, in turn: the hooded one, dock worker, net-mender, dock woman
 			th.texture = _tex(THRALL_LOOKS[looks % THRALL_LOOKS.size()])
 			looks += 1
+		th.set_meta("look", th.texture)
 		th.pixel_size = 1.85 / th.texture.get_height()   # ~1.85 tiles tall
 		th.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 		th.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
@@ -851,11 +853,14 @@ func _process(delta: float) -> void:
 				jerk = 0.018 * sin(t * 47.0 + i)
 				sp.modulate = Color(0.36 + 0.14 * beat, 0.1, 0.11)   # dark, blood-dim, pulsing
 			elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
-				sp.scale = Vector3(1.0, 1.1, 1.0)    # reared up, right in your face
-				sp.modulate = Color(0.5, 0.15, 0.15)
+				_thrall_art(sp, _tex(THRALL_LUNGE), 1.45)   # arms out, sack-mouth open, right in your face
+				sp.scale = Vector3.ONE
+				sp.modulate = Color(0.5, 0.4, 0.4)    # its own drowned grey; the screen flash brings the red
 			else:
 				sp.scale = Vector3(1.12, 0.84, 1.0)
 				sp.modulate = Color(0.8, 0.8, 0.82)
+			if not th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
+				_thrall_art(sp, sp.get_meta("look"), 1.85)
 			sp.position.x = jerk
 	if lunge_hit > 0.0:
 		lunge_hit = maxf(0.0, lunge_hit - delta * 1.6)
@@ -1947,6 +1952,15 @@ func _save_hints() -> void:
 
 
 ## It has you: the thing fills the screen, lunging up out of the dark, a red flash, a shake.
+## Swap a thrall's art (its own look, or the lunge) keeping it standing on the floor at a set height.
+func _thrall_art(sp: Sprite3D, tex: Texture2D, tall: float) -> void:
+	if sp.texture == tex:
+		return
+	sp.texture = tex
+	sp.pixel_size = tall / tex.get_height()
+	sp.offset = Vector2(0, tex.get_height() / 2.0)
+
+
 func _kill_shot() -> void:
 	var stalker: bool = game.killer == "stalker"
 	kill_shot = Control.new()
@@ -1959,12 +1973,12 @@ func _kill_shot() -> void:
 	kill_shot.add_child(dark)
 	_wing(kill_shot, Color(0, 0, 0, 0))
 	var face := TextureRect.new()
-	face.texture = _tex("stalker_bride" if stalker else "thrall_dock")
+	face.texture = _tex("stalker_bride" if stalker else THRALL_LUNGE)
 	for i in game.thralls.size():   # the one that took you, in its own look
 		var th: Dictionary = game.thralls[i]
 		if th.get("kind", "thrall") == game.killer and not th.get("gone", false) and not th.get("lying", false) \
 				and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1:
-			face.texture = thrall_sprites[i].texture
+			face.texture = thrall_sprites[i].texture if stalker else _tex(THRALL_LUNGE)
 			break
 	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1982,12 +1996,12 @@ func _kill_shot() -> void:
 	while e < T_KILL:
 		e += get_process_delta_time()
 		var k := clampf(e / 0.28, 0.0, 1.0)          # it comes up fast, then hangs there
-		var size := lerpf(h * 0.5, h * 2.1, k * k)
+		var size := lerpf(h * 0.5, (h * 2.1 if stalker else h * 1.15), k * k)   # the lunge art is half a body: hands stay in frame
 		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 14.0 * (1.0 - e / T_KILL)
 		var tex := face.texture.get_size()
 		face.size = Vector2(size * tex.x / tex.y, size)   # its own shape: nothing cropped off the top
 		# the hood is in the top fifth of the art: keep it in the middle of the screen as it comes
-		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * 0.13) + shake
+		face.position = Vector2((UI_W - face.size.x) / 2.0, h * 0.4 - size * (0.13 if stalker else 0.22)) + shake
 		dark.color.a = 0.6 * k
 		red.color.a = 0.45 * (1.0 - absf(e - 0.3) / 0.45) if e < 0.75 else 0.0
 		await get_tree().process_frame
@@ -2550,6 +2564,7 @@ func _capture_art() -> void:
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
 		["fp_art_lamp", Vector2i(9, 12), Vector2i.RIGHT],
 		["fp_art_letter", Vector2i(7, 4), Vector2i.UP],
+		["fp_art_thrall_a", Vector2i(10, 6), Vector2i.UP],    # the hooded one, two tiles off
 		["fp_art_thrall_b", Vector2i(5, 12), Vector2i.LEFT],
 		["fp_art_thrall_c", Vector2i(3, 16), Vector2i.LEFT]]
 	for v in views:
