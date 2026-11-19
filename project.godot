@@ -9,7 +9,7 @@ config/quit_on_go_back=false
 
 config/name="Lethemoor: The Last Lantern"
 config/icon="res://assets/art/app_icon.png"
-config/description="Gothic tactics-horror roguelite. Light is life."
+config/description="Gothic first-person survival horror. Light is life."
 run/main_scene="res://scenes/fp_room.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 ; 60 fps cap: a turn-based game gains nothing from 90/120 Hz screens, and the phone runs cooler

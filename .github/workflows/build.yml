@@ -55,8 +55,9 @@ jobs:
           sudo apt-get install -y -qq xvfb >/dev/null
           timeout 600 xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 \
             --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture 2>&1 | tee capture.log | grep -E "PASS|FAIL|SCRIPT ERROR" || true
-          ! grep -qE "FAIL|SCRIPT ERROR" capture.log
+          ! grep -qE "FAIL|SCRIPT ERROR|^ERROR: .*(Failed loading|Cannot open|Node not found|Invalid)" capture.log
           grep -q "STALKER PASS" capture.log
+          grep -q "^ART PASS" capture.log   # the capture's last line: a crash or hang in passes 3-4 fails here
 
   export:
     needs: test

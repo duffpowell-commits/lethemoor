@@ -481,7 +481,7 @@ func _pose(i: int) -> void:
 		var to_cam: Vector3 = cam.global_position - thrall_nodes[i].global_position if cam else Vector3.FORWARD
 		sp.rotation = Vector3(0, atan2(to_cam.x, to_cam.z), PI / 2 + 0.08)
 		sp.offset = Vector2.ZERO
-		sp.position = Vector3(0, sp.texture.get_width() * sp.pixel_size * 0.42, 0)
+		sp.position = Vector3(0, sp.texture.get_width() * sp.pixel_size * sp.scale.x * 0.42, 0)
 	else:
 		sp.rotation = Vector3.ZERO
 		sp.position = Vector3.ZERO
@@ -615,6 +615,13 @@ func _sync_slicks() -> void:
 			fl.omni_range = 2.6
 			fl.light_energy = 1.6
 			fl.position = Vector3(0, 0.4, 0)
+			# each light redraws everything near it on the Compatibility renderer: two fire lights at most
+			var lights := 0
+			for q: Vector2i in slick_nodes:
+				for c in slick_nodes[q].get_children():
+					if c is OmniLight3D and c.visible:
+						lights += 1
+			fl.visible = lights < 2
 			m.add_child(fl)
 			var fire := _make_fire()
 			m.add_child(fire)
@@ -807,8 +814,6 @@ func _process(delta: float) -> void:
 			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
 				jerk = 0.05 * sin(t * 90.0 + i)
 			thrall_sprites[i].position.x = jerk
-	if busy:
-		pass
 	var eff: int = game.effective()
 	if hand_art:
 		var want: String = HAND_ART[eff]
@@ -1085,7 +1090,7 @@ func _layout_bottom() -> void:
 		var b: Button = lantern_buttons[s]
 		b.position = Vector2(x, 60)
 		b.size = Vector2(162 if pad_on else 128, 56)
-		b.add_theme_font_size_override("font_size", 13 if pad_on else 12)
+		b.add_theme_font_size_override("font_size", 13 if pad_on else 11)
 		x += 174 if pad_on else 138
 	for k in move_buttons:
 		move_buttons[k].visible = pad_on
@@ -1827,7 +1832,8 @@ func _kill_shot() -> void:
 	face.texture = _tex("stalker_bride" if stalker else "thrall_dock")
 	for i in game.thralls.size():   # the one that took you, in its own look
 		var th: Dictionary = game.thralls[i]
-		if th.get("kind", "thrall") == game.killer and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1:
+		if th.get("kind", "thrall") == game.killer and not th.get("gone", false) and not th.get("lying", false) \
+				and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1:
 			face.texture = thrall_sprites[i].texture
 			break
 	face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -2431,6 +2437,7 @@ func _capture_art() -> void:
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
 	await _shot("fp_art_corpse")
-	print("CORPSE ", "PASS" if thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2 else "FAIL")
-	print("ART PASS")
+	var corpse_ok: bool = thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2
+	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
+	print("ART ", "PASS" if corpse_ok else "FAIL")   # the last line: CI requires it, so a crash or hang anywhere before fails the build
 	get_tree().quit()
