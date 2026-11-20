@@ -351,6 +351,8 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   to the controls that matter (<260 chars, tested); spin round + MOVE BUTTONS moved to a new `behind` card that
   shows the first time a horror is within 2 walking tiles outside your view (same rule as the breath). POUR OIL
   is hidden until a horror has been lit, the hook found or a slick poured (`tools_shown`).
+- **DECIDED (Duff, Nov 20): the bell stays silent.** No hum, toll or sound cue from the bell to steer by (it would
+  break the letters' "keep the bell silent" story). If finding it is a problem in playtests, solve it without sound.
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
