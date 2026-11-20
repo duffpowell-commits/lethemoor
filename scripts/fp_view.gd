@@ -70,7 +70,11 @@ const SWIPE_MIN := 50.0            # UI px a finger must travel to count as a sw
 ## a move made mid-glide is queued and runs straight after; keep the finger down after a
 ## forward/back swipe and you keep walking. Anything in STOP_EVENTS (or a new flicker) ends the
 ## walk and drops the queue, so a held finger never walks you into a horror.
-const MOVE_KINDS := ["forward", "back", "left", "right", "wait"]
+const MOVE_KINDS := ["forward", "back", "left", "right", "wait", "about"]
+## About-face (Nov 20): swipe down with TWO fingers (or X) = turn right twice in one spin.
+## Two turns, the world moves twice; a stop event after the first half ends the spin there.
+const ABOUT_TIME := 0.32
+var touches := {}                  # finger index -> true while it's down
 var swipe_fired := false           # this finger already made its move
 var hold_kind := ""                # finger still down after a forward/back swipe: repeat it
 var queued := ""                   # one move made while the last one was still gliding
@@ -752,6 +756,13 @@ func act(kind: String) -> void:
 		"back": events = game.step_dir(-game.facing)
 		"left": events = game.turn_by(-1)
 		"right": events = game.turn_by(1)
+		"about":
+			events = game.turn_by(1)
+			var half_stop: bool = game.over()
+			for ev in events:
+				half_stop = half_stop or ev in STOP_EVENTS
+			if not half_stop:
+				events += game.turn_by(1)
 		"wait": events = game.wait()
 		"hook": events = game.hook()
 		"pour": events = game.pour()
@@ -783,16 +794,21 @@ func act(kind: String) -> void:
 	if walking:
 		foot = -foot
 	var side := cam.global_transform.basis.x
+	var dur := ABOUT_TIME if kind == "about" else STEP_TIME
+	if kind == "about" and absf(angle_difference(from_yaw, to_yaw)) > 3.0:
+		turn_dir = -1.0
+		to_yaw = from_yaw - PI   # a full half-turn: always spin the same way (right), not by lerp_angle's whim
 	var e := 0.0
-	while e < STEP_TIME:
+	while e < dur:
 		e += get_process_delta_time()
-		var u := minf(e / STEP_TIME, 1.0)
+		var u := minf(e / dur, 1.0)
 		var k := glide(u, v0, v1)
 		var arc := sin(u * PI)
 		step_k = arc if walking else 0.0
 		# head: dips onto the foot and sways off it; a turn leans into it a touch
 		var head := Vector3(0, -arc * 0.035, 0) + side * (arc * 0.018 * foot) if walking else Vector3.ZERO
-		_place_cam(from_pos.lerp(to_pos, k) + head, lerp_angle(from_yaw, to_yaw, k), -turn_dir * arc * 0.025)
+		var yaw := lerpf(from_yaw, to_yaw, k) if kind == "about" else lerp_angle(from_yaw, to_yaw, k)
+		_place_cam(from_pos.lerp(to_pos, k) + head, yaw, -turn_dir * arc * (0.04 if kind == "about" else 0.025))
 		for j in thrall_nodes.size():
 			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
 		await get_tree().process_frame
@@ -830,8 +846,10 @@ func act(kind: String) -> void:
 
 
 ## A swipe in UI pixels. Mostly vertical: step; mostly sideways: turn the way the finger went.
-func swipe(d: Vector2) -> void:
-	if absf(d.y) >= absf(d.x):
+func swipe(d: Vector2, fingers := 1) -> void:
+	if fingers >= 2 and d.y > 0 and absf(d.y) >= absf(d.x):
+		act("about")
+	elif absf(d.y) >= absf(d.x):
 		act("forward" if d.y < 0 else "back")
 	else:
 		act("right" if d.x > 0 else "left")
@@ -881,6 +899,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	# swipe on the view: up = forward, down = back, left/right = turn (buttons stay as backup)
 	var release: bool = event is InputEventScreenTouch and not event.pressed
 	release = release or (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	# second fingers only count toward a two-finger swipe; the first finger steers
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			touches[event.index] = true
+		else:
+			touches.erase(event.index)
+		if event.index != 0:
+			return
+	if event is InputEventScreenDrag and event.index != 0:
+		return
 	var drag: bool = event is InputEventScreenDrag
 	drag = drag or (event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0)
 	if press:
@@ -892,9 +920,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		var d: Vector2 = to_ui * event.position - to_ui * swipe_from
 		if d.length() >= SWIPE_MIN:
 			swipe_fired = true
-			if drag and absf(d.y) >= absf(d.x) and modal == null and menu_sheet == null:
+			var fingers := touches.size()
+			if drag and fingers < 2 and absf(d.y) >= absf(d.x) and modal == null and menu_sheet == null:
 				hold_kind = "forward" if d.y < 0 else "back"   # finger stays down: keep walking
-			swipe(d)
+			swipe(d, fingers)
 	if release:
 		swipe_from = null
 		swipe_fired = false
@@ -906,6 +935,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_S, KEY_DOWN: act("back")
 			KEY_A, KEY_LEFT: act("left")
 			KEY_D, KEY_RIGHT: act("right")
+			KEY_X: act("about")
 			KEY_SPACE: act("wait")
 			KEY_H: act("hook")
 			KEY_P: act("pour")
@@ -1670,7 +1700,7 @@ func _refresh_hud() -> void:
 	elif flicker or fake_flicker:
 		s = "The flame gutters. Something is near."
 	if game.turn < 3 and extra == "":
-		s = "Swipe up to walk, down to back away, sideways to turn. Find the bell."
+		s = "Swipe up to walk (hold to keep going), down to back away, sideways to turn. Find the bell."
 	status_label.text = s
 	if item_buttons:
 		item_buttons.hook.visible = game.hook_wear > 0
@@ -2599,6 +2629,52 @@ func _capture_fluid() -> void:
 	var settled: bool = not busy and game.turn - t0 <= held_steps + 1
 	print("HOLD ", "PASS" if held_steps >= 2 and game.hunter == at + f * (game.turn - t0) and settled else "FAIL",
 			" steps=", game.turn - t0, " held=", held_steps)
+	# two fingers down = spin round: facing flips, two turns spent, one gesture
+	var f2: Vector2i = game.facing
+	t0 = game.turn
+	_touch(0, xf * (c - Vector2(0, 90)), true)
+	_touch(1, xf * (c + Vector2(70, -90)), true)
+	var dr := InputEventScreenDrag.new()
+	dr.index = 0
+	dr.position = xf * (c + Vector2(0, 90))
+	Input.parse_input_event(dr)
+	await get_tree().process_frame
+	_touch(0, dr.position, false)
+	_touch(1, xf * (c + Vector2(70, 90)), false)
+	for i in 60:
+		await get_tree().process_frame
+		if not busy:
+			break
+	var cam_back: bool = absf(angle_difference(cam.rotation.y, _yaw(game.facing))) < 0.02
+	print("ABOUT ", "PASS" if game.facing == -f2 and game.turn == t0 + 2 and cam_back else "FAIL",
+			" facing=", game.facing, " turns=", game.turn - t0)
+	# a horror two tiles behind, out of view: the breath plays once, at its tile
+	var au = get_node_or_null("/root/Audio")
+	var behind_tile: Vector2i = game.hunter - game.facing * 2
+	var bi := -1
+	for i in game.thralls.size():
+		if not game.thralls[i].get("lying", false) and game.thralls[i].get("kind", "thrall") == "thrall":
+			bi = i
+			break
+	if au and bi >= 0 and not room.is_wall(behind_tile) and not room.is_wall(game.hunter - game.facing):
+		var keep: Vector2i = game.thralls[bi].pos
+		game.thralls[bi].pos = behind_tile
+		au.was_behind = {}
+		au._world_sounds(game)
+		var heard: bool = au.was_behind.has(bi)
+		game.thralls[bi].pos = keep
+		au.was_behind = {}
+		print("BREATH ", "PASS" if heard else "FAIL")
+	else:
+		print("BREATH ", "PASS (skipped: wall behind)")
+
+
+func _touch(index: int, pos: Vector2, down: bool) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.index = index
+	ev.pressed = down
+	ev.position = pos
+	Input.parse_input_event(ev)
 
 
 func _mouse(pos: Vector2, down: bool) -> void:

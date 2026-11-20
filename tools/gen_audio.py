@@ -391,6 +391,23 @@ def shuffle(i):
     write(f"shuffle_{i}", fade(reverb(fit(out, dur), 1.2, 0.3)), peak=0.75)
 
 
+def breath_behind():
+    """A wet, slow exhale right at your neck: something close you are not looking at.
+    Nearly dry (it's beside your ear, not down the alley), low, with a click of a throat."""
+    dur = 1.5
+    tt = t(dur)
+    shape = np.sin(np.pi * np.clip(tt / 1.25, 0, 1)) ** 1.5 * np.exp(-tt * 0.6)
+    air = onepole(noise(dur), 300 + 900 * np.sin(np.pi * np.clip(tt / 1.25, 0, 1)))
+    rasp = fft_filter(noise(dur), lo=900, hi=2600) * (0.5 + 0.5 * np.sin(2 * np.pi * 31 * tt)) * 0.25
+    wet = np.zeros_like(tt)
+    for _ in range(14):
+        g = fft_filter(noise(0.012), lo=1500, hi=6000) * env(int(0.012 * SR), 0.0005, 0.004)
+        place(wet, g * rng.uniform(0.1, 0.4), rng.uniform(0.2, 1.1))
+    click = np.sin(2 * np.pi * 140 * t(0.03)) * env(int(0.03 * SR), 0.001, 0.01)
+    out = mix(air * shape, rasp * shape, wet, np.pad(click, (int(0.05 * SR), 0)) * 0.4)
+    write("breath_behind", fade(reverb(fit(out, dur), 0.5, 0.08)), peak=0.7)
+
+
 def whisper():
     """Breath shaped like words, too quiet to make out (the flame gutters)."""
     dur = 1.6
@@ -544,7 +561,7 @@ def main():
         "stalker_silk": stalker_silk, "whisper": whisper, "panic": panic, "night_start": night_start,
         "hook_swing": hook_swing, "hook_hit": hook_hit, "hook_broke": hook_broke, "hook_found": hook_found,
         "pour": pour, "ignite": ignite, "burn_shriek": burn_shriek,
-        "heard_turn": heard_turn, "fire_loop": fire_loop,
+        "heard_turn": heard_turn, "fire_loop": fire_loop, "breath_behind": breath_behind,
     }
     for i in range(4):
         jobs[f"step_{i}"] = lambda i=i: footstep(i)
