@@ -371,6 +371,13 @@ func test_lessons_teach_in_order() -> void:
 	check(Lessons.due(g, seen) == "hood", "hooding explains hooding")
 	seen["hood"] = true
 	check(Lessons.due(g, seen, "panic") == "panic", "panic event gets its card")
+	var b = Night.start("########\n#..H...#\n########\n")
+	b.facing = Vector2i.RIGHT
+	b.thralls.append({"pos": Vector2i(1, 1), "kind": "thrall", "target": null, "last_seen": null})
+	check(Lessons.due(b, {"goal": true}) == "behind", "a horror at your back gets the spin-round card")
+	b.facing = Vector2i.LEFT
+	check(Lessons.due(b, {"goal": true}) != "behind", "looking at it: no behind card")
+	check(Lessons.CARDS.goal[1].length() < 260, "the first card stays short enough to read on a phone")
 	for id in Lessons.ORDER:
 		check(Lessons.CARDS.has(id), "every lesson has a card: " + id)
 

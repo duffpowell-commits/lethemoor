@@ -75,6 +75,7 @@ const MOVE_KINDS := ["forward", "back", "left", "right", "wait", "about"]
 ## Two turns, the world moves twice; a stop event after the first half ends the spin there.
 const ABOUT_TIME := 0.32
 var touches := {}                  # finger index -> true while it's down
+var tools_shown := false           # POUR OIL appears once a horror has been seen (or the hook found)
 var swipe_fired := false           # this finger already made its move
 var hold_kind := ""                # finger still down after a forward/back swipe: repeat it
 var queued := ""                   # one move made while the last one was still gliding
@@ -1706,6 +1707,12 @@ func _refresh_hud() -> void:
 		item_buttons.hook.visible = game.hook_wear > 0
 		item_buttons.hook.text = "HOOK\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
 		item_buttons.spark.visible = game.slicks.values().has(0)
+		# POUR OIL waits till there's a reason for it: a horror seen, or the hook in hand
+		# (the first minute shows only the lantern; a new player was pouring 3 oil on turn 1)
+		if not tools_shown and (game.hook_wear > 0 or game.slicks.size() > 0 or game.thralls.any(func(th):
+				return not th.get("gone", false) and not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT)):
+			tools_shown = true
+		item_buttons.pour.visible = tools_shown
 		var y: float = _ui_h() - _bh() - 12 - 64
 		for k in ["spark", "pour", "hook"]:
 			if item_buttons[k].visible:
@@ -2661,7 +2668,8 @@ func _capture_fluid() -> void:
 		game.thralls[bi].pos = behind_tile
 		au.was_behind = {}
 		au._world_sounds(game)
-		var heard: bool = au.was_behind.has(bi)
+		au._world_sounds(game)    # still there next turn: it breathes again
+		var heard: bool = au.was_behind.get(bi, 0) == 2
 		game.thralls[bi].pos = keep
 		au.was_behind = {}
 		print("BREATH ", "PASS" if heard else "FAIL")

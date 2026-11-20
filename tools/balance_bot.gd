@@ -7,6 +7,8 @@ extends SceneTree
 ## comparing rule changes, not a model of a good player.
 
 const Fog = preload("res://scripts/sim/fog.gd")
+const EARLY := 20                       # ~the first minute on a phone
+var first_seen := -1                    # turn the first horror came into the light this night
 
 
 func _init() -> void:
@@ -20,16 +22,24 @@ func _init() -> void:
 	var oil_sum := 0
 	var turns_sum := 0
 	var causes := {}
+	var early := 0                      # deaths in the first EARLY turns: the first-minute check
+	var death_turns: Array = []
+	var seen_turns: Array = []
 	var first := int(OS.get_environment("BOT_FIRST")) if OS.get_environment("BOT_FIRST") != "" else 1
 	for s in range(first, first + count):
 		var g = load(script_path).start(text, s)
+		first_seen = -1
 		_play(g)
+		seen_turns.append(first_seen if first_seen >= 0 else 999)
 		if g.rang:
 			won += 1
 			oil_sum += g.oil
 			turns_sum += g.turn
 		elif g.dead:
 			died += 1
+			death_turns.append(g.turn)
+			if g.turn <= EARLY:
+				early += 1
 			causes[g.cause.left(28)] = causes.get(g.cause.left(28), 0) + 1
 		else:
 			stuck += 1
@@ -37,6 +47,13 @@ func _init() -> void:
 		count, won, 100.0 * won / count, died, 100.0 * died / count, stuck,
 		float(oil_sum) / maxi(won, 1), float(turns_sum) / maxi(won, 1)])
 	print("causes: ", causes)
+	death_turns.sort()
+	print("deaths by turn %d: %d (%.0f%% of nights)  median death turn: %s" % [EARLY, early,
+		100.0 * early / count, str(death_turns[death_turns.size() / 2]) if death_turns.size() > 0 else "-"])
+	seen_turns.sort()
+	var quiet := seen_turns.filter(func(x): return x > EARLY).size()
+	print("first horror seen: median turn %d, after turn %d in %.0f%% of nights" % [
+		seen_turns[seen_turns.size() / 2], EARLY, 100.0 * quiet / count])
 	quit()
 
 
@@ -55,6 +72,8 @@ func _play(g) -> void:
 		if g.over():
 			return
 		var near: Array = _awake_lit(g)
+		if first_seen < 0 and near.size() > 0:
+			first_seen = g.turn
 		if trace:
 			print(g.turn, " me=", g.hunter, " f=", g.facing, " oil=", g.oil, " lit=", near.map(func(x): return x.pos), " all=", g.thralls.map(func(x): return x.pos))
 		if near.any(func(th): return _md(th.pos, g.hunter) <= 2):
