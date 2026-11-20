@@ -333,6 +333,13 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   `THRALL_LOOKS`, 2.2 tall via meta `tall`: sack head stitched with fishhooks, ribs torn open, claws) and `thrall_lunge_nightmare`
   (now `THRALL_LUNGE`: sack mouth split open, ribs like a jaw; lunge + kill shot). Forge's auto magenta key ate dark bodies, so
   these were rendered WITHOUT `key` and cut out with rembg `isnet-general-use` (pip install "rembg[cpu]"): clean on painted backdrops.
+- **Fluid moves (Nov 20, Duff: "make the movement more fluid"):** a swipe fires as soon as the finger passes
+  `SWIPE_MIN` (drag events, not lift); a move made mid-glide is `queued` and runs the moment the step lands;
+  keep the finger down after a forward/back swipe and you keep walking (`hold_kind`), one turn per tile. Any
+  `STOP_EVENTS` event, a new flicker, a bump or a card drops the queue and the walk. Chained steps keep their
+  speed (`glide()` cubic Hermite, v0/v1) instead of stopping on every tile; head dips + sways per foot, turns
+  lean slightly (camera roll), hand lantern bobs with the step (`step_k`). Rules unchanged: still one turn per
+  move. Capture prints QUEUE / HOLD PASS (seen failing with the features off).
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.

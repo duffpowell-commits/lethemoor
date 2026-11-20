@@ -66,6 +66,17 @@ var fake_flicker := false
 var last_event := ""
 var swipe_from = null              # where a finger went down on the world view (window px)
 const SWIPE_MIN := 50.0            # UI px a finger must travel to count as a swipe
+## Fluid moves (Nov 20): a swipe fires the moment the finger passes SWIPE_MIN (not on lift);
+## a move made mid-glide is queued and runs straight after; keep the finger down after a
+## forward/back swipe and you keep walking. Anything in STOP_EVENTS (or a new flicker) ends the
+## walk and drops the queue, so a held finger never walks you into a horror.
+const MOVE_KINDS := ["forward", "back", "left", "right", "wait"]
+var swipe_fired := false           # this finger already made its move
+var hold_kind := ""                # finger still down after a forward/back swipe: repeat it
+var queued := ""                   # one move made while the last one was still gliding
+var chain_from := ""               # the move this one carries straight on from ("" = from rest)
+var step_k := 0.0                  # 0..1..0 over each step: drives the hand-lantern bob
+var foot := 1.0                    # which foot: the head sways the other way each step
 
 var cam: Camera3D
 var light: OmniLight3D
@@ -199,9 +210,17 @@ func _cam_pos(p: Vector2i, f: Vector2i) -> Vector3:
 	return _w(p) - Vector3(f.x, 0, f.y) * CAM_BACK + Vector3(0, EYE, 0)
 
 
-func _place_cam(pos: Vector3, yaw: float) -> void:
+func _place_cam(pos: Vector3, yaw: float, roll := 0.0) -> void:
 	cam.position = pos
-	cam.rotation = Vector3(0, yaw, 0)
+	cam.rotation = Vector3(0, yaw, roll)
+
+
+## Ease from v0 to v1 (0 = at rest, 1 = full speed): steps that run on into each other keep
+## their speed instead of stopping dead on every tile (cubic Hermite, 0 -> 1).
+static func glide(k: float, v0: float, v1: float) -> float:
+	var k2 := k * k
+	var k3 := k2 * k
+	return (k3 - 2.0 * k2 + k) * v0 + (-2.0 * k3 + 3.0 * k2) + (k3 - k2) * v1
 
 
 # ---------------------------------------------------------------- world
@@ -712,9 +731,15 @@ func _flicker_fires() -> void:
 
 ## One action = one turn. The camera glides to the new pose while the thralls glide too.
 func act(kind: String) -> void:
+	if busy and kind in MOVE_KINDS and not game.over():
+		queued = kind         # mid-glide: runs the moment this step lands
+		return
 	if busy or game.over() or modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null:
+		chain_from = ""
 		return
 	busy = true
+	var carried := chain_from
+	chain_from = ""
 	last_event = ""
 	turn_events = []
 	var from_pos := cam.position
@@ -735,6 +760,8 @@ func act(kind: String) -> void:
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
+		hold_kind = ""
+		queued = ""
 		var ahead: Vector2i = game.hunter + (game.facing if kind == "forward" else -game.facing)
 		var who: int = game.thrall_at(ahead)
 		last_event = "blocked_fire" if game.burning(ahead) else ("blocked" if who < 0 else ("blocked_body" if game.thralls[who].get("lying", false) else "blocked_horror"))
@@ -749,15 +776,27 @@ func act(kind: String) -> void:
 	_refresh_fog()
 	var to_pos := _cam_pos(game.hunter, game.facing)
 	var to_yaw := _yaw(game.facing)
+	var walking := kind in ["forward", "back"]
+	var v0 := 1.0 if walking and carried == kind else 0.0
+	var v1 := 1.0 if walking and (hold_kind == kind or queued == kind) else 0.0
+	var turn_dir := 0.0 if walking else signf(angle_difference(from_yaw, to_yaw))
+	if walking:
+		foot = -foot
+	var side := cam.global_transform.basis.x
 	var e := 0.0
 	while e < STEP_TIME:
 		e += get_process_delta_time()
-		var k := smoothstep(0.0, 1.0, minf(e / STEP_TIME, 1.0))
-		var bob := sin(k * PI) * 0.03 if kind in ["forward", "back"] else 0.0
-		_place_cam(from_pos.lerp(to_pos, k) + Vector3(0, bob, 0), lerp_angle(from_yaw, to_yaw, k))
+		var u := minf(e / STEP_TIME, 1.0)
+		var k := glide(u, v0, v1)
+		var arc := sin(u * PI)
+		step_k = arc if walking else 0.0
+		# head: dips onto the foot and sways off it; a turn leans into it a touch
+		var head := Vector3(0, -arc * 0.035, 0) + side * (arc * 0.018 * foot) if walking else Vector3.ZERO
+		_place_cam(from_pos.lerp(to_pos, k) + head, lerp_angle(from_yaw, to_yaw, k), -turn_dir * arc * 0.025)
 		for j in thrall_nodes.size():
-			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), k)
+			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
 		await get_tree().process_frame
+	step_k = 0.0
 	turn_events = events
 	if "hook_hit" in events or "hook_miss" in events or "hook_broke" in events:
 		hook_jab = 1.0
@@ -779,6 +818,15 @@ func act(kind: String) -> void:
 		_show_page(game.letters_read.size() - 1)
 	else:
 		_teach(last_event)
+	# carry straight on: a queued move first, else the held finger's walk
+	var stop: bool = game.over() or last_event in STOP_EVENTS or last_event == "flicker" or modal != null
+	var next: String = "" if stop else (queued if queued != "" else hold_kind)
+	queued = ""
+	if stop:
+		hold_kind = ""
+	if next != "":
+		chain_from = kind
+		act(next)
 
 
 ## A swipe in UI pixels. Mostly vertical: step; mostly sideways: turn the way the finger went.
@@ -833,14 +881,24 @@ func _unhandled_input(event: InputEvent) -> void:
 	# swipe on the view: up = forward, down = back, left/right = turn (buttons stay as backup)
 	var release: bool = event is InputEventScreenTouch and not event.pressed
 	release = release or (event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	var drag: bool = event is InputEventScreenDrag
+	drag = drag or (event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0)
 	if press:
+		if swipe_from == null:   # touch + its emulated mouse press: keep the first
+			swipe_fired = false
 		swipe_from = event.position
-	elif release and swipe_from != null:
+	elif (drag or release) and swipe_from != null and not swipe_fired:
 		var to_ui := get_viewport().get_final_transform().affine_inverse()
 		var d: Vector2 = to_ui * event.position - to_ui * swipe_from
-		swipe_from = null
 		if d.length() >= SWIPE_MIN:
+			swipe_fired = true
+			if drag and absf(d.y) >= absf(d.x) and modal == null and menu_sheet == null:
+				hold_kind = "forward" if d.y < 0 else "back"   # finger stays down: keep walking
 			swipe(d)
+	if release:
+		swipe_from = null
+		swipe_fired = false
+		hold_kind = ""
 	# keyboard for the web build: arrows / WASD, space waits, 1-2-3 lantern
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -940,7 +998,7 @@ func _process(delta: float) -> void:
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
 		hand_art.modulate = Color(k, k, k)
-		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22 + sin(t * 2.1) * 2.0
+		hand_art.position.y = _ui_h() - _bh() - HAND_W + 22 + sin(t * 2.1) * 2.0 + step_k * 9.0
 
 
 # ---------------------------------------------------------------- HUD
@@ -2503,6 +2561,55 @@ func _swipe_real(from: Vector2, to: Vector2) -> void:
 			break
 
 
+## Fluid moves: a second swipe made mid-glide still counts (QUEUE), and a finger held down
+## after a forward swipe keeps walking until it lifts (HOLD).
+func _capture_fluid() -> void:
+	var xf := get_viewport().get_final_transform()
+	var c := Vector2(_col_x() + UI_W / 2.0, (TOP_H + _ui_h() - _bh()) / 2.0)
+	var f: Vector2i = game.facing
+	var t0: int = game.turn
+	for dx in [90.0, -90.0]:     # right then straight back left, no waiting between
+		_mouse(xf * (c - Vector2(dx, 0)), true)
+		_mouse(xf * (c + Vector2(dx, 0)), false)
+		await get_tree().process_frame
+	for i in 60:
+		await get_tree().process_frame
+		if not busy and queued == "":
+			break
+	print("QUEUE ", "PASS" if game.turn == t0 + 2 and game.facing == f else "FAIL", " turns=", game.turn - t0)
+	var at: Vector2i = game.hunter
+	t0 = game.turn
+	_mouse(xf * (c + Vector2(0, 90)), true)
+	var mv := InputEventMouseMotion.new()
+	mv.button_mask = MOUSE_BUTTON_MASK_LEFT
+	mv.position = xf * (c - Vector2(0, 90))
+	mv.global_position = mv.position
+	Input.parse_input_event(mv)
+	for i in 120:                # hold until two steps are done (or something stops the walk)
+		await get_tree().process_frame
+		if game.turn >= t0 + 2 or hold_kind == "":
+			break
+	var held_steps: int = game.turn - t0
+	_mouse(mv.position, false)
+	for i in 60:
+		await get_tree().process_frame
+		if not busy:
+			break
+	await get_tree().process_frame
+	var settled: bool = not busy and game.turn - t0 <= held_steps + 1
+	print("HOLD ", "PASS" if held_steps >= 2 and game.hunter == at + f * (game.turn - t0) and settled else "FAIL",
+			" steps=", game.turn - t0, " held=", held_steps)
+
+
+func _mouse(pos: Vector2, down: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = down
+	ev.position = pos
+	ev.global_position = pos
+	Input.parse_input_event(ev)
+
+
 ## Two passes (the scene reloads between them): 0 = controls + walk to the bell and ring it,
 ## 1 = read a letter under BRIGHT, then hood and walk blind into a thrall.
 func _capture() -> void:
@@ -2571,6 +2678,7 @@ func _capture() -> void:
 		_close_menu()
 		var slim_ok: bool = not pad_on and absf(bottom_panel.size.y - SLIM_H) < 1.0 and wait_button.is_visible_in_tree()
 		print("PAD ", "PASS" if tall_ok and plates_ok and slim_ok else "FAIL", " tall=", tall_ok, " plates=", plates_ok, " slim=", slim_ok)
+		await _capture_fluid()
 		await _capture_rotate()
 		var bell: Vector2i = room.bells[0]
 		var shot_horror := false
