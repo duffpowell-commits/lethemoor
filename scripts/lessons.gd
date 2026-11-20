@@ -6,11 +6,13 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 
 ## Danger first: if a thrall and a letter turn up together, the thrall gets the card.
-const ORDER := ["goal", "stalker", "rose", "lunge", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
+const ORDER := ["goal", "stalker", "rose", "lunge", "behind", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
 
 const CARDS := {
 	"goal": ["RING THE BELL",
-		"The bell hangs somewhere in this ward. Reach it and ring it to end the night.\n\nSwipe up to step, down to back away, left or right to turn. WAIT waits a turn. (Rather have buttons? MENU, MOVE BUTTONS.) Every move, even a turn, is one turn. The dark moves when you do."],
+		"Somewhere in this ward hangs a bell. Ring it to end the night.\n\nSwipe up to walk. Hold your finger down to keep going. Down backs away, sideways turns.\n\nEvery move, even a turn, is one turn. The dark moves when you do."],
+	"behind": ["BEHIND YOU",
+		"A breath at your neck: something is that close and you are not looking at it.\n\nSwipe down with two fingers to spin round (two turns). Or keep walking.\n\n(Rather have buttons? MENU, MOVE BUTTONS.)"],
 	"oil": ["OIL IS YOUR CLOCK",
 		"The amber bar is your oil. NORMAL burns 1 a turn, BRIGHT burns 2, HOODED burns none. Changing the lantern is free.\n\nThe oil you still have when the bell rings is your score."],
 	"hood": ["HOODED",
@@ -69,6 +71,9 @@ static func _now(id: String, game, event: String) -> bool:
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT)
 		"lunge", "rose":
 			return event == id
+		"behind":   # what the breath-at-your-neck sound means (audio.gd behind())
+			return game.thralls.any(func(th): return not th.get("gone", false) and not th.get("lying", false) \
+					and not game.in_view(th.pos) and game.room.reachable(th.pos, 2).has(game.hunter))
 		"stalker":
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
 		"flicker":

@@ -31,6 +31,7 @@ build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~
 | panic.ogg | a gasp, oil spilling and hissing | dread hits 100 |
 | whisper.ogg | breath shaped like words | the flame gutters (something near); random phantom whispers behind you at 50+ dread |
 | shuffle_0.ogg, shuffle_1.ogg, shuffle_2.ogg | a foot dragging, a wet breath (one take without the groan) | a thrall within 7.5 tiles moves (in 3D, seen or not); hunting thralls drag a foot now and then |
+| breath_behind.ogg | a slow wet exhale at your neck, nearly dry, a throat click | a horror gets within 2 walking tiles of you outside your view cone (once as it arrives, in 3D at its tile) |
 | stalker_silk.ogg | lace dragging on stone with a breath in it | the Stalker moves (in 3D) |
 | night_start.ogg | low swell and a far-off toll | each night starts (also dawn) |
 | ui_click.ogg | soft wooden tick | any button |

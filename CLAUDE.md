@@ -340,6 +340,17 @@ Owner: Duff. Read this first; it is the handoff between sessions.
   speed (`glide()` cubic Hermite, v0/v1) instead of stopping on every tile; head dips + sways per foot, turns
   lean slightly (camera roll), hand lantern bobs with the step (`step_k`). Rules unchanged: still one turn per
   move. Capture prints QUEUE / HOLD PASS (seen failing with the features off).
+- **Sound + about-face (Nov 20, Duff picked "1 and 4"):** footsteps play `STEP_SYNC` 0.09 s into the glide (boot lands
+  on the head dip). **Breath at your neck:** `Audio.behind(game)` = live horrors within `BEHIND_NEAR` 2 walking tiles and
+  outside your view cone; `breath_behind` plays at its tile every turn it stays there (Duff: "keep breaths playing"), +1.5 dB and a little lower each turn it lingers, up to 3 (`was_behind` counts turns). Shuffles still go
+  silent within 3, so it's silence, then a breath. **About-face:** two-finger swipe down (or X) = `act("about")`, two
+  `turn_by(1)` in one 0.32 s spin (`ABOUT_TIME`), second half skipped on a stop event; `touches` tracks fingers, only
+  finger 0 steers. Guide text updated. 65 tests; capture prints ABOUT / BREATH PASS (seen failing with them off).
+- **First minute (Nov 20):** balance bot now prints deaths by turn 20 (0% over 300 nights) and when the first
+  horror is seen (median turn 16, always by 20), so the opening is a readability job, not balance. Goal card cut
+  to the controls that matter (<260 chars, tested); spin round + MOVE BUTTONS moved to a new `behind` card that
+  shows the first time a horror is within 2 walking tiles outside your view (same rule as the breath). POUR OIL
+  is hidden until a horror has been lit, the hook found or a slick poured (`tools_shown`).
 - **Art needs: `docs/art_needs.md`** (prioritized P0/P1/P2 for the slice, then the full game, with
   sizes and why). Shared copy for Duff's art team: Claude Doc https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj.
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.

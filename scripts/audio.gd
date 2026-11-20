@@ -39,6 +39,9 @@ var heart: AudioStreamPlayer
 var pool: Array[AudioStreamPlayer] = []
 var muted := false
 var last_step := -1
+const STEP_SYNC := 0.09            # s after a step starts: the boot lands as the head dips (fp_view glide)
+const BEHIND_NEAR := 2             # walking tiles: this close and out of your view cone, you hear it breathe
+var was_behind := {}               # thrall index -> turns in a row it has breathed at your neck
 var prev_pos: Array = []          # thrall positions after the last refresh
 var quiet := false
 var was_flicker := false
@@ -203,6 +206,7 @@ func night() -> void:
 	was_flicker = false
 	was_haunted = false
 	prev_pos = []
+	was_behind = {}
 	fires.clear()     # the old scene freed its players
 	_fade(bed, BED_DB, 3.0)
 	_fade(heart, -80.0, 0.5)
@@ -218,8 +222,11 @@ func on_turn(kind: String, events: Array, game, spent: bool) -> void:
 				if i == last_step:
 					i = (i + 1) % 4
 				last_step = i
-				sfx("step_%d" % i, -3.0, randf_range(0.92, 1.07))
+				_later(STEP_SYNC, "step_%d" % i, -3.0, randf_range(0.92, 1.07))
 			"turn": sfx("turn", -6.0, randf_range(0.95, 1.05))
+			"turn_about":   # spun round: two quick rustles, the second lower
+				sfx("turn", -5.0, randf_range(1.0, 1.08))
+				_later(0.14, "turn", -6.0, randf_range(0.85, 0.92))
 			"bump": sfx("bump", -2.0, randf_range(0.95, 1.05))
 			"oil": sfx("oil", -2.0)
 			"letter": sfx("letter", 0.0)
@@ -261,6 +268,8 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 		out.append("step")
 	elif spent and kind in ["left", "right"]:
 		out.append("turn")
+	elif spent and kind == "about":
+		out.append("turn_about")
 	elif spent and kind == "hook":
 		out.append("hook_swing")
 	elif spent and kind in ["pour", "spark"]:
@@ -308,6 +317,33 @@ func _world_sounds(game) -> void:
 			at("shuffle_%d" % (randi() % 3), th.pos, near_db, randf_range(0.9, 1.1))
 		elif th.target != null and randf() < 0.35:
 			at("shuffle_%d" % (randi() % 3), th.pos, near_db - 6.0, randf_range(0.85, 1.0))
+	# the breath at your neck: every turn it stays there (Duff: "keep breaths playing"),
+	# a touch louder and lower each turn it lingers, so staying put sounds worse and worse
+	var now := {}
+	for i in behind(game):
+		now[i] = was_behind.get(i, 0) + 1
+		var bd: float = Vector2(game.thralls[i].pos - game.hunter).length()
+		var linger: int = mini(now[i] - 1, 3)
+		at("breath_behind", game.thralls[i].pos, 1.0 - bd * 2.0 + linger * 1.5, randf_range(0.9, 1.05) - linger * 0.04)
+	was_behind = now
+
+
+## Horrors breathing at your neck: within BEHIND_NEAR walking tiles, out of your view cone,
+## not burned, not playing dead. Shuffles go silent this close (silent()); this is the one
+## sound that says "it's right behind you". Plays every turn it stays. Pure, tested headless.
+static func behind(game) -> Array:
+	var out: Array = []
+	for i in game.thralls.size():
+		var th: Dictionary = game.thralls[i]
+		if th.get("gone", false) or th.get("lying", false) or game.in_view(th.pos):
+			continue
+		if game.room.reachable(th.pos, BEHIND_NEAR).has(game.hunter):
+			out.append(i)
+	return out
+
+
+func _later(delay: float, name: String, db: float, pitch: float) -> void:
+	get_tree().create_timer(delay).timeout.connect(func(): sfx(name, db, pitch))
 
 
 ## After every refresh: the heartbeat follows dread, the flame follows the lantern, the bed

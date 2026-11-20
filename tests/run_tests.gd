@@ -371,6 +371,13 @@ func test_lessons_teach_in_order() -> void:
 	check(Lessons.due(g, seen) == "hood", "hooding explains hooding")
 	seen["hood"] = true
 	check(Lessons.due(g, seen, "panic") == "panic", "panic event gets its card")
+	var b = Night.start("########\n#..H...#\n########\n")
+	b.facing = Vector2i.RIGHT
+	b.thralls.append({"pos": Vector2i(1, 1), "kind": "thrall", "target": null, "last_seen": null})
+	check(Lessons.due(b, {"goal": true}) == "behind", "a horror at your back gets the spin-round card")
+	b.facing = Vector2i.LEFT
+	check(Lessons.due(b, {"goal": true}) != "behind", "looking at it: no behind card")
+	check(Lessons.CARDS.goal[1].length() < 260, "the first card stays short enough to read on a phone")
 	for id in Lessons.ORDER:
 		check(Lessons.CARDS.has(id), "every lesson has a card: " + id)
 
@@ -536,7 +543,7 @@ func test_audio_every_cue_has_a_clip() -> void:
 	var names := ["amb_moor", "flame_loop", "heartbeat", "turn", "bump", "oil", "letter", "letter_dim",
 		"sting_horror", "sting_dread", "panic", "out_of_oil", "bell", "death", "night_start", "ui_click",
 		"lantern_hood", "lantern_normal", "lantern_bright", "stalker_silk", "whisper",
-		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek", "heard_turn", "fire_loop"]
+		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek", "heard_turn", "fire_loop", "breath_behind"]
 	for i in 4:
 		names.append("step_%d" % i)
 	for i in 3:
@@ -546,6 +553,24 @@ func test_audio_every_cue_has_a_clip() -> void:
 	var src := FileAccess.get_file_as_string("res://assets/audio/SOURCES.md")
 	for n in names:
 		check(src.contains(n + ".ogg"), "SOURCES.md doesn't list " + n)
+
+
+func test_breath_behind_you() -> void:
+	var g = Night.start("########\n#..H...#\n########\n")
+	g.facing = Vector2i.RIGHT
+	g.thralls.append({"pos": Vector2i(1, 1), "kind": "thrall", "target": null})
+	check(Audio.behind(g) == [0], "two tiles behind, out of view: you hear it breathe")
+	g.facing = Vector2i.LEFT
+	check(Audio.behind(g) == [], "looking at it: no breath")
+	g.facing = Vector2i.RIGHT
+	g.thralls[0].pos = Vector2i(6, 1)
+	check(Audio.behind(g) == [], "three tiles ahead: too far, and in view")
+	g.facing = Vector2i.LEFT
+	g.thralls[0].pos = Vector2i(5, 1)
+	check(Audio.behind(g) == [0], "two tiles behind the other way")
+	g.thralls[0].lying = true
+	check(Audio.behind(g) == [], "playing dead: no breath")
+	check(Audio.cues("about", [], true) == ["turn_about"], "spinning round rustles twice")
 
 
 func test_silent_bell_before_the_stalker_moves() -> void:
