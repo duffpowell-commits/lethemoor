@@ -1,0 +1,20 @@
+{
+ "t1_try1": {"score": 2, "note": "Reads as a clean front/left/back/right rotation."},
+ "t1_try2": {"score": 1, "note": "Rotation reads but side views are swapped (cell 2 faces right, cell 4 faces left)."},
+ "t1_try3": {"score": 0, "note": "Both side cells face the same way (left); not a turnaround."},
+ "t2_try1": {"score": 0, "note": "All 4 frames are the same contact pose redrawn; no passing frames, lantern does not swing. Plays as jitter, not a walk."},
+ "t2_try2": {"score": 0, "note": "Same as try1: 4 near-copies of one stride pose."},
+ "t2_try3": {"score": 0, "note": "Same as try1: 4 near-copies of one stride pose."},
+ "t3_try1": {"score": 0, "note": "'Right foot forward' frame was mirrored to face LEFT; cycle flips direction."},
+ "t3_try2": {"score": 0, "note": "All three frames are effectively identical (silhouette IoU 0.985); lantern moved to the far hand vs anchor."},
+ "t3_try3": {"score": 1, "note": "Left/right frames identical; only the passing frame differs. Reads as a 2-frame shuffle at best."},
+ "t4_try1": {"score": 1, "note": "Bob reads, but the whole sprite is redrawn (texture boil, arm/coat shifts), not just 1 px shoulders + flame."},
+ "t4_try2": {"score": 1, "note": "Bob reads but drops ~4 px at 64 px and the sprite is redrawn; jittery."},
+ "t4_try3": {"score": 1, "note": "Bob reads; redraw boil and lantern shift. Not the 'nothing else changes' brief."},
+ "t5_try1": {"score": 1, "note": "Frame 1 is just idle (no recoil); frame 3 sits up rather than collapses. Partially reads."},
+ "t5_try2": {"score": 2, "note": "Recoil -> one knee -> collapsed with lantern beside him reads clearly."},
+ "t5_try3": {"score": 2, "note": "Recoil (lantern flung) -> kneel -> collapsed reads clearly."},
+ "t6_try1": {"score": 1, "note": "Frame 2 barely moves; no visible head tilt. Lurch weak."},
+ "t6_try2": {"score": 2, "note": "Clear lurching step forward; slight head tilt. Reads well."},
+ "t6_try3": {"score": 2, "note": "Clear step forward with reaching arm; head tilt subtle."}
+}
