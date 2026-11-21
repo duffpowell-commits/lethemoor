@@ -2,7 +2,22 @@
 build/
 *.tmp
 debug.keystore
+# Unencrypted keystores stay out. The encrypted signing key (*.keystore.enc) stays tracked.
 *.keystore
+!*.keystore.enc
+*.jks
+*.pem
+.env
+.env.*
+secrets/
+
+# Local prompt and handoff files. This repo is public.
+*.prompt.md
+*.prompt.txt
+handoff.local.md
+HANDOFF.local.md
+prompts.local/
+
 build.txt
 build_code.txt
 

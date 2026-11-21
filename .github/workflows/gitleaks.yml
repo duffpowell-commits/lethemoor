@@ -1,0 +1,26 @@
+name: gitleaks
+
+# Secret scan on every pull request and every push to main, including docs-only changes.
+# The build workflow skips those paths; this one does not.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          VER=8.24.3
+          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan git history
+        run: ./gitleaks detect --source . --redact --verbose --exit-code 1

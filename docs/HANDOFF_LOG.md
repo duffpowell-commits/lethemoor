@@ -358,7 +358,7 @@ Moved word for word out of CLAUDE.md on Nov 21 2026 (lean harness: CLAUDE.md loa
   P0 = app icon (APK + home screen still show the Godot robot), sky over the alleys, wall tops.
   Tick items off in the md as art lands.
 - **Slice status (Nov 19):** all slice features built. Left before expanding: one playtest round
-  (Duff Android, Brittany + Madison iPhone) collecting verdicts, FPS and sound notes; tune oil,
+  (Duff on Android, iPhone testers on the web build) collecting verdicts, FPS and sound notes; tune oil,
   thrall speed, Stalker spot from it; second round. Kill test by Nov 28: median fun 6+, testers
   replay. Don't start the full-game systems (safe room, satchel, corpse, Choir) before it passes.
 - Older plan: **M1 = new slice** (pivot doc #12): 2–3 rooms, locked door + key, one Stalker, one safe
@@ -372,7 +372,7 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
   clean, put the mood in Godot lights. Duff wants it "overall more creepy".
 - **Roles (Duff's call):** Grok designs characters, Claude is "the head": converts, cleans,
   lights, integrates, and pushes back on quality. Grok's design >> code-drawn `hunter48`
-  (Duff and Claude agree). Prompt template lives in `grok_art/README.md`.
+  (Duff and Claude agree). Pasteable image prompts stay in the Drive plan, not in this repo.
 - **Importer lessons** (`tools/import_sprite.py`): BOX shrink + palette snap + speckle and 3x3
   majority cleanup + ink outline works. A min-filter "keep the darks" blend at 0.35 made it
   muddy; it's at 0.12 now. Bright amber is only allowed in the lower-right lantern zone
@@ -391,10 +391,10 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 
 ## Decisions (Duff, Nov 7)
 - Visuals first: every milestone ships something Duff can see, rendered to `docs/renders/`.
-- Test channels: **web build** for iPhone testers (Brittany is on iPhone; she opens a link in
+- Test channels: **web build** for iPhone testers (they open a link in
   Safari, no install). **APK** for Duff's Android. iOS native is later (needs a Mac build
   machine + $99/yr Apple account); avoid Android-only plugins so a port stays a build job.
-- Hosting: code here (private GitHub). Builds = CI artifacts. Web playtests on an **itch.io
+- Hosting: code here (public GitHub). Builds = CI artifacts. Web playtests on an **itch.io
   draft page** (Duff still has to make the itch account; then add a `BUTLER_API_KEY` repo
   secret and an upload step). Not Netlify: free credits ran out on Chaos.
 - Store later: Google Play, $25. New personal accounts need **12 testers opted in for 14 days**
@@ -409,6 +409,8 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 - Skill tree or not, and sound spend: see the pivot doc's Open questions.
 - Is the M0 lantern look (warm pool, black beyond, soft edge) the right direction?
 
+
+- **Public repo guardrails (Nov 21):** rules at the top of `CLAUDE.md`. gitleaks runs on pull requests and pushes to main. Tester names and the committed image-prompt template are off the branch tip. Older commits and the `glaze-art` and `grok/art-generation-guide` branches still have prompt and handoff text; removing that from history needs Duff's approval. No passphrase was found in the tree.
 
 ## Old Layout / Commands / Tech / House rules (CLAUDE.md before Nov 21, kept verbatim)
 
