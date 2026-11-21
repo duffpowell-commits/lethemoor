@@ -1,6 +1,8 @@
 # STATUS
 
-Shared handoff for Jace, Blace, Glaze, and Claude. Read this first. Update it last, before a chat is reset. Long record: `docs/HANDOFF_LOG.md`. Design that wins: `docs/design/first_person_design.md` (Nov 19).
+Public repo: follow the Public repo rules at the top of `CLAUDE.md`.
+
+Read this first. Update it last. Long record: `docs/HANDOFF_LOG.md`. Design that wins: `docs/design/first_person_design.md` (Nov 19).
 
 ## The game
 
@@ -18,7 +20,7 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 ## In progress
 
-Playtest round 1. Duff on the Android APK. Brittany and Madison on the iPhone web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
+Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
 
@@ -51,6 +53,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- 2026-11-21. Public-repo guardrails: rules in `CLAUDE.md`, gitleaks on PRs and main, secret and prompt ignores.
 - 2026-11-21. Push guards, fresh-eyes review gate, lean CLAUDE.md (PR #32, commit 7191080).
 - 2026-11-20. Breath keeps playing while a horror lingers. Short goal card, behind-you card, POUR hidden until it is needed.
 - 2026-11-20. Footsteps land on the footfall. Breath at your neck. Two-finger swipe turns you about.

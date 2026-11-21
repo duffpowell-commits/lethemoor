@@ -3,7 +3,7 @@ name: build
 # Every push: parse all scripts, run the rule tests, then export a web build (for iPhone
 # testers via Safari / itch) and a debug APK (for Android). Download both from the run's
 # "Artifacts" box on GitHub; the phone can open them straight from the GitHub app/site.
-# To save Actions minutes (private repo, 2,000 free/month): CI runs on pushes to main and on
+# To save Actions minutes: CI runs on pushes to main and on
 # PRs, not on plain branch pushes, and skips changes that only touch docs/, *.md or grok_art/
 # (art drops never ship by themselves; Foxboard drops are decoded by foxboard_decode.yml).
 # `workflow_dispatch` builds any branch on demand (GitHub app: Actions -> build -> Run workflow).
@@ -169,7 +169,7 @@ jobs:
           gh release upload dev build/version.json --clobber
           gh release edit dev --notes "Rebuilt on every push to main. Last: ${GITHUB_SHA::7}"
       - name: Publish web build to GitHub Pages (main only)
-        # Brittany's link: https://duffpowell-commits.github.io/lethemoor/ (plays in iPhone Safari).
+        # Web playtest link: https://duffpowell-commits.github.io/lethemoor/ (plays in iPhone Safari).
         # Force-pushes build/web as the only commit on the gh-pages branch. Threads are off in the
         # Web preset, so Pages needs no special COOP/COEP headers.
         if: github.ref == 'refs/heads/main'

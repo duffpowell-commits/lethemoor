@@ -18,21 +18,9 @@ Name it what it is: `lantern_bearer.jpg`, `thrall.jpg`, `drowned_priest.jpg`.
 - **Original file**, not a screenshot, if you can (screenshots work, just softer).
 - Lantern or other light sources glowing amber, so the importer can find the flame.
 
-## Grok prompt template (Grok's chat writes/refines prompts, Grok Imagine renders)
-```
-Single game sprite, 2D pixel art, HD-2D style (Octopath Traveler-like): crisp hand-placed pixels,
-no anti-aliasing, no blur, no gradients.
-Subject: [describe the character]
-View: 3/4 front-facing, full body, idle pose, centered.
-Canvas: character fills ~80% of a square frame, designed to downscale cleanly to 64x64.
-Palette: max 16 colors — desaturated bone, rust, moss green, ink black; ONE warm accent (lantern amber).
-Lighting: single warm light source from the lantern, low and to the right; deep shadows, rim light.
-Mood: gothic, Edgar Allan Poe, quiet dread, something slightly wrong with the anatomy.
-Background: flat solid #00FF00, no scenery, no floor shadow, no text, no border.
-Avoid: chibi, cute, anime gloss, 3D render look, painterly brushwork.
-```
-Attach an approved design as a style anchor ("match this exact style and palette"). One pose per
-image; Grok can't hold a character consistent across a whole animation sheet.
+## Grok prompts
+Pasteable image prompts stay in the Drive plan linked above. Do not commit them in this repo.
+One pose per image; Grok can't hold a character consistent across a whole animation sheet.
 
 ## From Foxboard (Duff's phone art editor)
 Foxboard's **Send to game** button drops art here as `grok_art/<date>-foxboard/<name>-<time>.png`

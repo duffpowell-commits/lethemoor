@@ -1,17 +1,21 @@
 # Lethemoor: The Last Lantern
 
+## Public repo rules
+
+This repo is public. Never commit secrets, passwords, keys, tokens, keystore passes, or `.env` files (secrets only in GitHub Actions secrets added by Duff). Never commit AI prompts, bot instructions, persona text, or private chat handoffs. Never commit personal or family info. Never copy code, data, signals, or results from swinglifeaway or other private trading repos.
+
 Gothic turn-based survival horror, **first person** grid crawler, Android phones (portrait) + web for
 iPhone testers. Godot 4.5, GDScript only. Owner: Duff. This is the handoff; keep it short.
 **Everything built so far, with the details and gotchas of each system: `docs/HANDOFF_LOG.md`.**
 Search it for a system before you change it.
-**Read `STATUS.md` first and update it last.** Shared handoff for Jace, Blace, Glaze, and Claude.
+**Read `STATUS.md` first and update it last.**
 
 ## Where things stand (Nov 21)
 - Design that wins over every older doc: `docs/design/first_person_design.md` (Nov 19, first person,
   Duff: "Switch fully now"). Pillars: light is life, every slot matters, the dead don't stay gone.
 - The One Night slice is built: bell + grade, Stalker, boathook + oil-slick trap, noise, letters,
   sound, shuffled nights, verdict card, scarier thralls, corpses, painted art, in-app updates.
-- **Now:** one playtest round (Duff Android, Brittany + Madison iPhone): verdicts, FPS, sound notes.
+- **Now:** one playtest round (Duff on Android, iPhone testers on the web build): verdicts, FPS, sound notes.
   Tune oil, thrall speed, Stalker spot from it; then a second round.
 - **Kill test by Nov 28:** median fun 6+/10 and testers choose to replay. Don't start full-game
   systems (safe room, satchel, corpse, Choir) before it passes.
