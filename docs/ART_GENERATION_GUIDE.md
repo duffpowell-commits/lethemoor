@@ -10,10 +10,10 @@ How the Grok Bot art agents get results Duff likes, mapped onto Foxboard Forge
   pipeline, now the painted 512×512 wall and floor textures (and other
   first-person slice art) after the Nov 19 first-person pivot.
 
-This file does not invent techniques those agents do not use. Forge-only
-controls (seeds, `tile: true`, `keyfix.py`, Magic edit) are called out as
-Forge features that stand in for a Grok habit, not as something Grok itself
-exposed.
+This file does not invent techniques those agents do not use. Where Forge
+cannot do what Grok does, it says so plainly. See `docs/DECISIONS.md`
+(2026-11-21, America/Chicago) for why the style-reference path is a
+workaround.
 
 **Forge prompts and outputs are public.** Never put Duff's likeness, private
 info, real names of living people, or anything that should stay off the
@@ -25,13 +25,11 @@ public internet in `forge/jobs/<id>.json`.
 
 - Grok art skills: `game-art-delivery-pipeline`, `game-art-batch-pipeline`,
   `pixel-sprite-generate-and-clean`, `getting-started`.
-- Transcripts of Quase (`81b2f3dd-ab12-4901-b8dd-b37f5f5a32be`) and Glaze
-  (`b17145c5-8d33-409a-a57c-611724f21f4f`), Nov 2026. The transcript tool
-  returned the chat, not the hidden `GenerateImage` tool calls, so exact
-  prompt wording is taken from files the agents wrote: Lethemoor
-  `grok_art/glaze/HANDOFF.md`, `grok_art/glaze/showcase/README.md`, and
+- Files the Grok art agents wrote: Lethemoor `grok_art/glaze/HANDOFF.md`,
+  `grok_art/glaze/showcase/README.md`, and
   `grok_art/glaze/env/round1/process_tiles.py`.
-- Foxboard `README.md`, `CLAUDE.md`, and real job JSON under `forge/jobs/`
+- Foxboard `README.md`, `CLAUDE.md`, `forge/render_one.py`,
+  `tools/claude/art_loop.py`, and real job JSON under `forge/jobs/`
   (Hunter `dh-*`, Lethemoor `lm-*`).
 - Hunter `docs/style-guide.md`, `docs/ART_LOG.md`, `tasks/lessons.md`,
   `standards/09-art-assets.md`.
@@ -47,75 +45,101 @@ example here, the game's file wins.
 This is the shared Grok pipeline, not a mood board.
 
 1. **Read the repo first.** Art-needs list, style bible, palette, banned
-   content, file names and sizes. Glaze almost started a 48 px pixel batch
-   after Lethemoor had already switched to painted 512 px first-person art
-   (`docs/art_needs.md`, Nov 19). Always `git fetch` and read the current
-   docs before generating.
+   content, file names and sizes. Always `git fetch` and read the current
+   docs before generating. Glaze almost started a 48 px pixel batch after
+   Lethemoor had already switched to painted 512 px first-person art.
 2. **Lock the style with 2–3 drafts** of one new asset type. Show Duff.
-   Do not batch until he says the look is right. After that, you may batch
-   that type without asking about style again. A new type (characters vs
-   scenes, or a new realm) gets its own lock. Quase was told: finish the
-   characters in the locked sprite style, then stop and get background
-   drafts approved separately.
+   Do not batch until he says the look is right. A new type (characters vs
+   scenes, or a new realm) gets its own lock.
 3. **Build a reference kit and keep it in the repo** before the batch:
-   identity cards, a style-only crop for scenes, a prop / setting guide.
-4. **Generate one subject per job**, with the references attached and an
-   explicit prompt (style, setting, palette, pose or framing, and what to
-   exclude).
-5. **Self-check, then fix locally** if a small area is wrong. Regenerate
-   the whole image only when composition or identity is wrong.
+   identity cards (verbatim trait strings, laterality, approved views),
+   a style-only crop for scenes, a prop / setting guide.
+4. **Generate one subject per job**, with an explicit prompt (style,
+   setting, palette, pose or framing, and what to exclude). How to attach
+   a picture on Forge is in §3 — it is not the same as Grok.
+5. **Self-check with `art_loop.py score`, then `cut`**, and fix locally
+   if a small area is wrong. Regenerate only when composition or identity
+   is wrong.
 6. **Preview with a contact sheet**, one honest weakest-spot line, and a
-   clear approve / fix / hold ask. Do not dump a pile of unreviewed takes
-   on Duff.
-7. **Handoff only the finals** (plus notes). Log the job, seed, verdict
-   and known issues. Commit on a feature branch, never main, never a
-   force-push. Do not overwrite files that already exist on the default
-   branch; put new art beside them. Do not touch code, scenes or rigs
-   unless asked.
+   clear approve / fix / hold ask.
+7. **Handoff only the finals** (plus notes) into the **game** repo on a
+   feature branch. Never push game-repo code to main, never force-push.
+   Do not overwrite files that already exist on the default branch; put
+   new art beside them. Do not touch code, scenes or rigs unless asked.
+
+**Where to queue a Forge job: Foxboard `main`.**
+`.github/workflows/forge.yml` runs only on a push to `main` under
+`forge/jobs/**`, and only while the repo is public. A job committed on a
+feature branch never renders. Code changes to Foxboard still go through
+a pull request. `art_loop.py queue` publishes a job-only commit to
+`origin/main` for you (see §2). The "no push to main" rule in step 7
+applies to the game repos, not to those job files.
 
 **Why this works:** Duff's "love it, now finish the rest in the same
 style, and show me backgrounds again before you go on" is the quality
 gate. Most of the art he has sent back failed a check the agent could
-have run first (stray text, off-palette color, leftover backgrounds,
-wrong laterality, a description that did not match the picture).
-
-**On Foxboard:** queue `forge/jobs/<id>.json` as in Foxboard `CLAUDE.md`.
-Wait with `python3 tools/claude/forge_wait.py <id>...`. Copy approved
-takes into the game repo's art drop (Hunter `docs/art/`, Lethemoor
-`grok_art/`) on a feature branch, or use Send to game for the Lethemoor
-inbox. Do not commit 55 MB of rejected raws; keep those off the PR
-(Glaze left rejects on the machine and said so).
+have run first.
 
 ---
 
-## 2. Prompt structure (Forge job fields)
+## 2. Prompt structure and how to queue
 
-A Forge job is a JSON file at `forge/jobs/<id>.json`. The fields that
-matter for this guide:
+### Two working queue paths
+
+1. **`art_loop.py queue`** (the usual Claude path; this is what the
+   `lm-*` jobs originally used, now with the missing flags):
+
+   ```
+   python3 tools/claude/art_loop.py queue \
+     --id lm-walltop-b-20261121 --prompt-file p.txt \
+     --n 2 --w 512 --h 512 --seed 2125475105 --tile \
+     --ref grok_art/style_crop.png --ref-strength 0.55
+   ```
+
+   Optional: `--mode new|sketch|edit --init a.png --mask m.png`
+   `--strength 0.7 --key '#00FF00'`. `--no-publish` writes the files
+   without pushing (tests / a dry run). The command writes the job
+   JSON and any `.init.b64` / `.mask.b64` / `.ref.b64` in one commit
+   and publishes that job-only commit to Foxboard `main`.
+
+2. **`F.forgeFiles({mode, prompt, initCanvas|id, refCanvas|refSrc,
+   strength, tile, seed, w, h, n, ...})`** through
+   `node tools/claude/fb.js`, then `saveForge`, then a job-only push
+   to `main`. Same fields.
+
+A hand-written `forge/jobs/<id>.json` plus the matching b64 files also
+works if they land on `main` in the same commit.
+
+### Job fields
 
 | Field | What to put |
 |---|---|
-| `prompt` | One complete instruction. See the template below. |
+| `prompt` | One complete instruction, max 1500 characters. See the template below. |
 | `n` | 2 or 3 for a style-lock or a pick sheet (`n` ≤ 4). |
-| `w`, `h` | Multiples of 64, up to 1024. Use the game's size table, not a default 512×768 unless that is the spec. |
+| `w`, `h` | **256–1024 and a multiple of 64.** `render_one.py` clamps and floors anything else; `art_loop.py queue` rejects it with a clear error. Game asset sizes that are not valid Forge sizes (Lethemoor ~190×500, ~660×665, 184×512, ~400×900) should be rendered at a valid size (for example 576×1024 or 512×512) and then cut or resized with `art_loop.py cut --height`. |
 | `seed` | Always set one integer. Take `k` is rendered at `seed+k`. |
 | `key` | `"#00FF00"` (or the game's key) for cut-out sprites; omit for full-frame textures and skies. |
-| `tile` | `true` for Lethemoor 512×512 floor/wall textures (adds sd.cpp `--circular`). See §6 for Hunter's different rule. |
-| `mode` | `new` for a first take. `sketch` (img2img from `init`, `strength` 0.3–0.95, lower = closer) when you have an approved reference or a sketch. `edit` + `mask` to fix a small area (FLUX.2 klein). |
-| `init` / `mask` | Paths to `forge/jobs/<id>.init.b64` and `.mask.b64`. This is how you attach a style anchor or the previous approved take. |
+| `tile` | `true` for Lethemoor 512×512 floor/wall textures (adds sd.cpp `--circular`). Only affects the FLUX path (`new` / `sketch` / flux edit), not klein edits. For Hunter's different tile rule, see **§9**. |
+| `mode` | `new` (text-to-image, or a new subject with `ref`), `sketch` (img2img from `init`), `edit` (Magic edit), `expand`, `upscale`. |
+| `strength` | Img2img follow, **0.3–0.95**. The renderer defaults to **0.7** if it is missing on a sketch job. The Foxboard Follow slider defaults to 0.87; a flat sketch needs ≥ 0.75 or FLUX schnell can leave it flat. Subtle vary is 0.35, strong vary is 0.6. |
+| `init` | `forge/jobs/<id>.init.b64` (`png:` + base64). Means "start from this picture" (same subject, or a rough layout). **`mode` must be `sketch`** (or edit/expand/upscale). If you set `init` on `mode: "new"`, the queue and the renderer **switch the job to sketch and warn**. They will not silently ignore it. Forge takes exactly one `init`. |
+| `mask` | Required with `init` for `edit` (and expand). White = change, black = keep. |
+| `ref` | `forge/jobs/<id>.ref.b64`. Style-board workaround for a **new** subject. See §3. Cannot be combined with `init`. |
+| `ref_strength` | 0.15–0.85, default 0.55. How hard to follow `ref`. Higher stays closer to the style board. |
+
+### `edit` (Magic edit)
+
+Needs **both** `init` and `mask`. The mask is white = change, black =
+keep. The edit runs on FLUX.2 klein at `side` (default 512), so `w` /
+`h` and `tile` do not apply to it. Do not go back to schnell inpaint.
 
 ### Prompt template (paste, then fill the brackets)
 
-Write the prompt as short labeled blocks, not a loose paragraph. Glaze's
-working pixel template (from `HANDOFF.md` §3) and Quase's locked sprite
-briefs both do this: style first, then the subject, then view, canvas,
-palette, light, background, and avoids.
+Write the prompt as short labeled blocks, not a loose paragraph.
 
 ```
 STYLE / GAME: [one locked sentence for this game, unchanged from the
-style guide. For a new character in an existing style, start with:
-"Copy ONLY the technique and colour palette of the attached image;
-do NOT copy its character or props."]
+style guide.]
 
 SUBJECT: [literal description. Name which hand holds what, what
 replaces a missing hand, hair/hat/bald, face covered or not, laterality
@@ -146,11 +170,14 @@ AVOID: [banned props, readable text, logos, named IP, the wrong style
 a Hunter ink sprite), and any trait the last take invented.]
 ```
 
-**Why this works:** Vague pose words ("contact / passing", "facing
-left", "the lamp fuses into his body") made Grok repeat one pose, swap
-sides, or ignore the change. Naming feet frame by frame, pointing at a
-screen edge, and saying what replaces the hand fixed those. A pasted
-trait string does not drift the way a rewritten one does.
+**Why this works:** Vague pose words made Grok repeat one pose or swap
+sides. Naming feet, pointing at a screen edge, and saying what replaces
+the hand fixed those. A pasted trait string does not drift the way a
+rewritten one does.
+
+On Forge, the style sentence and the trait string are doing more of the
+work than they did on Grok, because Forge cannot truly "see" an attached
+style reference. See §3.
 
 ### Game style sentences (locked; do not mix them)
 
@@ -171,63 +198,63 @@ and ink: warm gold light, blue-black dark, desaturated bone, moss,
 rust; blood red only for vampires and danger. Match existing walls,
 floor and the dock thrall (`docs/renders/fp_start.png`). The older
 64 px / `#00FF00` / 16-colour pixel rules in `grok_art/glaze/HANDOFF.md`
-§1–6 still describe work already in `glaze/final/`. Do not start new
-pixel characters unless Duff reopens that pipeline.
+still describe work already in `glaze/final/`. Do not start new pixel
+characters unless Duff reopens that pipeline.
 
 ---
 
-## 3. Style anchors and reference images
+## 3. Pictures you attach: `init` vs `ref`
 
-This is the main consistency trick. A paragraph of style words is not a
-substitute for the approved picture.
+This is the main place the first version of this guide was wrong.
+Grok's `GenerateImage` can take an attached image as a style or
+character reference. **FLUX.1-schnell, as Forge runs it, cannot.**
+sd.cpp's IP-Adapter supports only SD 1.5 and SDXL. There is no FLUX
+Redux hook on this stack. See `docs/DECISIONS.md`.
 
-**Identity card (one per character), kept in the repo:**
+### `init` + `mode: "sketch"` — "start from this picture"
 
-- Paths to the approved front, back and portrait.
-- 3–5 must-keep traits as **one verbatim prompt string** (example from
-  Quase's Chaos work: Teodor's skin tone, grey beard, and rag). Paste
-  that string unchanged into every later prompt.
-- A laterality list (which side each tattoo, armband, satchel or prop
-  is on). When a back view disagrees with the front, the approved art
-  wins, and you do not mirror an asymmetric sprite to make the other
-  facing.
-- Things to avoid (hats Grok likes to invent, horns nobody asked for,
-  a lantern copied off the style anchor).
-- Attach the hero images to the job as `init`, and use `sketch` at a
-  strength that follows the identity without flattening it. If Forge
-  cannot take several refs, attach the best approved view and keep the
-  other paths listed in the identity card so you can check against them.
+The model img2imgs from the whole `init`, resized to `w`×`h`. At
+strength below about 0.95 it keeps that picture's layout and
+silhouette. Use it for:
 
-**New creature or prop in the same style:** attach the approved style
-anchor, but do **not** say "match this exact character". Use the line
-that stopped Glaze's first enemies from all coming back as the
-skull-faced lantern-bearer:
+- a rough layout or a flat sketch (strength ≥ 0.75)
+- variations of an approved take (0.35 subtle, 0.6 strong, seed kept)
 
-> Copy ONLY the pixel technique and colour palette of the attached
-> image; do NOT copy its character or props.
+Do **not** use a character sprite as `init` when you want a *new*
+creature in the same style. That is the opposite of "copy only the
+technique and palette." The wording "Copy ONLY the technique and
+colour palette of the attached image; do NOT copy its character or
+props" **has no effect on Forge.** That wording is for Grok or Canva.
 
-For Lethemoor painted work, say "painted technique and colour palette"
-instead of "pixel". Spell out "carries NOTHING" and "no skull, no
-lantern, no hat" when those belong only to the anchor. If the anchor
-still bleeds through, drop it and attach the character's own earlier
-passing take instead (that is how the Faceless Docker's backward knees
-finally read).
+Forge takes exactly one `init`. There is no multi-reference.
 
-**Scenes and backdrops:** do not attach a full character sprite as the
-style reference. Use a close-up crop of approved brushwork and outlines
-with no identity and no text. Open the prompt with a preamble that
-copies only technique and palette. Treat photo references as layout
-only. Attach the prop / setting guide (approved props and banned props
-for the era) so the model does not invent armored vans, regime
-barriers, or off-era furniture.
+### `ref` + `mode: "new"` — style-board workaround
 
-**Why this works:** image models copy props and faces from a full
-character reference unless you forbid it. Quase's scene drafts went
-too realistic, or picked up character details, until the style-only
-crop was used. Glaze's Stalker only passed once the prompt said the
-face was completely covered and the creature carried nothing; without
-that, the "one warm lantern accent" in the base template rebuilt the
-hero.
+`ref` is the closest Forge can get to a style reference for a **new**
+subject. `forge/style_ref.py` shuffles overlapping crops of the
+reference into a board (so a character does not sit in the same place)
+and schnell img2imgs from that board at a high strength (0.72–0.92,
+mapped from `ref_strength`). Palette and brushwork can bleed through.
+This is **not** IP-Adapter and will not hold a character identity.
+
+- Prefer a **style-only crop** (brushwork and outlines, no face, no
+  unique silhouette, no text).
+- Default `ref_strength` is 0.55. Higher follows the board more;
+  too high can still leak shapes from a character photo.
+- You cannot set `ref` and `init` on the same job.
+
+### What actually keeps a character consistent on Forge
+
+The locked style sentence, a verbatim trait string, seed reuse, and
+`init` + sketch when you are editing an approved take. Same-seed
+rerolls that name the one failed detail (`tasks/lessons.md`) are still
+the right fix when the rest of the take is already good (Rook's iron
+mask, "no horns" on Vesper).
+
+**Why this works (and why the first guide failed):** a paragraph of
+style words plus an attached file looked like Grok's method, but Forge
+never fed that file to a style encoder. The jobs that "attached a
+reference" and used `mode: "new"` were plain text-to-image.
 
 ---
 
@@ -235,58 +262,38 @@ hero.
 
 - Stay inside the game's locked swatches. One strong accent, not a
   rainbow. Faction or realm colors stay on their own side.
-- Pin the accents that must survive a shrink or a 16-colour cut (bone
-  white, blood red, near-black, lamp glow, Hunter's demon orange).
-  Plain median-cut quantization ate the Red Death's white mask and
-  blood red until Glaze locked those colors and k-means'd the rest.
+- Pin the accents that must survive a shrink or a 16-colour cut.
 - Outlines: Hunter ink uses a thick, even dark outline around the
-  whole figure (Duff asked for a slightly thicker outline on a Chaos
-  sprite and noticed when it only thickened a little). Lethemoor
-  painted textures are the opposite: "no outlines, no comic ink".
-- No readable text, fake lettering, logos, brand badges or
-  license-plate glyphs in the image unless Duff asked for that exact
-  wording. Leave signs, posters, banners and stamps blank; set real
-  type afterward with a script or in Foxboard. Quase kept seeing
-  gibberish captions until this became a hard rule.
-- Content: follow the game's rules (Lethemoor faceless enemies; no
-  named IP). The image provider may also block gore words (`blood`,
-  `nailed`, `jammed`, `caved in`, `fatal wound`). Glaze's workaround
-  was to generate a milder take, then edit the existing image ("dark
-  red stains", "ribs bent outward like a burst cage") or finish the
-  last details by hand at final size. Do not keep retrying blocked
-  wording.
+  whole figure. Lethemoor painted textures are the opposite: "no
+  outlines, no comic ink".
+- No readable text, fake lettering, logos or brand badges unless Duff
+  asked for that exact wording. Leave signs, posters and banners blank;
+  set real type afterward in Foxboard or with a script.
+- The image provider may block gore words. Generate a milder take, then
+  Magic-edit (`init` + `mask`) or finish the last details by hand.
+  Phrase changes as edits to an existing image ("dark red stains", not
+  "blood").
 
 **Why this works:** palette and outline are how a batch still looks
-like one game. Small accents vanish in cleanup unless you protect
-them. Text in a generated image is almost never spelled right.
+like one game. Text in a generated image is almost never spelled right.
 
 ---
 
 ## 5. Seeds and consistency
 
-Grok's `GenerateImage` path, as recorded in the agents' handoff notes,
-did **not** use a seed. Consistency came from the approved reference,
-the verbatim trait string, and "same character, same style, change
-only X" edit prompts.
+Grok's recorded workflow did not use a seed. Consistency came from the
+approved reference and a verbatim trait string. Forge does expose a
+seed — keep using it, on top of the trait string, not instead of a
+picture when `init` or `ref` actually applies.
 
-Forge does expose a seed, and Claude already uses it well. Keep doing
-that, on top of the reference kit, not instead of it:
+- Always set `seed`. Take `k` uses `seed+k`. Log the take-0 seed.
+- To retry one missed detail, queue a same-seed job whose prompt names
+  that one failed detail.
+- Foxboard's Reuse action resubmits prompt + seed.
 
-- Always set `seed`. Take `k` uses `seed+k`. Log the take-0 seed in
-  `ART_LOG`.
-- To retry one missed detail (Rook's iron mask, "no horns" on Vesper),
-  queue a same-seed job whose prompt names that one failed detail
-  (`tasks/lessons.md`). This is a Forge lesson, and it is the right
-  tool when the rest of the take is already good.
-- Foxboard's Reuse action resubmits prompt + seed. Subtle / strong
-  variations keep the seed and change `strength` (0.35 same layout,
-  0.6 reworked details).
-- Do not rely on a new random seed to "maybe get the mask this time"
-  while rewriting the whole prompt from memory.
-
-**Why this works:** a seed repeat plus one named fix stays on-model.
-A rewritten prompt with a new seed often fixes the mask and breaks
-the pose, or the other way around.
+**Why this works:** a seed repeat plus one named fix stays on-model. A
+rewritten prompt with a new seed often fixes the mask and breaks the
+pose.
 
 ---
 
@@ -296,121 +303,101 @@ the pose, or the other way around.
 - Put them on a contact sheet at a size Duff can read on a phone.
 - Ask him to pick, or to change one thing, before you make the rest.
 - Once he says "finish the rest in this style", batch that type only.
-- A later type (backgrounds after characters, env tiles after
-  figures, a new district) gets a fresh 2–3 draft lock.
+- A later type (backgrounds after characters, env tiles after figures)
+  gets a fresh 2–3 draft lock.
 - Write any flavor text from the image you actually got, not from the
-  brief. Duff rejected Revenant flavor that described a wound the
-  picture did not show.
+  brief.
 
 **Why this works:** batching a guessed style multiplies one wrong
-assumption across a week of work. Quase's first "regime" backdrops
-were technically on-style and still wrong for the modern-city setting;
-two modern drafts would have caught that before a full scene set.
+assumption across a week of work.
 
 ---
 
 ## 7. Self-checks before you show Duff
 
-Do these on every take you plan to keep. If a game repo has an
-automated art check, run it. Then look at the image, including a
-zoomed crop of the risky area and a downscale to phone size.
+Run Foxboard's checker first, then look at the sheet yourself.
 
-**Every sprite or standing figure**
+```
+python3 tools/claude/art_loop.py score <id> --game lethemoor --kind sprite|texture|scene|hud [--aspect 0.37]
+```
 
-- Exact canvas size the game asked for.
-- Flat key color, no scenery, no caption, no border.
-- Nothing important touching a cell edge; the whole figure is in
-  frame; feet sit on one baseline.
+`score` flags key holes, floor shadow, stray marks / watermarks,
+cropped head or sides, floating feet, off-palette colour, baked glow,
+and texture seams, and writes `forge/out/<id>_sheet.png`. It is a
+pre-filter: it cannot see faces, and Lethemoor's faceless rule still
+needs your eye.
+
+Then, for every take you plan to keep:
+
+- Exact *game* size after `cut`, not only the Forge canvas.
+- Flat key color, no scenery, no caption, no border (sprites).
+- Nothing important touching a cell edge; feet on one baseline.
 - Correct facing (named by screen edge). Laterality matches the
   identity card. Do not ship a mirrored copy of an asymmetric design.
-- Attack or action frames are real strike poses, not a tinted idle.
 - On-model: the verbatim traits are all visible. No extra horns, hats,
   lanterns, faces, or dropped masks.
-- No readable junk text.
-
-**Lethemoor painted figures and HUD**
-
-- Faceless. Lit flat (no baked lantern bloom). Feet at the bottom
-  edge, facing the camera, about 190×500 for standing enemies (see
-  the size table). Reads at ~390 px wide in the dark.
-
-**Textures**
-
-- Exact 512×512 (or the stated strip size). Edge to edge, no picture
-  frame. Lit flat.
-- Preview a **3×3 repeat** (Glaze writes these under `tiles_3x3/`)
-  and a zoomed crop. If a grid, bevel or border shows, it is not
-  seamless. Early cobbles failed this way.
-- Match the existing granite / stone palette, not a new one.
+- Lethemoor figures: faceless, lit flat, reads at ~390 px wide in the
+  dark.
+- Lethemoor textures: inspect the 3×3 preview `score` implies by the
+  seam flag, or build one yourself. Early cobbles failed this way.
 
 **If a check fails**
 
-- Small area: inpaint or Magic edit (`mode: "edit"` + mask), or a
-  logged scripted retouch (Glaze stamped leaves out of the wet floor,
-  pushed Revenant ribs at 64 px, wrapped tile edges in
-  `process_tiles.py`). Re-check after the fix.
+- Small area: Magic edit (`mode: "edit"` + `init` + `mask`) or a
+  logged scripted retouch. Re-score after the fix.
 - Wrong composition or identity: regenerate, with the failed detail
   named, preferably same seed.
-- Save each revision under a **new filename**. Chat and some previews
-  cache same-name images.
+- Save each revision under a **new filename**.
 
 **Why this works:** Duff has been acting as the QA department. The
-list above is almost entirely things he or the agents already had to
-send back (Teodor's skin, chalk pastels off-palette, red-and-white
-barriers, leftover grey backgrounds, leftover blue dress after a full
-redraw, a face on Rook, horns on Vesper, flavor that did not match).
+list is almost entirely things he or the agents already had to send
+back.
 
 ---
 
 ## 8. Background removal and cleanup
 
-- For cut-out sprites, set `"key": "#00FF00"` on the job. Forge
-  `keyfix.py` then forces an exact-key background (border flood plus
-  enclosed key-tinted patches such as the shadow between legs) and
-  leaves muted subject colors alone.
-- If you still have to key a generated image yourself, **chroma-key
-  by hue with a tolerance**, not by the exact hex. Grok's green came
-  back JPEG-noisy, around `(4, 235, 12)`. A working test from
-  `HANDOFF.md`: `g > 140 and g - max(r, b) > 70`. Use a shadow pass
-  (Glaze's `--shadow`) to drop dark-green ground shadows and puddles.
-- Crop to the subject, then resize with the right filter:
-  nearest-neighbour for true pixel art, Lanczos for painted 512.
-- De-spill green from the edges. Drop orphan pixels.
-- Prefer a transparent PNG for anything that stands in the world or
-  the HUD. Keep a green-key copy if the importer wants one.
-- For pixel work that still needs a 16-colour cap, pin accents first,
-  then quantize, then do hand fixes at final size in a small logged
-  script.
-- Subtle idles and 1 px bobs should be done in code, not by asking
-  the model for "the same image, 1 px lower". That request comes back
-  as a full repaint and the texture boils (movement test T4, plan B).
-- Left/right facings for a symmetric (or accepted-as-symmetric)
-  character: flip in code or PIL after cleanup. Do not regenerate the
-  other facing, and do not flip a design with one-sided tattoos.
+Use Foxboard's cutter first, not a hand-rolled chroma key and not
+Lethemoor's old `--shadow` script (that script is not in this repo):
 
-**Why this works:** the generator will not give you a perfect key or a
-perfect palette. Cleanup is part of the art, not an afterthought.
-Local edits keep identity stable; a full redraw often adds a new
-mistake.
+```
+python3 tools/claude/art_loop.py cut <id>/<take> out.png --height 640
+```
+
+`--key` is optional when the job JSON already has one. `cut` turns the
+key to transparent (soft edge), crops to the subject, resizes, and
+despills only a 3 px edge band so real key-ish colours inside the
+subject (moss on a green key) survive.
+
+- For cut-out sprites, set `"key": "#00FF00"` on the job. Forge
+  `keyfix.py` then forces an exact-key background before you cut.
+- Subtle idles and 1 px bobs should be done in code, not by asking
+  the model for "the same image, 1 px lower".
+- Left/right facings for a symmetric character: flip in code or PIL
+  after cleanup. Do not regenerate the other facing, and do not flip
+  a design with one-sided tattoos.
+
+**Why this works:** cleanup is part of the art. Local edits keep
+identity stable; a full redraw often adds a new mistake.
 
 ---
 
 ## 9. Sizes and Godot import
 
-Use the size the game already documents. Do not invent a "close
-enough" canvas.
+Use the size the game already documents. Render at a **valid Forge
+size**, then cut or resize to the game size.
 
 **Lethemoor** (`docs/art_needs.md`)
 
-| Kind | Size |
-|---|---|
-| Standing figure (enemy, NPC) | ~190×500, feet at the bottom, facing you (dock thrall is 184×512) |
-| Floor / wall texture | 512×512, seamless on all four sides |
-| Floor / standing prop | 100–400 px tall, upright, facing you |
-| HUD hand art | ~660×665, lower right, transparent |
-| Letter paper | ~600×800, torn edges, transparent |
-| App icon | 1024×1024, no transparency, must read at 48 px |
-| Boss (full game, later) | ~400×900 |
+| Kind | Game size | Example Forge canvas, then cut |
+|---|---|---|
+| Standing figure (enemy, NPC) | ~190×500, feet at the bottom, facing you (dock thrall is 184×512) | 576×1024, then `cut --height 500` |
+| Floor / wall texture | 512×512, seamless on all four sides | 512×512, `tile: true` |
+| Floor / standing prop | 100–400 px tall, upright, facing you | 512×1024, then `cut` |
+| HUD hand art | ~660×665, lower right, transparent | 640×640 or 768×768, then `cut` |
+| Letter paper | ~600×800, torn edges, transparent | 576×768 or 640×832, then `cut` |
+| App icon | 1024×1024, no transparency, must read at 48 px | 1024×1024 |
+| Boss (full game, later) | ~400×900 | 512×1024, then `cut --height 900` |
 
 Light it flat. Painted HUD and world art use **linear** filtering.
 Enemies stay faceless. Delivery is PNG.
@@ -420,37 +407,30 @@ Enemies stay faceless. Delivery is PNG.
 - Concept / lineup art from Forge is reference for 3D models,
   portraits and colour, not a sprite sheet to drop in as a character.
 - In-game: low-poly humanoids, toon shading, thick screen-space
-  outlines (~3 px at 720×1280), hero about 1/9 of screen height
-  (`docs/art/ink-3d/`).
-- Source art still arrives through Foxboard into `grok_art/` and does
-  not ship.
+  outlines (~3 px at 720×1280), hero about 1/9 of screen height.
 
 **Seamless tiles — the two games disagree, so follow the one you are
 in.**
 
 - Lethemoor wants 512×512 seamless textures. Ask for an edge-to-edge
-  texture, set `"tile": true` on the Forge job (Claude's `lm-walltop`
+  texture, set `"tile": true` on the Forge job (the old `lm-walltop`
   and `lm-sky` jobs asked for "seamless" in the prompt but did not set
-  this flag), then inspect a 3×3 repeat. If a faint seam remains,
-  heal only a thin opposite-edge band; Glaze's first plus-shaped blur
-  left a dark cross on every join (`process_tiles.py`).
+  this flag), then inspect a 3×3 repeat or the `score` seam flag.
 - Hunter's standard 09 says: never ask an image generator for a
   seamless tile; use one big painted surface and make the seams or
   repeats in code.
 
-**Import settings** (both games; also Quase's Chaos upgrade)
+**Import settings**
 
 - Commit the `.import` sidecars with a consistent preset. Do not
   leave Godot on "detect".
 - Colour maps: sRGB, normal map **off**. Only `*_n` / `*_normal`
-  files are normal maps (Import dock → Normal Map).
+  files are normal maps.
 - Fail the build if an import breaks, when the repo has that check.
-- Small images go into atlases once the game is wiring them
-  (Hunter `standards/05-performance.md`).
 
-**Why this works:** a beautiful 1024 px painting that is the wrong
-aspect, baked-lit, or imported as a normal map still fails in the
-game. Phone-size readability is the real acceptance test.
+**Why this works:** a beautiful painting that is the wrong aspect,
+baked-lit, or imported as a normal map still fails in the game.
+Phone-size readability is the real acceptance test.
 
 ---
 
@@ -458,107 +438,80 @@ game. Phone-size readability is the real acceptance test.
 
 Every kept take gets a row, including the ones Duff rejects.
 
-| Date (America/Chicago) | Job id (`dh-*` / `lm-*`) | Seed (take 0) | Refs attached | Verdict | Where it lives | Wired into the game? |
+| Date (America/Chicago) | Job id (`dh-*` / `lm-*`) | Seed (take 0) | `init` / `ref` | Verdict | Where it lives | Wired into the game? |
 |---|---|---|---|---|---|---|
 
-Also write down:
-
-- The prompt (the job JSON is the source of truth; do not retype it
-  from memory).
-- Which identity card or style crop was attached.
-- Known issues and the fix you already tried (same-seed reroll, local
-  edit, dropped anchor).
-- Flavor text only after it matches the final picture.
-- For a batch PR: a contact sheet, commit SHAs, CI status, one honest
-  weakest-spot line, and a status per asset (wired, needs a rig, or
-  unused).
+Also write down the prompt (the job JSON is the source of truth), known
+issues and the fix you already tried, and flavor text only after it
+matches the final picture. For a batch PR: a contact sheet, commit
+SHAs, CI status, one honest weakest-spot line, and a status per asset
+(wired, needs a rig, or unused).
 
 Hunter already has `docs/ART_LOG.md`. Lethemoor logs live in
 `docs/art_needs.md` (tick when wired), `docs/HANDOFF_LOG.md`, and
-`grok_art/glaze/HANDOFF.md` §10. Add a row; do not start a third
+`grok_art/glaze/HANDOFF.md`. Add a row; do not start a third
 conflicting log.
 
-**Why this works:** the next session cannot see your chat. A seed,
-a job id and a verdict are how Claude (or Quase, or Glaze) picks up
-without repeating a failed take.
+**Why this works:** the next session cannot see your chat.
 
 ---
 
 ## 11. Differences from what Claude does today
 
-These are the gaps that show up when you compare Forge jobs and
-Hunter's art log with the Grok agents' actual working method. They
-are the five things to change first.
-
-1. **Attach an approved style anchor (or a style-only crop) and a
-   verbatim trait string. Do not describe the style from memory and
-   call that a reference.** Many Lethemoor jobs (`lm-walltop`,
-   `lm-sky`, `lm-thrall-dockwoman`) have no `init` image; the prompt
-   just says "realistic oil-painted game art…". Hunter's early
-   `dh-hero` / `dh-rook` / style-test jobs are the same: words only,
-   no locked identity card. That is why FLUX schnell added horns
-   nobody asked for on Vesper and dropped Rook's iron mask
-   (`tasks/lessons.md`). Glaze only stopped cloning the lantern-bearer
-   after "Copy ONLY the technique and palette… do NOT copy its
-   character or props."
+1. **Do not pretend Forge can use an attached image the way Grok can.**
+   Many Lethemoor jobs (`lm-walltop`, `lm-sky`, `lm-thrall-dockwoman`)
+   and Hunter's early `dh-*` jobs have no `init` and no `ref`; the
+   prompt just says "realistic oil-painted…". That is still a text-only
+   schnell job. For a new subject, add `ref` (style-only crop) and
+   understand it is a style-board workaround. For an approved take you
+   want to vary, use `init` + `sketch`. The "copy only the technique"
+   sentence does nothing on Forge.
 
 2. **Lock one asset type with 2–3 picks on a contact sheet, then
-   batch. Do not explore three whole styles, or a full set, before
-   Duff has chosen.** Hunter's Nov 20 log still had pixel, ink and
-   puppet tests sitting in "awaiting Duff" in parallel, and the log
-   itself went stale after the style was locked. Quase showed style
-   options, then one sprite, then waited; backgrounds needed a second
-   lock. Glaze showed two wall tops, two wet floors, two grates, two
-   bell towers, and filed only the pick.
+   batch.** Do not explore several styles or a full set before Duff
+   has chosen. Write flavor from the picture you got.
 
-3. **Run the self-check and fix in place before Duff sees the take.**
-   Claude's log often records the miss after the fact, then suggests a
-   same-seed reroll. Keep the reroll, but first catch dropped masks,
-   invented horns, leftover key-colour fringing, baked lantern light,
-   readable junk text, and laterality. If the composition is already
-   right, Magic-edit or script-edit the broken area (Glaze's rib push,
-   leaf stamp, and seam wrap) instead of rolling a new picture that
-   can introduce a new error.
+3. **Run `art_loop.py score` (and `cut`) before Duff sees the take.**
+   Catch dropped masks, invented horns, leftover key fringing, baked
+   lantern light, and laterality. If the composition is already right,
+   Magic-edit or script-edit the broken area instead of rolling a new
+   picture.
 
-4. **Use Forge's actual consistency switches, not only a longer
-   prompt.** Always set `seed` and reuse it (this part Claude already
-   does). Also attach `init.b64` for approved art, and for Lethemoor
-   floor and wall textures set `"tile": true`. The `lm-walltop` and
-   `lm-sky` jobs asked for a "seamless tileable texture" in prose and
-   left `tile` unset, so seam fixing had to happen in post, the same
-   way Glaze's first cobbles arrived with a border and would not tile.
-   For Hunter, do not ask the generator for a seamless tile at all
-   (`standards/09-art-assets.md`).
+4. **Use Forge's actual switches, not only a longer prompt.** Always
+   set and reuse `seed`. Set `"tile": true` on Lethemoor floor and wall
+   textures (`lm-walltop` and `lm-sky` asked for seamless in prose and
+   left `tile` unset). Attach `init` only with `mode: "sketch"` (or
+   let the queue switch and warn). For Hunter, do not ask the
+   generator for a seamless tile (`standards/09-art-assets.md`).
 
-5. **Be painfully literal, light Lethemoor art flat, and write notes
-   from the picture you got.** Name facings by screen edge, which hand
-   holds the prop, what replaces a hand, "bald, no hat", "carries
-   nothing", "face completely covered". Leave signs blank. Do not bake
-   lantern highlights into a floor or wall (the old 256 px
-   `floor_wet.png` was unused for that reason; Duff picked Glaze's
-   flat-lit flooded floor). After a pick, log the job, the seed, the
-   verdict, and whether the art is wired. Flavor text describes the
-   final image, not the brief.
+5. **Be painfully literal, light Lethemoor art flat, queue on
+   Foxboard main, and log the take.** Name facings by screen edge,
+   which hand holds the prop, "bald, no hat", "carries nothing",
+   "face completely covered". Leave signs blank. Do not bake lantern
+   highlights into a floor or wall. After a pick, log the job, the
+   seed, the verdict, and whether the art is wired.
 
 ---
 
 ## Quick checklist (every Forge job)
 
 - [ ] I fetched and read this game's current style guide and art-needs
-      list (Hunter: ink on 3D; Lethemoor: painted 512, faceless, lit
-      flat). I am not using a retired pipeline.
+      list. I am not using a retired pipeline.
 - [ ] The prompt is public-safe (no Duff likeness, no private info, no
       named IP).
 - [ ] Style is already locked for this asset type, or this job is one
       of 2–3 lock drafts, not a silent batch.
-- [ ] Approved `init` reference is attached, with the correct "copy
-      only technique and palette" or identity-card wording.
+- [ ] If I am varying an approved picture, I set `init` and
+      `mode: "sketch"` (or I am ready for the queue to switch and
+      warn). If I want a new subject with a style hint, I set `ref`
+      and a style-only crop, and I know that is a workaround.
 - [ ] Trait string, laterality, palette, light, background/key, size,
       and avoids are explicit.
 - [ ] `seed` is set. Lethemoor tiles have `"tile": true`. Cut-out
-      sprites have `"key": "#00FF00"`.
-- [ ] I keyed, cleaned, and self-checked (including a 3×3 tile preview
-      or a phone-size downscale) before showing Duff.
+      sprites have `"key": "#00FF00"`. `w`/`h` are 256–1024 and a
+      multiple of 64.
+- [ ] I queued onto **Foxboard `main`** (via `art_loop.py queue` or a
+      job-only commit), then ran `score` and `cut` before showing Duff.
 - [ ] Contact sheet + one honest weak spot + a pick request.
-- [ ] Log row written. Finals only on the PR. No push to main, no
-      force-push.
+- [ ] Log row written. Finals only, on a **game-repo** feature branch.
+      No push of game code to main, no force-push.
