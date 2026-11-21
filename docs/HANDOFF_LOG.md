@@ -407,3 +407,42 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 - Skill tree or not, and sound spend: see the pivot doc's Open questions.
 - Is the M0 lantern look (warm pool, black beyond, soft edge) the right direction?
 
+
+## Old Layout / Commands / Tech / House rules (CLAUDE.md before Nov 21, kept verbatim)
+
+### Layout
+- `scripts/sim/` pure rules, no nodes: `fog.gd`, `room.gd`. Tests drive these headless.
+- `scripts/room_view.gd` the playable room (draws rules, takes taps, HUD built in code).
+- `rooms/*.txt` handmade rooms: `#` wall, `.` floor, `H` hunter, `T` thrall, `L` lamp, `E` exit.
+  Exported via the presets' include filter (`rooms/*.txt`); new data folders need adding there.
+- `grok_art/` design sources from Duff (never ships). `tools/fixes/` per-sprite hand fixes.
+- `assets/art/` 32×32 tiles. `tools/` scripts that never ship. `docs/` never ships.
+
+### Commands
+- Godot in the cloud sandbox: download the 4.5-stable Linux zip from GitHub releases with
+  curl, move it to `/usr/local/bin/godot`. Fresh clone: `godot --headless --path . --import`.
+- Tests (before every push): `godot --headless --path . --script tests/run_tests.gd`
+- Parse check one script: `godot --headless --path . --check-only --script <file>` (a parse
+  error makes a scene hang instead of failing).
+- Renders: `xvfb-run -a godot --path . --rendering-driver opengl3 -- --capture`
+  → `docs/renders/m0_*.png` (720×1280, 2× the 360×640 base).
+- Placeholder art: `python3 tools/gen_placeholder_art.py`
+- CI: `.github/workflows/build.yml` (tests, then web + debug APK artifacts + `dev` release).
+  `gh` GraphQL is blocked in Claude sessions: use `gh run ...` or `gh api repos/...` (REST). Check with
+  `gh run list -L 3` before calling a milestone done. Exports run in CI only (templates are big).
+
+### Tech rules
+- Renderer is **Compatibility** everywhere: the only one that runs in iPhone Safari.
+- UI base 540×960 portrait, canvas_items stretch (3D at full phone res), nearest filtering on
+  sprites/tiles. 3D room: top bar 72 px, thumb zone (status + lantern buttons) bottom 216 px.
+- Fog is gameplay truth (sim grid); lights are the look. Never let the look decide rules.
+- Game logic stays grid-only so a later isometric renderer is a renderer swap, not a rewrite.
+
+### House rules
+- **One Claude session per repo at a time.** `git fetch` before starting and before pushing.
+- Duff is phone-only (Godot Android editor). No desktop-only tools. GDScript only.
+- Push after every chunk of work; merge to `main` at the end of every milestone.
+- Up to three milestones per session; update this handoff and merge after EACH one.
+- Save renders to `docs/renders/`, don't paste lots of images into chat.
+- Visual decisions need real engine renders shown to Duff, not sketches.
+- Every feature must serve a pillar or it gets cut.

@@ -33,6 +33,10 @@ Search it for a system before you change it.
 - Thrall indexes shift when the map changes: pick horrors by kind or position, never by index.
 - **Signing:** Lethemoor keeps its OWN key (`signing/lethemoor.keystore.enc`, secret
   `LM_KEYSTORE_PASS`). Never change it, never use it for another game. A new key breaks updates.
+- `git fetch` before starting and before pushing. Save renders to `docs/renders/`, not chat.
+- UI base 540×960 portrait, canvas_items stretch; top bar 72 px, thumb zone bottom 216 px.
+- The signing key must be backed up outside the sandbox; Duff has the passphrase (sessions can't write secrets).
+  Not Netlify (credits spent).
 - One Claude session per repo at a time. Push after every chunk; merge to main after every
   milestone (up to three per session), updating this file + `docs/HANDOFF_LOG.md` each time.
 
@@ -40,11 +44,14 @@ Search it for a system before you change it.
 - `.claude/hooks/guard.py` blocks force push, direct push to main, pushing code the tests didn't pass
   on, writing/generating signing keys and committing secrets. Run `tools/test.sh` before a push.
 - PRs: the `fresh-eyes` status stays pending until a fresh-context review posts
-  `FRESH-EYES REVIEW: PASS` on the head commit (`docs/FRESH_EYES.md`). Pending is not green: no merge.
+  `FRESH-EYES REVIEW: PASS` on the head commit (`docs/FRESH_EYES.md`). Pending is not green: sessions check the combined status and don't merge
+  (GitHub itself doesn't block it).
 
 ## Layout
 - `scripts/sim/` rules: `night.gd` (turns, thralls, Stalker, oil, dread, noise), `room.gd` (map,
-  paths, shuffle), `fog.gd`. `rooms/*.txt` maps (`one_night.txt` is the slice; legend in the log).
+  paths, shuffle), `fog.gd`. `rooms/*.txt` maps (`one_night.txt` is the slice; legend:
+  `#` wall `.` floor `H` hunter `T` thrall `L` lamp `E` exit, more in the log). New data folders go in the
+  export presets' include filter (`rooms/*.txt` is there).
 - Main scene `scenes/fp_room.tscn` (`scripts/fp_view.gd`). `audio.gd` (autoload `Audio`),
   `letters.gd`, `lessons.gd` (field notes), `perf.gd`, `ui_style.gd`, `updater.gd`.
 - Old views kept for reference only: `room.tscn` (2D), `room3d.tscn` (top-down 3D).
@@ -54,8 +61,9 @@ Search it for a system before you change it.
 - Godot in the cloud sandbox: 4.5-stable Linux zip from GitHub releases -> `/usr/local/bin/godot`.
   Fresh clone: `godot --headless --path . --import`.
 - Tests: `tools/test.sh` (runs `tests/run_tests.gd`, must end `N passed, 0 failed`).
+- Parse check one script: `godot --headless --path . --check-only --script <file>` (a parse error hangs a scene).
 - Capture (real input, prints PASS lines; CI needs the last line `ART PASS`):
   `xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture`
 - Balance: `godot --headless --path . --script tools/balance_bot.gd -- 300` (`BOT_FIRST=0` = handmade night).
 - CI: `gh api repos/duffpowell-commits/lethemoor/actions/runs?per_page=3` (gh GraphQL is blocked).
-  Exports run in CI only.
+  Run `gh run list -L 3` before calling a milestone done. Exports run in CI only.
