@@ -1,0 +1,26 @@
+{
+ "A": {"title": "A - Fog-dweller grunt", "items": [
+  {"id": "A1", "file": "A1_bandaged_nurse.png", "concept": "Bandaged infirmary nurse: wet head-wrap, no face, neck bent wrong, dragging a rusted bone saw.",
+   "flavor": "She still does rounds. You are the round. The bandages are not for her face. They are for yours, after."},
+  {"id": "A2", "file": "A2_net_sack.png", "concept": "Net-sack fisherman: a sailcloth sack on two bare legs, split open at the chest with rope and fish hooks spilling out.",
+   "flavor": "Somebody sewed him shut so the sea would not want him. The sea did not want him. Neither do you. Keep walking."},
+  {"id": "A3", "file": "A3_faceless_docker.png", "concept": "Faceless dockworker: flat cap over a smooth membrane where a face should be, backward knees, fog leaking from his coat. (He came back holding a lantern; that can be taken out.)",
+   "flavor": "He punched in at six. He never punched out. His face stopped bothering to be one. Fog is what a man breathes out when he forgets."}
+ ]},
+ "B": {"title": "B - G-virus boss, stage 1", "items": [
+  {"id": "B1", "file": "B1_harbourmaster_stage1.png", "concept": "The Harbourmaster: a heavy brass-buttoned officer, his right shoulder burst into raw tissue with one yellow eye and an overgrown arm. Still human-faced. (He also carries a lantern.)",
+   "flavor": "Every ship that leaves, he logs. Nothing leaves. The eye on his shoulder keeps the books now. It never blinks. Neither will you."},
+  {"id": "B2", "file": "B2_lighthouse_keeper_stage1.png", "concept": "The Lighthouse Keeper: oilskin and sou'wester, an eye bulging from his neck, his left arm split into a dragging limb studded with eyes and ending in a claw. He carries a lamp.",
+   "flavor": "He kept the light on for forty years. Then the light started keeping him. Count the eyes on the arm. Now count them again. There's one more."},
+  {"id": "B3", "file": "B3_surgeon_stage1.png", "concept": "The Surgeon: a smiling top-hatted doctor with spectacles, his apron split over a huge slit-pupil eye in his chest; doctor's bag and amputation knife.",
+   "flavor": "He washes his hands between patients. Out of habit. Out of courtesy. This won't hurt, he says. He is a doctor. Doctors lie."}
+ ]},
+ "C": {"title": "C - Poe enemy", "items": [
+  {"id": "C1", "file": "C1_raven_thing.png", "concept": "The Raven-thing: a mourning frock coat on a man's frame, a matted raven head with one milky eye, talons and bird legs, paper scraps in its feathers.",
+   "flavor": "You ask it how many nights are left. It tells you. It always tells you the same number. The number is the one you were afraid of."},
+  {"id": "C2", "file": "C2_tell_tale.png", "concept": "The Tell-Tale: a nightcapped old man built from floorboards and nails, one huge filmy blue vulture eye, a beating red heart in his rib-cage, dragging a crowbar.",
+   "flavor": "You hear it before you see it. Under the boards. Under your boots. Under your own ribs. Louder. It isn't his heart anymore. It's yours, keeping time."},
+  {"id": "C3", "file": "C3_red_death.png", "concept": "The Red Death: a tall shrouded reveller in a cracked porcelain mask weeping blood, with a stopped clock pendant. (Generated without the anchor as a test; no lantern crept in.)",
+   "flavor": "The party is still going. The clock stopped at midnight and nobody noticed. You noticed. That's how it knows you're a guest."}
+ ]}
+}

@@ -1,0 +1,5 @@
+{"A3": {"title": "A3 Faceless Docker - round 2 (backward knees)", "items": [
+ {"id": "v1", "file": "a3_docker_v1.png", "concept": "Hunched docker on goat legs: forward knee, high backward hock, small hooves. The backward joint reads clearly at full size and at 64 px.", "flavor": "VERDICT: PASS. Backward hock clear at 1024 and at 64 px."},
+ {"id": "v2", "file": "a3_docker_v2.png", "concept": "Moss-green coat, rope bandolier, cloven hooves. Correct goat anatomy at full size, but at 64 px it reads more like bent human knees.", "flavor": "VERDICT: PARTIAL. Clear at full size, weak at 64 px."},
+ {"id": "v3", "file": "a3_docker_v3.png", "concept": "Deep crouch with one arm reaching. Both legs make a wide zig-zag; the backward hock is the most visible of the three at 64 px.", "flavor": "VERDICT: PASS. The strongest read at 64 px."}
+]}}
