@@ -1,0 +1,9 @@
+{
+  "date": "2026-11-21",
+  "asset": "P2 bell tower landmark",
+  "repo_context": "No skyline layer exists. Walls are 2.4-tall box meshes against sky_night.png (2048x1024 panorama, energy 0.55, fog_sky_affect 0.35). Props are transparent Sprite3D via _prop_sprite, FIXED_Y, base at feet, h world units. Suggested h about 5-7 so the belfry clears the walls. Filename not specified in art_needs; used prop_belltower to match prop_bell / prop_lamppost.",
+  "variants": {
+    "v1": "prop_belltower_v1_parish.png \u2014 442x1024 RGBA. Square granite parish tower, arched belfry, unlit bell, shallow pyramidal roof, small iron cross. One regen to put it on green.",
+    "v2": "prop_belltower_v2_harbour_watch.png \u2014 262x1024 RGBA. Taller thinner harbour watch tower, mixed granite and brick, open unlit cupola, first take kept."
+  }
+}

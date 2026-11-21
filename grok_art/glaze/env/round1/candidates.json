@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-21",
+  "style": "Painted 512x512, lit flat, palette matched to assets/art/wall_granite.png and floor_stone.png. Not pixel art.",
+  "assets": {
+    "wall_top": {
+      "spec": "docs/art_needs.md P0 #3, 512x512 seamless",
+      "v1": "wall_top_v1_mossy_coping_512.png \u2014 moss and lichen on granite capstones, overhead",
+      "v2": "wall_top_v2_broken_brick_512.png \u2014 crumbling cap, broken mortar, overhead",
+      "note": "First pair looked like wall faces (hanging drips); rejected in rejected/. These are the overhead redo. Top faces are not seen at eye height 0.82 vs walls 2.4; may need a skyline trim to be visible."
+    },
+    "floor_wet": {
+      "spec": "docs/art_needs.md P2 #13, 512x512 seamless, lit flat",
+      "v1": "floor_wet_v1_puddles_512.png \u2014 same 2x2 flagstones as floor_stone, puddles in joints and on slabs",
+      "v2": "floor_wet_v2_flooded_512.png \u2014 wetter, more even standing water, cleaner joints",
+      "note": "Replaces unused 256px floor_wet.png, which had baked lantern highlights. Leaves in the source were stamped out by hand."
+    },
+    "floor_grate": {
+      "spec": "docs/art_needs.md P2 #13 drain grate, 512x512. Also a candidate to replace 32px exit.png if an exit tile is used.",
+      "v1": "floor_grate_v1_square_iron_512.png \u2014 large rusted square grate, cobble rim",
+      "v2": "floor_grate_v2_manhole_512.png \u2014 circular iron drain in flagstones",
+      "note": "Hero tiles, not a repeating grate pattern. Shown in contact sheet surrounded by floor_stone. Surrounding stones are not the same 2x2 scale as floor_stone."
+    }
+  }
+}
