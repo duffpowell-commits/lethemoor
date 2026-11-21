@@ -372,7 +372,7 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
   clean, put the mood in Godot lights. Duff wants it "overall more creepy".
 - **Roles (Duff's call):** Grok designs characters, Claude is "the head": converts, cleans,
   lights, integrates, and pushes back on quality. Grok's design >> code-drawn `hunter48`
-  (Duff and Claude agree). Prompt template lives in `grok_art/README.md`.
+  (Duff and Claude agree). Pasteable image prompts stay in the Drive plan, not in this repo.
 - **Importer lessons** (`tools/import_sprite.py`): BOX shrink + palette snap + speckle and 3x3
   majority cleanup + ink outline works. A min-filter "keep the darks" blend at 0.35 made it
   muddy; it's at 0.12 now. Bright amber is only allowed in the lower-right lantern zone
