@@ -42,7 +42,7 @@ Search it for a system before you change it.
 
 ## Guards (enforced)
 - `.claude/hooks/guard.py` blocks force push, direct push to main, pushing code the tests didn't pass
-  on, writing/generating signing keys and committing secrets. Run `tools/test.sh` before a push.
+  on, writing/generating signing keys and committing secret files (.env, keystores, secrets.*; names only, not contents). Run `tools/test.sh` before a push.
 - PRs: the `fresh-eyes` status stays pending until a fresh-context review posts
   `FRESH-EYES REVIEW: PASS` on the head commit (`docs/FRESH_EYES.md`). Pending is not green: sessions check the combined status and don't merge
   (GitHub itself doesn't block it).
