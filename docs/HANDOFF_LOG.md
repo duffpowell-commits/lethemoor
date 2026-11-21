@@ -1,3 +1,5 @@
+Shared handoff: read and update [STATUS.md](../STATUS.md) first and last. This file is the long record.
+
 # Lethemoor handoff log (everything built, newest at the bottom)
 
 Moved word for word out of CLAUDE.md on Nov 21 2026 (lean harness: CLAUDE.md loads into every session; this log is read on demand). Search it for a system before changing it.
