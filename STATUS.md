@@ -8,7 +8,7 @@ Lethemoor: The Last Lantern. Gothic turn-based survival horror, first-person gri
 
 Pillars: light is life (oil is the clock), every slot matters, the dead don't stay gone.
 
-The live slice is One Night: ring the bell before the oil runs out. Grade is oil left plus letters read (S/A/B/C/D). Start oil 60. Thralls move every other turn. The Stalker freezes only while lit and in view.
+The live slice is One Night: ring the bell before the oil runs out. Grade is oil left plus 5 per letter read (S 35 / A 29 / B 23 / C 18 / D). Start oil 60. Thralls move every other turn. The Stalker freezes only while lit and in view.
 
 ## Live
 
@@ -28,9 +28,9 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Blockers
 
-- GitHub Actions minutes for the account ran out on Nov 18. CI and the web build will not refresh until the monthly reset or a spending limit. The Nov 21 publish above is the last one that landed. Later commits stay on main until minutes return. Markdown-only edits are ignored by the build workflow.
+- CI is running. This repo is public, and the build workflow kept succeeding after Nov 18, through the Nov 21 publish above. A newer web page or APK lands when a non-docs change merges to main. Markdown-only edits are ignored by the build workflow, so they do not start a build. A Nov 18 "Actions minutes ran out" note does not match these runs.
 - `LM_KEYSTORE_PASS` is the repo Actions secret that unlocks `signing/lethemoor.keystore.enc`. Duff has the passphrase. Sessions cannot write Actions secrets. Never change this key and never use it for another game. If the secret is missing, CI signs with a throwaway key and that APK cannot update an installed one. The key must stay backed up outside the sandbox.
-- Phone numbers are still missing: real FPS, lunge timing, corpse readability, kill shot, swipe-only controls, sound mix. Tuning waits on the playtest.
+- Real-phone reads are still missing: FPS, lunge timing, corpse readability, kill shot, swipe-only controls, sound mix. Tuning waits on the playtest.
 - P0 art still open: wall tops. List: `docs/art_needs.md`.
 
 ## Next
