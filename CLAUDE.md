@@ -4,6 +4,7 @@ Gothic turn-based survival horror, **first person** grid crawler, Android phones
 iPhone testers. Godot 4.5, GDScript only. Owner: Duff. This is the handoff; keep it short.
 **Everything built so far, with the details and gotchas of each system: `docs/HANDOFF_LOG.md`.**
 Search it for a system before you change it.
+**Read `STATUS.md` first and update it last.** Shared handoff for Jace, Blace, Glaze, and Claude.
 
 ## Where things stand (Nov 21)
 - Design that wins over every older doc: `docs/design/first_person_design.md` (Nov 19, first person,
@@ -38,7 +39,7 @@ Search it for a system before you change it.
 - The signing key must be backed up outside the sandbox; Duff has the passphrase (sessions can't write secrets).
   Not Netlify (credits spent).
 - One Claude session per repo at a time. Push after every chunk; merge to main after every
-  milestone (up to three per session), updating this file + `docs/HANDOFF_LOG.md` each time.
+  milestone (up to three per session), updating this file + `docs/HANDOFF_LOG.md`, then `STATUS.md`, each time.
 
 ## Guards (enforced)
 - `.claude/hooks/guard.py` blocks force push, direct push to main, pushing code the tests didn't pass
