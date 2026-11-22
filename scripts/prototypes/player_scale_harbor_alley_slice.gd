@@ -69,7 +69,7 @@ func _build_masonry_faces() -> void:
 				if z > 4.35:
 					continue
 				var length := 1.12 - (0.12 if (row + col) % 3 == 0 else 0.0)
-				var shade := palette[(row * 3 + col + side) % palette.size()]
+				var shade := palette[posmod(row * 3 + col + side, palette.size())]
 				var stone := _box(self, "Masonry_%d_%d_%d" % [side,row,col], Vector3(0.10,0.23,length), Vector3(side*2.79,y,z), shade)
 				stone.rotation.y = 0.015 * ((row + col) % 3 - 1)
 		# Stone footing courses visually anchor the wall.
