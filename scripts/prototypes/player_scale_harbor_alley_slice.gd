@@ -1,6 +1,7 @@
 extends Node3D
 ## A player-scale alley slice built from standalone modular components.
 ## Deliberately art-only: no changes to gameplay, renderer, or main scene.
+## Test export marker: standalone art slice remains safe for branch APK testing.
 
 func _ready() -> void:
 	_build_floor()
