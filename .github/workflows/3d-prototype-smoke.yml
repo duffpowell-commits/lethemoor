@@ -1,0 +1,30 @@
+name: 3D Prototype Runtime Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - art/3d-art-conversion-blueprint
+    paths:
+      - 'scenes/prototypes/**'
+      - 'scripts/prototypes/**'
+      - '.github/workflows/3d-prototype-smoke.yml'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.5.1 headless
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5.1/Godot_v4.5.1-stable_linux.x86_64.zip -O godot.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.5.1-stable_linux.x86_64
+          ./Godot_v4.5.1-stable_linux.x86_64 --version
+      - name: Import and parse project
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --editor --path . --quit
+      - name: Run reusable prop composition smoke test
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . res://scenes/prototypes/reusable_prop_assembly_test.tscn --quit-after 5
