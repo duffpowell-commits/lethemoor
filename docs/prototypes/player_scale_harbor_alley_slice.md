@@ -7,6 +7,8 @@ A compact, cohesive scene intended to evaluate the modular 3D art conversion at 
 - 2.6 m walls with simple masonry band details and collision blockers.
 - A dark framed doorway at the far end.
 - Reusable crate, barrel, and bollard props.
+- Six reflective puddle patches.
+- Faceless thrall silhouette scale reference.
 - Warm lantern point light, restrained ambient fill, directional lighting.
 - One preview camera and environment.
 
