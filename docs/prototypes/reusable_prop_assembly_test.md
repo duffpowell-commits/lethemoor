@@ -5,10 +5,13 @@ A composition-only preview that instantiates the extracted crate, barrel, and bo
 - Individual props remain camera-, lighting-, and environment-free.
 - One shared preview camera, directional light, and environment.
 - A floor patch helps evaluate silhouette and scale.
-- Blocker collision boxes are added as separate StaticBody3D nodes for rough interaction/scale review; they are deliberately not embedded in the prop scenes.
+- Each standalone prop scene now carries a coarse StaticBody3D collision shape with the same transform as its geometry; composition no longer creates duplicate blockers.
 
 ## Preview
 Open `scenes/prototypes/reusable_prop_assembly_test.tscn`.
 
-## Limitations
-The blocker shapes are coarse, approximate and not intended as final collision. Scene/script review only; no Godot runtime validation was available.
+## Collision scope
+The crate, barrel and bollard use deliberately simple box collision volumes. They are suitable for prototyping navigation obstruction, but should be reviewed against player dimensions and interaction requirements before production.
+
+## Validation
+Godot 4.5.1 headless import/parse and the reusable-prop scene smoke launch passed on GitHub Actions (run 2).
