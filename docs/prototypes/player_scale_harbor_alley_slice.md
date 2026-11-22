@@ -8,6 +8,7 @@ A compact, cohesive scene intended to evaluate the modular 3D art conversion at 
 - A dark framed doorway at the far end.
 - Reusable crate, barrel, and bollard props.
 - Six reflective puddle patches.
+- Deterministic wall damp streaks and small edge rubble chips, placed to keep the center walking lane visually clear.
 - Faceless thrall silhouette scale reference.
 - Warm lantern point light, restrained ambient fill, directional lighting.
 - One preview camera and environment.
@@ -20,3 +21,8 @@ This remains an isolated art prototype. It does not alter the main scene, grid g
 
 ## Runtime
 Add this scene to the smoke test workflow for import/parse and short headless launch validation.
+
+
+## Dressing iteration
+
+The latest iteration adds seeded damp streak placement on both side walls and restrained stone-chip debris along the alley edges. Seeded placement keeps the preview reproducible across launches and avoids cluttering the central traversal lane. These additions are visual-only and do not affect collision or gameplay.
