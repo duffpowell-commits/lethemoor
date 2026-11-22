@@ -165,3 +165,5 @@ func _build_thrall() -> void:
 	thrall.rotation.y = 0.22
 	thrall.scale = Vector3(0.78,0.78,0.78)
 	add_child(thrall)
+
+# CI revision marker: APK pipeline retries after SDK setup adjustments.
