@@ -1,0 +1,49 @@
+name: Build Lethemoor Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - art/3d-art-conversion-blueprint
+    paths:
+      - 'scenes/prototypes/**'
+      - 'scripts/prototypes/**'
+      - 'export_presets.cfg'
+      - '.github/workflows/build-android-apk.yml'
+
+jobs:
+  export-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018'
+      - name: Install Godot 4.5.1 and Android export templates
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          wget --tries=3 --timeout=30 https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip -O godot.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.5.1-stable_linux.x86_64
+          wget --tries=3 --timeout=30 https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz -O templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.5.1.stable"
+          unzip -q templates.tpz -d templates
+          cp templates/templates/* "$HOME/.local/share/godot/export_templates/4.5.1.stable/"
+          echo "sdk.dir=$ANDROID_HOME" > android-sdk.properties
+      - name: Import project
+        run: ./Godot_v4.5.1-stable_linux.x86_64 --headless --editor --path . --quit
+      - name: Export APK
+        run: |
+          mkdir -p build/android
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-debug "Android" build/android/lethemoor.apk
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lethemoor-Android-APK
+          path: build/android/lethemoor.apk
+          if-no-files-found: error
+          retention-days: 14
