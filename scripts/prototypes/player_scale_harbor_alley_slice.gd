@@ -6,7 +6,9 @@ extends Node3D
 func _ready() -> void:
 	_build_floor()
 	_build_puddles()
+	_build_floor_debris()
 	_build_walls()
+	_build_wall_wear()
 	_build_dressing()
 	_build_thrall()
 	_build_lighting()
@@ -167,3 +169,29 @@ func _build_thrall() -> void:
 	add_child(thrall)
 
 # CI revision marker: APK pipeline retries after SDK setup adjustments.
+
+func _build_wall_wear() -> void:
+	# Narrow vertical damp streaks break up the flat masonry without touching blockers.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7319
+	for side in [-1, 1]:
+		for i in range(22):
+			var z := rng.randf_range(-4.2, 4.2)
+			var y := rng.randf_range(0.65, 2.35)
+			var height := rng.randf_range(0.22, 0.72)
+			var width := rng.randf_range(0.025, 0.075)
+			var stain := Color(0.16,0.20,0.22) if i % 3 else Color(0.20,0.23,0.24)
+			var streak := _box(self, "DampStreak_%d_%d" % [side,i], Vector3(0.012,height,width), Vector3(side*2.845,y,z), stain)
+			streak.rotation.x = rng.randf_range(-0.035,0.035)
+
+func _build_floor_debris() -> void:
+	# Small, deterministic stone chips near edges; the center lane remains readable.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20417
+	for i in range(28):
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var x := side * rng.randf_range(1.65, 2.35)
+		var z := rng.randf_range(-4.2, 4.2)
+		var size := rng.randf_range(0.07, 0.18)
+		var chip := _box(self, "StoneChip_%d" % i, Vector3(size,0.035,size*0.65), Vector3(x,0.025,z), Color(0.28,0.31,0.32))
+		chip.rotation.y = rng.randf_range(-0.6,0.6)
