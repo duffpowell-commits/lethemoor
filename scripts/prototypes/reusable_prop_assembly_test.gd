@@ -17,18 +17,6 @@ func _place(scene: PackedScene, pos: Vector3, yaw: float) -> void:
 	instance.position = pos
 	instance.rotation.y = yaw
 	add_child(instance)
-	_add_blocker(instance.name + "_Collision", pos, Vector3(0.82, 0.9, 0.82))
-
-func _add_blocker(label: String, pos: Vector3, size: Vector3) -> void:
-	var body := StaticBody3D.new()
-	body.name = label
-	body.position = pos + Vector3(0.0, size.y * 0.5, 0.0)
-	var shape := BoxShape3D.new()
-	shape.size = size
-	var collider := CollisionShape3D.new()
-	collider.shape = shape
-	body.add_child(collider)
-	add_child(body)
 
 func _make_floor() -> void:
 	var floor_mesh := BoxMesh.new()
