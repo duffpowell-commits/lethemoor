@@ -9,6 +9,7 @@ static func make_crate() -> Node3D:
 	var edge := _mat(Color(0.38, 0.25, 0.14))
 	var base := _box("CrateCore", Vector3(0.78, 0.72, 0.78), wood, Vector3(0, 0.36, 0))
 	root.add_child(base)
+	_add_collision(root, Vector3(0.82, 0.78, 0.82), Vector3(0, 0.39, 0))
 	for i in range(5):
 		var x := -0.32 + i * 0.16
 		root.add_child(_box("FrontSlat_%d" % i, Vector3(0.14, 0.66, 0.035), edge, Vector3(x, 0.36, -0.405)))
