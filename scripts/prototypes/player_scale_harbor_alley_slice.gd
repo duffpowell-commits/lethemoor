@@ -4,8 +4,10 @@ extends Node3D
 
 func _ready() -> void:
 	_build_floor()
+	_build_puddles()
 	_build_walls()
 	_build_dressing()
+	_build_thrall()
 	_build_lighting()
 	_build_camera()
 
@@ -107,3 +109,33 @@ func _build_camera() -> void:
 	sun.rotation_degrees = Vector3(-38,-35,0)
 	sun.light_energy = 0.65
 	add_child(sun)
+
+func _build_puddles() -> void:
+	for i in range(6):
+		var puddle := CylinderMesh.new()
+		puddle.top_radius = 1.0
+		puddle.bottom_radius = 1.0
+		puddle.height = 0.012
+		puddle.radial_segments = 20
+		var node := MeshInstance3D.new()
+		node.name = "Puddle_%d" % i
+		node.mesh = puddle
+		var wet := StandardMaterial3D.new()
+		wet.albedo_color = Color(0.13,0.18,0.21,0.72)
+		wet.roughness = 0.22
+		wet.metallic = 0.28
+		wet.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		node.material_override = wet
+		node.position = Vector3(-1.5 + i*0.55,0.012,-2.6 + (i%3)*1.8)
+		node.scale = Vector3(0.48 + (i%2)*0.22,1.0,0.22 + (i%3)*0.1)
+		node.rotation.y = float(i)*0.35
+		add_child(node)
+
+func _build_thrall() -> void:
+	var thrall_scene := preload("res://scenes/prototypes/faceless_thrall_study.tscn")
+	var thrall := thrall_scene.instantiate() as Node3D
+	thrall.name = "AlleyThrallScaleReference"
+	thrall.position = Vector3(0.7,0.0,-2.9)
+	thrall.rotation.y = 0.22
+	thrall.scale = Vector3(0.78,0.78,0.78)
+	add_child(thrall)
