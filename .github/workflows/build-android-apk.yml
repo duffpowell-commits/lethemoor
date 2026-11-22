@@ -37,7 +37,9 @@ jobs:
       - name: Import project
         run: ./Godot_v4.5.1-stable_linux.x86_64 --headless --editor --path . --quit
       - name: Export APK
-        run: ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-debug "Android" build/android/lethemoor.apk
+        run: |
+          mkdir -p build/android
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-debug "Android" build/android/lethemoor.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
