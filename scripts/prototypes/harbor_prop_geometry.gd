@@ -55,6 +55,7 @@ static func make_barrel() -> Node3D:
 	cap.material_override = wood
 	cap.position.y = 0.83
 	root.add_child(cap)
+	_add_collision(root, Vector3(0.64, 0.86, 0.64), Vector3(0, 0.43, 0))
 	return root
 
 static func make_bollard() -> Node3D:
@@ -79,7 +80,19 @@ static func make_bollard() -> Node3D:
 	cap.material_override = dark
 	cap.position.y = 0.63
 	root.add_child(cap)
+	_add_collision(root, Vector3(0.42, 0.75, 0.42), Vector3(0, 0.375, 0))
 	return root
+
+static func _add_collision(parent: Node3D, size: Vector3, pos: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.name = "CollisionBody"
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	collider.position = pos
+	body.add_child(collider)
+	parent.add_child(body)
 
 static func _box(label: String, size: Vector3, mat: Material, pos: Vector3) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
