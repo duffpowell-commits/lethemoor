@@ -13,18 +13,22 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Install Godot 4.5.1 headless
+      - name: Install Godot 4.5.1
+        shell: bash
         run: |
-          wget -q https://github.com/godotengine/godot/releases/download/4.5.1/Godot_v4.5.1-stable_linux.x86_64.zip -O godot.zip
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          URL="https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip"
+          wget --server-response --tries=3 --timeout=30 "$URL" -O godot.zip
+          unzip -l godot.zip
           unzip -q godot.zip
           chmod +x Godot_v4.5.1-stable_linux.x86_64
           ./Godot_v4.5.1-stable_linux.x86_64 --version
       - name: Import and parse project
-        run: |
-          ./Godot_v4.5.1-stable_linux.x86_64 --headless --editor --path . --quit
+        run: ./Godot_v4.5.1-stable_linux.x86_64 --headless --editor --path . --quit
       - name: Run reusable prop composition smoke test
-        run: |
-          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . res://scenes/prototypes/reusable_prop_assembly_test.tscn --quit-after 5
+        run: ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . res://scenes/prototypes/reusable_prop_assembly_test.tscn --quit-after 5
