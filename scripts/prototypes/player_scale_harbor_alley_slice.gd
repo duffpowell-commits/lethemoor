@@ -55,10 +55,35 @@ func _build_walls() -> void:
 	_block(self,"LeftWallBlocker",Vector3(0.25,2.6,9.0),Vector3(-2.65,1.3,0))
 	_block(self,"RightWallBlocker",Vector3(0.25,2.6,9.0),Vector3(2.65,1.3,0))
 	_block(self,"FarWallBlocker",Vector3(5.3,2.6,0.25),Vector3(0,1.3,-4.55))
+	# Add individual staggered stones as shallow face geometry over the collision-backed wall.
+	_build_masonry_faces()
+
+func _build_masonry_faces() -> void:
+	var palette := [Color(0.34,0.35,0.36), Color(0.29,0.31,0.33), Color(0.38,0.37,0.35), Color(0.32,0.34,0.35)]
 	for side in [-1,1]:
+		for row in range(9):
+			var y := 0.18 + row * 0.27
+			var offset := 0.0 if row % 2 == 0 else 0.42
+			for col in range(7):
+				var z := -4.0 + col * 1.32 + offset
+				if z > 4.35:
+					continue
+				var length := 1.12 - (0.12 if (row + col) % 3 == 0 else 0.0)
+				var shade := palette[(row * 3 + col + side) % palette.size()]
+				var stone := _box(self, "Masonry_%d_%d_%d" % [side,row,col], Vector3(0.10,0.23,length), Vector3(side*2.79,y,z), shade)
+				stone.rotation.y = 0.015 * ((row + col) % 3 - 1)
+		# Stone footing courses visually anchor the wall.
 		for z in range(-4,5):
-			_box(self,"MasonryBand_%d_%d" % [side,z],Vector3(0.04,0.42,0.84),Vector3(side*2.49,0.35,z),Color(0.39,0.40,0.41))
-			_box(self,"MasonryBand2_%d_%d" % [side,z],Vector3(0.04,0.38,0.84),Vector3(side*2.49,1.12,z+0.42),Color(0.34,0.36,0.38))
+			_box(self,"WallFooting_%d_%d" % [side,z],Vector3(0.14,0.32,0.88),Vector3(side*2.79,0.16,z),Color(0.22,0.25,0.27))
+	# Far wall uses the same block rhythm, with a lintel course around the doorway.
+	for row in range(9):
+		for col in range(9):
+			var x := -2.4 + col * 0.6
+			var y := 0.18 + row * 0.27
+			if abs(x - 1.1) < 0.78 and y < 2.28:
+				continue
+			var color := palette[(row + col * 2) % palette.size()]
+			_box(self,"FarMasonry_%d_%d" % [row,col],Vector3(0.58,0.23,0.10),Vector3(x,y,-4.69),color)
 
 func _build_dressing() -> void:
 	var crate_scene := preload("res://scenes/prototypes/props/harbor_crate.tscn")
