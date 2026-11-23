@@ -16,7 +16,7 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 - Web (Safari): https://duffpowell-commits.github.io/lethemoor/
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
-- Both are build code 110, commit `7191080`, published 2026-11-21 02:34 UTC. That is the build testers have.
+- Both are build 123, commit `de5bf2a`, with the 3D nightmare Thrall.
 
 ## In progress
 
@@ -24,7 +24,7 @@ Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Colle
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
 
-The 3D harbor shipped in build 119 (PR #38). Milestone B starts with the approved nightmare Thrall model on `art/thrall-model`. Skeletal animation, the Stalker, and the corpse models remain pending.
+The 3D harbor shipped in build 119 (PR #38). Milestone B shipped the 3D nightmare Thrall in PR #40. The 3D Stalker preview on `art/stalker-model` is awaiting owner review. Skeletal animation and corpse models are pending.
 
 Parked until the kill test: safe room, satchel, revenant corpse, Choir. Kill test is Nov 28: median fun 6+/10 and testers choose to replay.
 

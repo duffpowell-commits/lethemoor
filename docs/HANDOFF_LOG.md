@@ -468,3 +468,8 @@ Back dismisses the card. The Field Guide lists the publisher under Credits.
 The approved drowned dockworker is the nightmare Thrall variant in the first-person view. Foxboard's TripoSR worker produced the draft. Blender restored the face and rebuilt the rope, baked the albedo, and exported the textured GLB with the texture embedded. The pose uses the existing crouch and lunge states to lower and lean the model. Standing and attack poses use a rigid mesh. Other standing variants, the Stalker, corpse poses, and the death-card artwork retain their current artwork.
 
 The art pass checks that the modeled variant is visible when lit, hides its standing sprite, drops for the crouch tell, and leans on a lunge. See `docs/renders/fp_art_thrall_3d.png`.
+
+### Stalker model preview (Nov 23)
+
+- The veiled bride uses a 6,193-triangle, opaque textured GLB derived from the existing bride reference and cleaned in Blender. The first-person view places it on the existing Stalker holder, which shares the simulation fog gate and turn interpolation. The model keeps its facing until she moves to another tile. The death card still uses its painted close-up.
+- Owner review is pending. See `docs/renders/fp_stalker_3d.png` for the lantern encounter and `docs/renders/stalker_3d_turnaround.jpg` for three model views. This preview uses rigid movement.

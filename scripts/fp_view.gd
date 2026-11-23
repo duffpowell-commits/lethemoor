@@ -49,6 +49,7 @@ const LIGHT := {
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
 const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const STALKER_MODEL = preload("res://assets/models/stalker.glb")
 const THRALL_MODEL = preload("res://assets/models/thrall.glb")
 const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
@@ -435,9 +436,10 @@ func _build_world() -> void:
 			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
-		if not stalker and th.texture == _tex("thrall_nightmare"):
-			var model := THRALL_MODEL.instantiate() as Node3D
-			model.scale = THRALL_MODEL_SCALE
+		if stalker or th.texture == _tex("thrall_nightmare"):
+			var model := (STALKER_MODEL if stalker else THRALL_MODEL).instantiate() as Node3D
+			if not stalker:
+				model.scale = THRALL_MODEL_SCALE
 			holder.add_child(model)
 			thrall_models[thrall_nodes.size()] = model
 		add_child(holder)
@@ -584,6 +586,13 @@ func _pose(i: int) -> void:
 	if model:
 		model.visible = not lying
 		sp.visible = lying
+		if game.thralls[i].kind == "stalker":
+			var tile: Vector2i = game.thralls[i].pos
+			if model.get_meta("facing_tile", Vector2i(-1, -1)) != tile:
+				var toward: Vector2i = game.hunter - tile
+				if toward != Vector2i.ZERO:
+					model.rotation.y = atan2(toward.x, toward.y)
+				model.set_meta("facing_tile", tile)
 	sp.billboard = BaseMaterial3D.BILLBOARD_DISABLED if lying else BaseMaterial3D.BILLBOARD_FIXED_Y
 	if lying:
 		# on its side across your view, turned to you, sagging back a little: a body, at a glance
@@ -2894,7 +2903,11 @@ func _capture_stalker() -> void:
 	while game.facing != Vector2i.RIGHT and not game.over():
 		await _go("right")
 	var st: Dictionary = game.thralls.filter(func(t): return t.get("kind") == "stalker")[0]
-	await _shot("fp_stalker")
+	await _shot("fp_stalker_3d")
+	var index: int = game.thralls.find(st)
+	var model: Node3D = thrall_models.get(index)
+	var model_visible := is_instance_valid(model) and model.is_visible_in_tree()
+	print("STALKER MODEL ", "PASS" if model_visible and not thrall_sprites[index].is_visible_in_tree() else "FAIL")
 	print("STALKER ", "PASS" if game.watched(st) and not game.dead else "FAIL", " at=", st.pos, " dead=", game.dead)
 	capture_phase = 3
 	get_tree().reload_current_scene()
