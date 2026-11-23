@@ -24,7 +24,7 @@ Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Colle
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
 
-Milestone A is on `art/one-night-3d-environment` for review. The One Night entry, masonry, floors, and fixtures now have modular 3D geometry in the playable scene. The enemy looks require owner approval before Milestone B integration.
+The 3D harbor shipped in build 119 (PR #38). Milestone B starts with the approved nightmare Thrall model on `art/thrall-model`. Skeletal animation, the Stalker, and the corpse models remain pending.
 
 Parked until the kill test: safe room, satchel, revenant corpse, Choir. Kill test is Nov 28: median fun 6+/10 and testers choose to replay.
 

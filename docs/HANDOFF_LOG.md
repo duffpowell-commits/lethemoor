@@ -462,3 +462,9 @@ Back dismisses the card. The Field Guide lists the publisher under Credits.
 - The live first-person scene builds the harbor kit in `scripts/harbor_geometry.gd`. It adapts the masonry, coping, and harbor-fixture studies from PR #36 to the existing 1-unit grid. The active view retains the painted stone and sky assets and existing lantern rig.
 - Wall segments place relief on the faces that border open cells and share meshes by exposed sides and ruin profile. Deck boards, slabs, bell steps, wet stone, and lintels dress traversable tiles. The street lamp and bell use opaque 3D meshes. The grid still resolves movement and contact. Fog drives visibility.
 - The four-pass capture now checks that the starting dock and wall use geometry, the bell and lamp are modeled, and the bell is gated by fog. See `docs/renders/harbor_entry.png`, `harbor_bell.png`, and `harbor_lamp.png`.
+
+## First modeled Thrall (Nov 23)
+
+The approved drowned dockworker is the nightmare Thrall variant in the first-person view. Foxboard's TripoSR worker produced the draft. Blender restored the face and rebuilt the rope, baked the albedo, and exported the textured GLB with the texture embedded. The pose uses the existing crouch and lunge states to lower and lean the model. Standing and attack poses use a rigid mesh. Other standing variants, the Stalker, corpse poses, and the death-card artwork retain their current artwork.
+
+The art pass checks that the modeled variant is visible when lit, hides its standing sprite, drops for the crouch tell, and leans on a lunge. See `docs/renders/fp_art_thrall_3d.png`.

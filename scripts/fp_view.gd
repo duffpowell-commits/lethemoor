@@ -49,6 +49,8 @@ const LIGHT := {
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
 const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
+const THRALL_MODEL = preload("res://assets/models/thrall.glb")
+const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -100,6 +102,7 @@ var tile_tex := {}                 # floor/wall tile -> texture name
 var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
 var thrall_nodes: Array = []
+var thrall_models: Dictionary[int, Node3D] = {}
 var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
 var print_nodes := {}              # tile -> wet footprints decal on the floor
 var pool_nodes := {}               # tile -> blood pool decal where a body lay
@@ -432,6 +435,11 @@ func _build_world() -> void:
 			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
+		if not stalker and th.texture == _tex("thrall_nightmare"):
+			var model := THRALL_MODEL.instantiate() as Node3D
+			model.scale = THRALL_MODEL_SCALE
+			holder.add_child(model)
+			thrall_models[thrall_nodes.size()] = model
 		add_child(holder)
 		if thrall.get("lying", false):   # the dead lie in what ran out of them; the pool stays if they rise
 			var pool := MeshInstance3D.new()
@@ -572,6 +580,10 @@ func _refresh_fog() -> void:
 func _pose(i: int) -> void:
 	var sp: Sprite3D = thrall_sprites[i]
 	var lying: bool = game.thralls[i].get("lying", false)
+	var model: Node3D = thrall_models.get(i)
+	if model:
+		model.visible = not lying
+		sp.visible = lying
 	sp.billboard = BaseMaterial3D.BILLBOARD_DISABLED if lying else BaseMaterial3D.BILLBOARD_FIXED_Y
 	if lying:
 		# on its side across your view, turned to you, sagging back a little: a body, at a glance
@@ -993,6 +1005,21 @@ func _process(delta: float) -> void:
 			var jerk := 0.0
 			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
 				jerk = 0.05 * sin(t * 90.0 + i)
+			var model: Node3D = thrall_models.get(i)
+			if model:
+				var toward: Vector3 = cam.global_position - thrall_nodes[i].global_position
+				var yaw := atan2(toward.x, toward.z) - PI / 2.0   # the imported Thrall faces +X
+				var pitch := 0.0
+				model.scale = THRALL_MODEL_SCALE
+				if th.get("crouched", false):
+					model.scale.y *= 0.72
+					pitch = -0.17 + 0.018 * sin(t * 47.0 + i)
+				elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
+					model.scale.y *= 0.78
+					pitch = -0.20
+				model.rotation = Vector3(0, yaw, pitch)
+				model.position.x = jerk
+				continue
 			if th.get("crouched", false):
 				var beat := 0.5 + 0.5 * sin(t * 9.0)
 				sp.scale = Vector3(1.3, 0.66, 1.0)
@@ -2946,14 +2973,18 @@ func _capture_art() -> void:
 	game.hunter = Vector2i(6, 18)
 	game.facing = Vector2i.RIGHT
 	game.thralls[ti].pos = Vector2i(8, 18)
-	game.thralls[ti].crouched = true
 	game.fog.update(game.lights())
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
 	thrall_nodes[ti].position = _w(game.thralls[ti].pos)
+	var thrall_model: Node3D = thrall_models.get(ti)
+	await _shot("fp_art_thrall_3d")
+	var thrall_model_ok: bool = thrall_model != null and thrall_model.is_visible_in_tree() and not thrall_sprites[ti].visible
+	game.thralls[ti].crouched = true
 	for k in 8:
 		await get_tree().process_frame
 	await _shot("fp_art_crouch")
+	thrall_model_ok = thrall_model_ok and thrall_model.scale.y < THRALL_MODEL_SCALE.y
 	game.thralls[ti].crouched = false
 	game.thralls[ti].lunge_cd = Night.LUNGE_COOLDOWN
 	game.thralls[ti].pos = Vector2i(7, 18)
@@ -2963,6 +2994,8 @@ func _capture_art() -> void:
 		await get_tree().process_frame
 	lunge_hit = 20.0   # held for the shot (a capture frame can be slow)
 	await _shot("fp_art_lunge")
+	thrall_model_ok = thrall_model_ok and thrall_model.rotation.z < 0.0
+	print("THRALL MODEL ", "PASS" if thrall_model_ok else "FAIL")
 	game.thralls[ti].lunge_cd = 0
 	game.thralls[ti].pos = keep_pos
 	thrall_nodes[ti].position = _w(keep_pos)
@@ -2977,6 +3010,6 @@ func _capture_art() -> void:
 	await _shot("fp_art_corpse")
 	var corpse_ok: bool = thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2
 	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
-	var art_ok := harbor_ok and corpse_ok
+	var art_ok := harbor_ok and corpse_ok and thrall_model_ok
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)
