@@ -2973,5 +2973,6 @@ func _capture_art() -> void:
 	await _shot("fp_art_corpse")
 	var corpse_ok: bool = thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2
 	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
-	print("ART ", "PASS" if corpse_ok else "FAIL")   # the last line: CI requires it, so a crash or hang anywhere before fails the build
-	get_tree().quit()
+	var art_ok := harbor_ok and corpse_ok
+	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
+	get_tree().quit(0 if art_ok else 1)
