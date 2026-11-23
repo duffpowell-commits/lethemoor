@@ -450,3 +450,9 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 - Save renders to `docs/renders/`, don't paste lots of images into chat.
 - Visual decisions need real engine renders shown to Duff, not sketches.
 - Every feature must serve a pillar or it gets cut.
+
+## Publisher branding (Nov 23)
+
+The startup scene displays the approved 3 Eyed Fox Studios primary weathered logo from the studio
+Drive folder while the existing first-person scene loads. Skip splash, Enter, Escape, or Android
+Back dismisses the card. The Field Guide lists the publisher under Credits.

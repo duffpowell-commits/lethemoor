@@ -7,6 +7,8 @@ extends Node3D
 ##   xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3
 ##     --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture   -> docs/renders/fp_*.png
 
+const StudioSplash = preload("res://branding/studio_splash.gd")
+
 const Fog = preload("res://scripts/sim/fog.gd")
 const Night = preload("res://scripts/sim/night.gd")
 const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing without the autoload
@@ -1984,6 +1986,8 @@ func _open_guide() -> void:
 	gl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	gl.custom_minimum_size.x = UI_W - 100
 	list.add_child(gl)
+	list.add_child(_label("CREDITS", 18, UI.AMBER, UI.head()))
+	list.add_child(_label("Published by " + StudioSplash.PUBLISHER, 18, UI.TEXT))
 	var close := Button.new()
 	close.text = "CLOSE"
 	close.focus_mode = Control.FOCUS_NONE
