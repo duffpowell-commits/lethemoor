@@ -55,6 +55,8 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- 2026-11-23. Added the skippable 3 Eyed Fox Studios splash and publisher credits in the Field Guide.
+
 - 2026-11-21. Public-repo guardrails: rules in `CLAUDE.md`, gitleaks on PRs and main, secret and prompt ignores.
 - 2026-11-21. Push guards, fresh-eyes review gate, lean CLAUDE.md (PR #32, commit 7191080).
 - 2026-11-20. Breath keeps playing while a horror lingers. Short goal card, behind-you card, POUR hidden until it is needed.

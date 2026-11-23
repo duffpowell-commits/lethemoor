@@ -451,6 +451,12 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 - Visual decisions need real engine renders shown to Duff, not sketches.
 - Every feature must serve a pillar or it gets cut.
 
+## Publisher branding (Nov 23)
+
+The startup scene displays the approved 3 Eyed Fox Studios primary weathered logo from the studio
+Drive folder while the existing first-person scene loads. Skip splash, Enter, Escape, or Android
+Back dismisses the card. The Field Guide lists the publisher under Credits.
+
 ## One Night 3D harbor environment (Nov 23)
 
 - The live first-person scene builds the harbor kit in `scripts/harbor_geometry.gd`. It adapts the masonry, coping, and harbor-fixture studies from PR #36 to the existing 1-unit grid. The active view retains the painted stone and sky assets and existing lantern rig.

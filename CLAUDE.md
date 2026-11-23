@@ -10,6 +10,8 @@ iPhone testers. Godot 4.5, GDScript only. Owner: Duff. This is the handoff; keep
 Search it for a system before you change it.
 **Read `STATUS.md` first and update it last.**
 
+- Publisher branding uses the approved 3 Eyed Fox Studios artwork at startup and credits in the Field Guide.
+
 ## Where things stand (Nov 21)
 - Design that wins over every older doc: `docs/design/first_person_design.md` (Nov 19, first person,
   Duff: "Switch fully now"). Pillars: light is life, every slot matters, the dead don't stay gone.
