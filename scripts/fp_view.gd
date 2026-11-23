@@ -15,11 +15,12 @@ const Letters = preload("res://scripts/letters.gd")
 const UI = preload("res://scripts/ui_style.gd")
 const Perf = preload("res://scripts/perf.gd")
 
+const Harbor = preload("res://scripts/harbor_geometry.gd")
+
 const UI_W := 540
 const TOP_H := 72
 const PAD_H := 330                 # status + lantern row + move pad (MENU -> MOVE BUTTONS: ON)
 const SLIM_H := 132                # status + lantern row + WAIT: swipes move you (the default)
-const WALL_H := 2.4                # tall: walls should loom over you
 const EYE := 0.82                  # eye height in tiles (a tile is ~ a stride)
 const CAM_BACK := 0.32             # stand at the back of the tile so the next one is in view
 const FOV := 64.0                  # horizontal (portrait keeps width)
@@ -89,8 +90,10 @@ var world_env: Environment
 var perf: Perf                    # FPS readout + graphics quality (scripts/perf.gd)
 var hand: Node3D
 var flame: MeshInstance3D
-var tile_mats := {}                # lamp posts + letters: their own material each (few)
+var tile_mats := {}                # letters have their own material
 var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
+var lintels := {}
+var harbor_fixtures := {}
 var tile_tex := {}                 # floor/wall tile -> texture name
 var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
 var tile_base := {}
@@ -273,54 +276,67 @@ func _build_world() -> void:
 	moon.rotation_degrees = Vector3(-60, -30, 0)
 	add_child(moon)
 
-	var floor_mesh := BoxMesh.new()
-	floor_mesh.size = Vector3(1, 0.2, 1)
-	var wall_mesh := BoxMesh.new()
-	wall_mesh.size = Vector3(1, WALL_H, 1)
+	var harbor := Harbor.new()
 	for y in room.size.y:
 		for x in room.size.x:
 			var p := Vector2i(x, y)
-			if room.is_wall(p) and _buried(p):
-				continue           # a wall with no floor beside it can never be seen: no draw
+			var wall: bool = room.is_wall(p)
+			if wall and _buried(p):
+				continue
 			var mi := MeshInstance3D.new()
-			mi.visibility_range_end = VIEW_RANGE   # past this the fog has it anyway
-			if room.is_wall(p):
-				mi.mesh = wall_mesh
-				mi.position = _w(p) + Vector3(0, WALL_H / 2.0, 0)
+			mi.visibility_range_end = VIEW_RANGE
+			mi.position = _w(p)
+			if wall:
+				mi.mesh = harbor.wall_for(room, p)
 				var stone: bool = (x * 3 + y) % 3 != 0
 				tile_tex[p] = "wall_granite" if stone else "wall_damask"
-				# Canva art is lit flat: let the lantern do the light. Paper is paler, so sink it more.
 				tile_base[p] = Color(0.72, 0.72, 0.78) if stone else Color(0.5, 0.48, 0.46)
 			else:
-				mi.mesh = floor_mesh
-				mi.position = _w(p) + Vector3(0, -0.1, 0)
-				tile_tex[p] = "exit" if p in room.exits else "floor_stone"
-				tile_base[p] = Color(0.58, 0.58, 0.62)   # the flagstone art is lit flat: sink it into the dark
+				# The western approach from the hunter starts on harbor decking.
+				var decking: bool = y == 19 and x >= 6 and x <= 10
+				if p in room.bells:
+					mi.mesh = harbor.bell_steps
+				else:
+					mi.mesh = harbor.dock if decking else harbor.floor_stone
+				tile_tex[p] = "floor_stone"
+				if decking:
+					tile_tex[p] = "deck"
+				elif p in room.exits:
+					tile_tex[p] = "exit"
+				elif (x * 5 + y) % 11 == 0:
+					tile_tex[p] = "floor_wet"
+				tile_base[p] = Color(0.31, 0.25, 0.20) if decking else Color(0.58, 0.58, 0.62)
+				var across: bool = room.is_wall(p + Vector2i.LEFT) and room.is_wall(p + Vector2i.RIGHT)
+				var along: bool = room.is_wall(p + Vector2i.UP) and room.is_wall(p + Vector2i.DOWN)
+				if (across or along) and (x + y * 3) % 7 == 0:
+					var lintel := MeshInstance3D.new()
+					lintel.mesh = harbor.lintel
+					lintel.position = _w(p)
+					lintel.rotation.y = PI / 2 if along else 0.0
+					lintel.visibility_range_end = VIEW_RANGE
+					add_child(lintel)
+					lintels[p] = lintel
 			add_child(mi)
 			tile_nodes[p] = mi
 
-	var iron := StandardMaterial3D.new()
-	iron.albedo_color = Color("#20242c")
+	var lamp_mesh := Harbor.lamp_mesh()
 	for lp: Vector2i in room.lamps:
-		# painted iron gas lamp, unlit (Forge art, keyed)
-		var post := _prop_sprite("prop_lamppost", 2.5)
-		post.position = _w(lp)
+		var post := MeshInstance3D.new()
+		post.name = "HarborLamp"
+		post.mesh = lamp_mesh
+		post.position = _w(lp) + Vector3(0.3, 0, 0.3)
 		add_child(post)
+		harbor_fixtures[lp] = post
 
 	for bp: Vector2i in room.bells:
-		# painted bell (Forge art, keyed) on a short iron rod from above, a touch bright: it's the goal.
-		# No frame legs: from the side a leg sat right in front of the bell.
-		var rod := MeshInstance3D.new()
-		var rm := BoxMesh.new()
-		rm.size = Vector3(0.05, 1.0, 0.05)
-		rod.mesh = rm
-		rod.position = _w(bp) + Vector3(0, 2.4, 0)
-		rod.material_override = iron.duplicate()
-		add_child(rod)
-		var bell := _prop_sprite("prop_bell", 0.95)
-		bell.position = _w(bp) + Vector3(0, 0.95, 0)
-		bell.modulate = Color(1.2, 1.12, 1.0)
+		var bell := Harbor.bell()
+		bell.position = _w(bp)
+		for direction: Vector2i in Harbor.CARDINALS:
+			if room.is_wall(bp + direction):
+				bell.rotation.y = atan2(float(direction.y), -float(direction.x))
+				break
 		add_child(bell)
+		harbor_fixtures[bp] = bell
 
 	# letters: a pale page nailed at chest height, facing the open floor. Read under BRIGHT.
 	for np: Vector2i in room.letters:
@@ -497,13 +513,14 @@ func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
 	m.metallic_specular = 0.25
-	m.albedo_texture = _tex(tex)
+	if tex != "deck":
+		m.albedo_texture = _tex(tex)
 	if tex.begins_with("wall"):
 		m.uv1_scale = Vector3(3, 2.0 * 1.6, 1)   # BoxMesh UVs are a 3x2 atlas: tile it
 		m.roughness = 0.9
-	elif tex == "floor_stone":
+	elif tex in ["floor_stone", "floor_wet"]:
 		m.uv1_scale = Vector3(3, 2, 1)   # BoxMesh UVs are a 3x2 atlas: one full slab set per tile
-		m.roughness = 0.45                # wet stone: the lantern glints off it
+		m.roughness = 0.43 if tex == "floor_wet" else 0.52
 	else:
 		m.roughness = 0.65
 	m.albedo_color = Color(base.r * k, base.g * k, base.b * k)
@@ -516,6 +533,10 @@ func _refresh_fog() -> void:
 		var mat := _tile_mat(tile_tex[p], tile_base[p], SHADE[fog.get_state(p)])
 		if tile_nodes[p].material_override != mat:
 			tile_nodes[p].material_override = mat
+	for p: Vector2i in lintels:
+		lintels[p].material_override = _tile_mat("wall_granite", Color(0.72, 0.72, 0.78), SHADE[fog.get_state(p)])
+	for p: Vector2i in harbor_fixtures:
+		harbor_fixtures[p].visible = fog.get_state(p) != Fog.DARK
 	for p in tile_mats:
 		var gp: Vector2i = p
 		if p.x <= -200:
@@ -2884,9 +2905,18 @@ func _capture_trap() -> void:
 	get_tree().reload_current_scene()
 
 
-## Pass 4 (art only, no checks): stand in fixed spots with the lantern high and look at the props.
+## Pass 4: check harbor geometry and capture lantern-lit fixtures, enemies, and props.
 func _capture_art() -> void:
 	await _press(lantern_buttons[Fog.Lantern.BRIGHT])
+	var entry: Vector2i = room.hunter
+	var quay_wall: Vector2i = entry + Vector2i.DOWN
+	var bell: Vector2i = room.bells[0]
+	var lamp: Vector2i = room.lamps[0]
+	var harbor_ok: bool = tile_nodes[entry].mesh is ArrayMesh and tile_tex[entry] == "deck" \
+		and tile_nodes[quay_wall].mesh.get_faces().size() > 36 \
+		and harbor_fixtures[bell].mesh is ArrayMesh and harbor_fixtures[lamp].mesh is ArrayMesh \
+		and harbor_fixtures[bell].visible == (fog.get_state(bell) != Fog.DARK)
+	print("HARBOR ", "PASS" if harbor_ok else "FAIL")
 	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
