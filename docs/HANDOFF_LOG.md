@@ -456,3 +456,9 @@ Duff's change happened: see the pivot doc. Size is now decided (64 px characters
 The startup scene displays the approved 3 Eyed Fox Studios primary weathered logo from the studio
 Drive folder while the existing first-person scene loads. Skip splash, Enter, Escape, or Android
 Back dismisses the card. The Field Guide lists the publisher under Credits.
+
+## One Night 3D harbor environment (Nov 23)
+
+- The live first-person scene builds the harbor kit in `scripts/harbor_geometry.gd`. It adapts the masonry, coping, and harbor-fixture studies from PR #36 to the existing 1-unit grid. The active view retains the painted stone and sky assets and existing lantern rig.
+- Wall segments place relief on the faces that border open cells and share meshes by exposed sides and ruin profile. Deck boards, slabs, bell steps, wet stone, and lintels dress traversable tiles. The street lamp and bell use opaque 3D meshes. The grid still resolves movement and contact. Fog drives visibility.
+- The four-pass capture now checks that the starting dock and wall use geometry, the bell and lamp are modeled, and the bell is gated by fog. See `docs/renders/harbor_entry.png`, `harbor_bell.png`, and `harbor_lamp.png`.

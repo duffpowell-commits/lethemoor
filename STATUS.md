@@ -24,6 +24,8 @@ Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Colle
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
 
+Milestone A is on `art/one-night-3d-environment` for review. The One Night entry, masonry, floors, and fixtures now have modular 3D geometry in the playable scene. The enemy looks require owner approval before Milestone B integration.
+
 Parked until the kill test: safe room, satchel, revenant corpse, Choir. Kill test is Nov 28: median fun 6+/10 and testers choose to replay.
 
 Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell stays silent, so later sessions leave the bell without a hum).
