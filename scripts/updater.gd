@@ -47,6 +47,11 @@ func _ready() -> void:
 		return                    # editor / local export: no build number, nothing to compare
 	if FileAccess.file_exists(APK_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(APK_PATH))   # last update's file
+	var poll := Timer.new()
+	poll.wait_time = RECHECK_S
+	poll.timeout.connect(_check_if_due)
+	add_child(poll)
+	poll.start()
 	await get_tree().create_timer(1.5).timeout     # let the title draw first
 	check()
 
@@ -66,8 +71,12 @@ func _local_code() -> int:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_RESUMED and my_code > 0 and sheet == null \
-			and Time.get_ticks_msec() / 1000.0 - last_check > RECHECK_S:
+	if what == NOTIFICATION_APPLICATION_RESUMED:
+		_check_if_due()
+
+
+func _check_if_due() -> void:
+	if my_code > 0 and sheet == null and Time.get_ticks_msec() / 1000.0 - last_check >= RECHECK_S:
 		check()
 
 
@@ -170,6 +179,7 @@ func _button(text: String, h: int) -> Button:
 
 
 func _close() -> void:
+	installing = false
 	if http != null and busy:
 		http.cancel_request()
 		busy = false
