@@ -41,6 +41,7 @@ const UI_DIM := Color("#7d8fa8")
 const UI_BLOOD := Color("#c81e2e")
 const SHADE := {Fog.DARK: 0.0, Fog.REMEMBERED: 0.2, Fog.LIT: 1.0}
 ## Lantern light per setting: [range, energy]. Close up, so less energy than top-down.
+const LOW_OIL_SPUTTER := 12   # at or under this much oil the lantern gutters (look only, never a rule)
 const LIGHT := {
 	Fog.Lantern.HOODED: [0.8, 0.25],
 	Fog.Lantern.NORMAL: [3.4, 1.7],
@@ -52,6 +53,11 @@ const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "th
 const STALKER_MODEL = preload("res://assets/models/stalker.glb")
 const THRALL_MODEL = preload("res://assets/models/thrall.glb")
 const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
+const RigHorror = preload("res://scripts/rig_horror.gd")
+## Looks that have a rigged, animated body (assets/models/<rig>.glb + <rig>_clips.res). A rig wins
+## over the rigid model and the painted card; a look without one keeps what it had.
+const RIGS := {"stalker_bride": ["rig_bride", 2.15], "thrall_nightmare": ["rig_nightmare", 2.1],
+	"thrall_hooded": ["rig_hooded", 1.85], "thrall_dockwoman": ["rig_dockwoman", 1.8], "thrall_dock": ["rig_dock", 1.9]}
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -104,6 +110,7 @@ var shared_mats := {}              # "tex|shade" -> one material shared by every
 var tile_base := {}
 var thrall_nodes: Array = []
 var thrall_models: Dictionary[int, Node3D] = {}
+var thrall_rigs: Dictionary[int, Node3D] = {}   # index -> rig_horror.gd body (also in thrall_models)
 var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
 var print_nodes := {}              # tile -> wet footprints decal on the floor
 var pool_nodes := {}               # tile -> blood pool decal where a body lay
@@ -436,7 +443,14 @@ func _build_world() -> void:
 			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
-		if stalker or th.texture == _tex("thrall_nightmare"):
+		var rig_look: String = "stalker_bride" if stalker else String(th.texture.resource_path.get_file().get_basename())
+		var rig: Array = RIGS.get(rig_look, [])
+		if not rig.is_empty() and ResourceLoader.exists("res://assets/models/%s.glb" % rig[0]):
+			var body: Node3D = RigHorror.make(rig[0], rig[1])
+			holder.add_child(body)
+			thrall_models[thrall_nodes.size()] = body
+			thrall_rigs[thrall_nodes.size()] = body
+		elif stalker or th.texture == _tex("thrall_nightmare"):
 			var model := (STALKER_MODEL if stalker else THRALL_MODEL).instantiate() as Node3D
 			if not stalker:
 				model.scale = THRALL_MODEL_SCALE
@@ -578,11 +592,55 @@ func _refresh_fog() -> void:
 		minimap.queue_redraw()
 
 
+## Turn a horror to face you (only when it isn't mid-step, so a walk reads as a walk).
+func _face_cam(i: int, body: Node3D) -> void:
+	if cam == null:
+		return
+	var toward: Vector3 = cam.global_position - thrall_nodes[i].global_position
+	body.rotation.y = atan2(toward.x, toward.z)   # glTF bodies face +Z
+
+
+## The rules say crouched / lunging / moving; the rig plays the clip for it. A risen one plays
+## its rise to the end before it shambles.
+func _drive_rig(i: int, rig: Node3D, th: Dictionary) -> void:
+	var holder: Node3D = thrall_nodes[i]
+	var moving: bool = holder.get_meta("last_pos", holder.position).distance_to(holder.position) > 0.0005
+	holder.set_meta("last_pos", holder.position)
+	if rig.state == "rise" and rig.player.is_playing():
+		return
+	if th.get("crouched", false):
+		rig.set_state("crouch", 0.8)
+	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
+		rig.set_state("lunge", 1.4)
+	elif moving:
+		rig.set_state("walk", 0.75)   # slow, dragging
+	else:
+		rig.set_state("idle", 0.6 + 0.08 * sin(t * 0.7 + i))
+	if rig.state != "walk":
+		_face_cam(i, rig)
+	else:
+		var dir: Vector3 = _w(game.thralls[i].pos) - holder.position
+		if dir.length() > 0.01:
+			rig.rotation.y = atan2(dir.x, dir.z)
+
+
 ## A corpse lies flat on the stones, feet toward the wall; once it gets up it stands like the rest.
 func _pose(i: int) -> void:
 	var sp: Sprite3D = thrall_sprites[i]
 	var lying: bool = game.thralls[i].get("lying", false)
 	var model: Node3D = thrall_models.get(i)
+	var rig: Node3D = thrall_rigs.get(i)
+	if rig:   # the body itself lies there, and gets up
+		rig.visible = true
+		sp.visible = false
+		if lying:
+			if rig.state != "dead":
+				rig.set_state("dead")
+				rig.hold_end()   # it was dead before you came
+		elif rig.state == "dead":
+			rig.set_state("rise")
+		_face_cam(i, rig)
+		return
 	if model:
 		model.visible = not lying
 		sp.visible = lying
@@ -1014,6 +1072,10 @@ func _process(delta: float) -> void:
 			var jerk := 0.0
 			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
 				jerk = 0.05 * sin(t * 90.0 + i)
+			var rig: Node3D = thrall_rigs.get(i)
+			if rig:
+				_drive_rig(i, rig, th)
+				continue
 			var model: Node3D = thrall_models.get(i)
 			if model:
 				var toward: Vector3 = cam.global_position - thrall_nodes[i].global_position
@@ -1083,7 +1145,11 @@ func _process(delta: float) -> void:
 	var wobble := sin(t * 7.0) * 0.05 + sin(t * 13.0) * 0.04
 	if (flicker or fake_flicker) and fmod(t, 1.1) < 0.18:
 		wobble -= 0.6 * absf(sin(t * 60.0))
-	light.light_energy = base + wobble
+	if game.oil > 0 and game.oil <= LOW_OIL_SPUTTER:   # the wick gutters: the dark leans in (look only)
+		var gap := fmod(t + 0.9, 2.6 - 1.2 * (1.0 - float(game.oil) / LOW_OIL_SPUTTER))
+		if gap < 0.32:
+			wobble -= base * 0.7 * sin(gap / 0.32 * PI)
+	light.light_energy = maxf(0.05, base + wobble)
 	hand.position.y = HAND_Y + sin(t * 2.1) * 0.006   # the hand isn't quite steady
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)

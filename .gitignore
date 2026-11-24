@@ -24,3 +24,6 @@ build_code.txt
 # test-pass marker for the push guard (tools/test.sh)
 .claude/state/
 .claude/settings.local.json
+
+# Meshy clip GLBs (each carries a full mesh copy). Kept in project files lethemoor-3d/meshy_source/.
+tools/clips_src/*.glb
