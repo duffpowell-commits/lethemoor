@@ -851,3 +851,12 @@ func test_killer_is_recorded() -> void:
 	n.set_lantern(Fog.Lantern.HOODED)
 	n.step(Vector2i(2, 1))
 	check(n.dead and n.killer == "thrall", "walked into a thrall in the dark: the thrall took you")
+
+
+# Why (Nov 23 review): the open-app update poll re-offered the same build after LATER.
+func test_updater_later_holds() -> void:
+	var U = load("res://scripts/updater.gd")
+	check(U.should_offer(5, 4, 0), "newer build offered")
+	check(not U.should_offer(5, 4, 5), "LATER holds for that build")
+	check(U.should_offer(6, 4, 5), "a build newer than the one put off is offered")
+	check(not U.should_offer(9, 0, 0), "editor build (0) never offered")

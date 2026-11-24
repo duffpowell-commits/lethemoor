@@ -4,8 +4,9 @@ extends CanvasLayer
 ##
 ## How it works: CI stamps every APK with a build number (`version/code` = the workflow run
 ## number, also written to res://build_code.txt) and, on main, uploads the APK plus
-## version.json ({"code": N, "sha": "abc1234"}) to the public "dev" release. On launch, and
-## when the app comes back to the front, this reads version.json; if its code is higher than
+## version.json ({"code": N, "sha": "abc1234"}) to the public "dev" release. On launch, when
+## the app comes back to the front, and every RECHECK_S while it stays open, this reads
+## version.json; if its code is higher than
 ## ours it offers UPDATE NOW. That downloads the APK into user:// and hands it to Android's
 ## installer via OS.shell_open (Godot's own FileProvider turns the path into a content:// URI).
 ## Android always asks the player to confirm; the first time it also asks to allow Lethemoor
@@ -24,6 +25,9 @@ const VERSION_URL := RELEASE + "version.json"
 const APK_URL := RELEASE + "lethemoor.apk"
 const APK_PATH := "user://update.apk"
 const RECHECK_S := 120.0          # coming back to the app re-checks at most this often
+## Why POLL_S < RECHECK_S (Nov 23 review): a 120 s timer against a 120 s gate skipped every other
+## tick, so open-app checks really came every ~240 s. Tick often, let _check_if_due decide.
+const POLL_S := 30.0
 
 var my_code := 0
 var new_code := 0
@@ -35,6 +39,9 @@ var line: Label
 var go_btn: Button
 var later_btn: Button
 var installing := false           # the APK is downloaded; GO hands it to Android again
+## Build the player said LATER to. Why (Nov 23 review): without it the open-app poll re-offered
+## the same build every few minutes mid-night. Holds until the app restarts.
+var dismissed := 0
 
 
 func _ready() -> void:
@@ -49,6 +56,11 @@ func _ready() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(APK_PATH))   # last update's file
 	await get_tree().create_timer(1.5).timeout     # let the title draw first
 	check()
+	var poll := Timer.new()
+	poll.wait_time = POLL_S
+	poll.timeout.connect(_check_if_due)
+	add_child(poll)
+	poll.start()
 
 
 func _enabled() -> bool:
@@ -66,8 +78,17 @@ func _local_code() -> int:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_RESUMED and my_code > 0 and sheet == null \
-			and Time.get_ticks_msec() / 1000.0 - last_check > RECHECK_S:
+	if what == NOTIFICATION_APPLICATION_RESUMED:
+		_check_if_due()
+
+
+## Offer only a newer build the player hasn't already put off.
+static func should_offer(remote: int, local: int, put_off: int) -> bool:
+	return local > 0 and remote > local and remote > put_off
+
+
+func _check_if_due() -> void:
+	if my_code > 0 and sheet == null and Time.get_ticks_msec() / 1000.0 - last_check >= RECHECK_S:
 		check()
 
 
@@ -106,7 +127,7 @@ func _on_version(result: int, code: int, _headers: PackedStringArray, body: Pack
 		return
 	new_code = int(data["code"])
 	print("UPDATER mine %d, release %d" % [my_code, new_code])
-	if new_code > my_code:
+	if should_offer(new_code, my_code, dismissed):
 		_offer()
 
 
@@ -170,6 +191,8 @@ func _button(text: String, h: int) -> Button:
 
 
 func _close() -> void:
+	dismissed = new_code
+	installing = false
 	if http != null and busy:
 		http.cancel_request()
 		busy = false
