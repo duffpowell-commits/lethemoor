@@ -21,7 +21,8 @@ Search it for a system before you change it.
   Tune oil, thrall speed, Stalker spot from it; then a second round.
 - **Kill test by Nov 28:** median fun 6+/10 and testers choose to replay. Don't start full-game
   systems (safe room, satchel, corpse, Choir) before it passes.
-- Milestone A has an isolated One Night environment conversion on `art/one-night-3d-environment`. See the handoff and `docs/renders/harbor_*.png`.
+- One Night has the 3D harbor environment (PR #38). The first modeled Thrall uses the nightmare variant slot. See the handoff and `docs/renders/fp_art_thrall_3d.png`.
+- The Stalker has an in-engine 3D preview on `art/stalker-model`, pending owner approval.
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
   web https://duffpowell-commits.github.io/lethemoor/ (gh-pages, pushed by CI on main).
 - Art still needed: `docs/art_needs.md` (P0 first). Shared copy: https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj
