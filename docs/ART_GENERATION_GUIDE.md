@@ -15,9 +15,10 @@ cannot do what Grok does, it says so plainly. See `docs/DECISIONS.md`
 (2026-11-21, America/Chicago) for why the style-reference path is a
 workaround.
 
-**Forge prompts and outputs are public.** Never put Duff's likeness, private
-info, real names of living people, or anything that should stay off the
-public internet in `forge/jobs/<id>.json`.
+**Forge prompts and outputs are public.** Never put private info, real names
+of living people, or anything that should stay off the public internet in
+`forge/jobs/<id>.json`. Duff's likeness is the exception: he okayed it being
+public (Nov 21, 2026) and dropped the no-likeness rule (Nov 24, 2026).
 
 ---
 
@@ -497,8 +498,8 @@ conflicting log.
 
 - [ ] I fetched and read this game's current style guide and art-needs
       list. I am not using a retired pipeline.
-- [ ] The prompt is public-safe (no Duff likeness, no private info, no
-      named IP).
+- [ ] The prompt is public-safe (no private info, no named IP; Duff's
+      likeness is OK as of Nov 24, 2026).
 - [ ] Style is already locked for this asset type, or this job is one
       of 2–3 lock drafts, not a silent batch.
 - [ ] If I am varying an approved picture, I set `init` and

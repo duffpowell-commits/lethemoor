@@ -26,7 +26,7 @@ Search it for a system before you change it.
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
   web https://duffpowell-commits.github.io/lethemoor/ (gh-pages, pushed by CI on main).
 - Art still needed: `docs/art_needs.md` (P0 first). Shared copy: https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj
-- How to generate that art in Foxboard: `docs/ART_GENERATION_GUIDE.md` (Quase and Glaze's method, mapped onto Forge job fields). Prompts in Foxboard are public: no Duff likeness or private info.
+- How to generate that art in Foxboard: `docs/ART_GENERATION_GUIDE.md` (Quase and Glaze's method, mapped onto Forge job fields). Prompts in Foxboard are public: no private info (Duff's likeness is OK, his call Nov 24).
 
 ## Rules (the ones sessions trip on)
 - Duff is phone-only (Godot Android editor). No desktop steps. GDScript only.
