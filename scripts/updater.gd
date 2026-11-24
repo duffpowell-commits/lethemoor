@@ -5,7 +5,8 @@ extends CanvasLayer
 ## How it works: CI stamps every APK with a build number (`version/code` = the workflow run
 ## number, also written to res://build_code.txt) and, on main, uploads the APK plus
 ## version.json ({"code": N, "sha": "abc1234"}) to the public "dev" release. On launch, when
-## the app comes back to the front, and every RECHECK_S while it stays open, this reads version.json; if its code is higher than
+## the app comes back to the front, and every RECHECK_S while it stays open, this reads
+## version.json; if its code is higher than
 ## ours it offers UPDATE NOW. That downloads the APK into user:// and hands it to Android's
 ## installer via OS.shell_open (Godot's own FileProvider turns the path into a content:// URI).
 ## Android always asks the player to confirm; the first time it also asks to allow Lethemoor
@@ -39,7 +40,7 @@ var go_btn: Button
 var later_btn: Button
 var installing := false           # the APK is downloaded; GO hands it to Android again
 ## Build the player said LATER to. Why (Nov 23 review): without it the open-app poll re-offered
-## the same build every few minutes mid-night. Cleared when the app comes back to the front.
+## the same build every few minutes mid-night. Holds until the app restarts.
 var dismissed := 0
 
 
@@ -78,7 +79,6 @@ func _local_code() -> int:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_RESUMED:
-		dismissed = 0
 		_check_if_due()
 
 
@@ -191,8 +191,7 @@ func _button(text: String, h: int) -> Button:
 
 
 func _close() -> void:
-	if not installing:
-		dismissed = new_code
+	dismissed = new_code
 	installing = false
 	if http != null and busy:
 		http.cancel_request()
