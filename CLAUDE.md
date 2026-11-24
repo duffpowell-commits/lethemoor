@@ -5,7 +5,7 @@
 This repo is public. Never commit secrets, passwords, keys, tokens, keystore passes, or `.env` files (secrets only in GitHub Actions secrets added by Duff). Never commit AI prompts, bot instructions, persona text, or private chat handoffs. Never commit personal or family info. Never copy code, data, signals, or results from swinglifeaway or other private trading repos.
 
 Gothic turn-based survival horror, **first person** grid crawler, Android phones (portrait) + web for
-iPhone testers. Godot 4.5, GDScript only. Owner: Duff. This is the handoff; keep it short.
+iPhone testers. Godot 4.7.2, GDScript only. Owner: Duff. This is the handoff; keep it short.
 **Everything built so far, with the details and gotchas of each system: `docs/HANDOFF_LOG.md`.**
 Search it for a system before you change it.
 **Read `STATUS.md` first and update it last.**
@@ -68,7 +68,7 @@ Search it for a system before you change it.
 - `tools/` never ships (`balance_bot.gd`, `gen_audio.py`, art generators). `grok_art/`, `docs/` never ship.
 
 ## Commands
-- Godot in the cloud sandbox: 4.5-stable Linux zip from GitHub releases -> `/usr/local/bin/godot`.
+- Godot in the cloud sandbox: 4.7.2-stable Linux zip from GitHub releases -> `/usr/local/bin/godot`.
   Fresh clone: `godot --headless --path . --import`.
 - Tests: `tools/test.sh` (runs `tests/run_tests.gd`, must end `N passed, 0 failed`).
 - Parse check one script: `godot --headless --path . --check-only --script <file>` (a parse error hangs a scene).
