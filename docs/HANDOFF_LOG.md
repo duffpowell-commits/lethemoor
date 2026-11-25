@@ -583,3 +583,18 @@ From the mock review: one map with fixed walls got learned by night three, and n
   Grade B / A / S -> keepsakes I / II / III, short letters listed under KEEPSAKES in the Field Guide
   (locked ones say what they need). The end card names anything unlocked that night. The title shows
   "BELLS RUNG n · BEST g". Capture never reads or writes the record.
+
+
+## Real recorded sound (Nov 25, Duff: "Free library, I pick")
+- `tools/real_audio.py` swaps the clips where a recording matters most for CC0 or public-domain recordings. The sources are listed in `assets/audio/SOURCES.md`, so the game needs no credits.
+  - bell: a Rocamadour church peal. The toll is the same file played at pitch 0.8.
+  - amb_moor: a harbour at night (Ploumanac'h) with drips.
+  - footsteps: four stone takes.
+  - fire_loop.
+  - letter and letter_dim: paper.
+  - shuffle_0 and shuffle_2: real moans laid over the synthesized drag. shuffle_1 stays a bare drag.
+- What stays synthesized: the stings, whisper, breath, death, heartbeat, lantern, oil, hook and UI clips.
+- Loudness: each clip matches the RMS of the clip it replaced. The targets are fixed in `LOUD`, so a re-run doesn't creep louder. A soft knee at 0.8 keeps Vorbis transients under 0 dB. The bed is band-limited to 45 Hz-9 kHz because a mic thump clipped.
+- Sources download once to `~/.cache/lethemoor_real_audio`. The footsteps come as a .7z, which needs `pip install py7zr`.
+- Order matters: `gen_audio.py` first, then `real_audio.py`. gen_audio rewrites every clip.
+- Reachable from the cloud sandbox: OpenGameArt and archive.org. Blocked here: freesound, pixabay, kenney.nl and zapsplat. The Wikimedia API rate-limits the shared proxy.

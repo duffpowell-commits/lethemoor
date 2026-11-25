@@ -1,10 +1,12 @@
 # Lethemoor sound: where every clip came from
 
-**All of it is original.** Every file here is synthesized from scratch by
-`tools/gen_audio.py` (numpy noise, sines, filters, a baked cave reverb; seed 1119), made for
-Lethemoor and owned by Duff. No samples, no recordings, no third-party or CC0 packs, so there
-is nothing to credit and nothing to license. Rebuild them all with
-`python3 tools/gen_audio.py` (needs numpy + ffmpeg; one clip: `--only bell`).
+**Two kinds.** Most clips are synthesized from scratch by `tools/gen_audio.py` (numpy noise,
+sines, filters, a baked cave reverb; seed 1119), made for Lethemoor and owned by Duff. Since
+Nov 25 (Duff: "Free library, I pick") the clips where a real recording matters most are real
+recordings, built by `tools/real_audio.py` from **CC0 or public-domain** sources only, so nothing
+needs a credit or a licence in the game. They are listed under "Real recordings" below with
+their source. Rebuild everything with `python3 tools/gen_audio.py` then
+`python3 tools/real_audio.py` (in that order: gen_audio would put the synthesized ones back).
 
 Format: Ogg Vorbis, 44.1 kHz, mono except the stereo bed. Reverb is baked in because the web
 build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~1.3 MB.
@@ -44,3 +46,17 @@ build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~
 | burn_shriek.ogg | a cracked, falling shriek in fire | something burns in the slick |
 | heard_turn.ogg | the drag stops, a pivot, a click in the throat | a horror turns toward a noise (hook, pour, spark, fire), in 3D at its tile |
 | fire_loop.ogg | 5 s loop: oil burning on stone | on every burning tile, in 3D, while it burns |
+
+## Real recordings (Nov 25, `tools/real_audio.py`)
+
+These clips are cut, filtered, reverbed and level-matched from the sources below. Each one stays as loud as the synthesized clip it replaced.
+
+| Clip | Source | Licence |
+|---|---|---|
+| bell.ogg | Radio Aporee: Rocamadour church bell, France, by kaoss012 (archive.org `aporee_61861_71175`) | Public Domain Mark |
+| amb_moor.ogg | Radio Aporee: Ploumanac'h port at night (boats, wind in the rigging, masts), by yponomeutaneko (archive.org `aporee_34708_39904`). Mixed with OpenGameArt "Dripping water loop" | Public Domain Mark; CC0 |
+| step_0.ogg, step_1.ogg, step_2.ogg, step_3.ogg | OpenGameArt: "Fantozzi's Footsteps (Grass/Sand & Stone)", the stone takes | CC0 |
+| fire_loop.ogg | OpenGameArt: "Fire Crackling" | CC0 |
+| shuffle_0.ogg | the synthesized drag (shuffle_1) under OpenGameArt "Undead moans" (undead-1) | CC0 |
+| shuffle_2.ogg | the synthesized drag (shuffle_1) under OpenGameArt "Zombie moans" by darsycho | CC0 |
+| letter.ogg, letter_dim.ogg | OpenGameArt: "Various paper sound effects" (paper_sound 1 and 3) | CC0 |
