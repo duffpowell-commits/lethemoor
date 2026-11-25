@@ -8,6 +8,7 @@ extends RefCounted
 
 const RANK := {"S": 4, "A": 3, "B": 2, "C": 1, "D": 0}
 const DEEPER := "deeper"
+const GENTLE_NIGHTS := 3   # your first this-many nights deal a thrall fewer (Night.start_dealt gentle)
 
 ## [id, grade needed, title, words, Deeper Night only]
 const KEEPSAKES := [
@@ -54,6 +55,11 @@ static func add_night(rec: Dictionary, rang: bool, grade: String, deep: bool) ->
 ## What the Field Guide says about a keepsake you haven't found yet.
 static func lock_text(k: Array) -> String:
 	return "LOCKED. Ring the bell with grade %s or better%s. One keepsake a night." % [k[1], " on a Deeper Night" if k[4] else ""]
+
+
+## Still one of your first nights (any ending counts as a night)?
+static func gentle(rec: Dictionary) -> bool:
+	return int(rec.get("nights", 0)) < GENTLE_NIGHTS
 
 
 static func has(rec: Dictionary, id: String) -> bool:

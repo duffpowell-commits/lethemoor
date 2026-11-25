@@ -46,7 +46,7 @@ static func choose(g) -> String:
 			return "hook"
 		for d: Vector2i in [-g.facing, g.facing]:   # back off, eyes on it (the field note)
 			var n: Vector2i = g.hunter + d
-			if _known_floor(g, n) and g.thrall_at(n) < 0 and close.all(func(th): return _md(th.pos, n) > _md(th.pos, g.hunter)):
+			if _known_floor(g, n) and not near.any(func(th): return th.pos == n) and close.all(func(th): return _md(th.pos, n) > _md(th.pos, g.hunter)):
 				return _toward(g, d)
 		return "wait"
 	var avoid := {}
@@ -85,7 +85,7 @@ static func choose(g) -> String:
 			best_score = score
 			best = p
 	if best == null or best == g.hunter:
-		# nothing new in reach: look around (turning shows the dark you haven't looked at)
+		# nothing new in reach: a newcomer turns about, lost (it costs a turn and shows nothing new)
 		return "right" if rng.randf() < 0.5 else "left"
 	return _step_to(g, reach, best)
 

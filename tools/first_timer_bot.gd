@@ -3,7 +3,8 @@ extends SceneTree
 ## screen (see that file). The balance bot (tools/balance_bot.gd) knows the whole map; this one
 ## says how a first night feels.
 ##   godot --headless --path . --script tools/first_timer_bot.gd -- [nights=200]
-## BOT_FIRST=n starts at night n (default 1). BOT_TRACE=1 prints every move.
+## BOT_FIRST=n starts at night n (default 1). BOT_TRACE=1 prints every move. BOT_GENTLE=1 plays
+## them as a newcomer's first nights (a thrall fewer, Record.gentle).
 
 const Night = preload("res://scripts/sim/night.gd")
 const Pilot = preload("res://tools/eyes/first_timer.gd")
@@ -11,7 +12,7 @@ const Pilot = preload("res://tools/eyes/first_timer.gd")
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
-	var count := int(args[0]) if args.size() > 0 else 200
+	var count := maxi(1, int(args[0])) if args.size() > 0 else 200
 	var first := int(OS.get_environment("BOT_FIRST")) if OS.get_environment("BOT_FIRST") != "" else 1
 	var trace := OS.get_environment("BOT_TRACE") != ""
 	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
@@ -26,7 +27,7 @@ func _init() -> void:
 	var death_turns: Array = []
 	var dry := 0                        # deaths after the oil ran out
 	for s in range(first, first + count):
-		var g = Night.start_dealt(text, s)
+		var g = Night.start_dealt(text, s, false, OS.get_environment("BOT_GENTLE") == "1")
 		for _i in 300:
 			if g.over():
 				break

@@ -30,6 +30,7 @@ const STALKER_SHADOW := 6       # blind, she closes to this many walking tiles a
 const STALKER_RECOIL := 3       # held lit and looked at this many turns running, she can't bear it and is gone into the dark
 const BELL_EVERY := 10          # the bell tolls by itself on turn 1 and every this many turns after: follow it
 const VIEW_COS := 0.64          # ~50 degrees either side of where you face
+const GENTLE_SPARE := 1         # thralls left out of a newcomer's first nights (Record.GENTLE_NIGHTS)
 const FLASK_OIL := 12          # an oil flask found on the floor
 ## Deeper Night (unlocked by ringing the bell once, record.gd): the bride wakes sooner and the
 ## flasks are thinner and you set out with less oil. Same ward, same horrors.
@@ -77,6 +78,7 @@ var facing := Vector2i.UP       # first-person view looks this way (top-down ign
 var setting: int = Fog.Lantern.NORMAL
 var oil := START_OIL
 var deep := false               # Deeper Night
+var gentle := false             # one of your first nights: a thrall fewer (start_dealt)
 var dread := 0
 var turn := 0
 var dead := false
@@ -107,9 +109,16 @@ var seed := 0                   # which night was dealt (0 = the map as drawn); 
 ## `seed` deals the night (room.shuffle): 0 = the map exactly as drawn (tests, captures).
 ## A dealt night as the game plays it: night `seed` gets its own walls (ward.gd), then the dealer
 ## places the horrors on them. Seed 0 is the handmade night, walls as drawn.
-static func start_dealt(room_text: String, seed: int, deeper := false) -> RefCounted:
-	var n = start(Ward.carve(room_text, seed) if seed > 0 else room_text, seed)
+## `gentle`: one of a newcomer's first nights (Record.gentle): one thrall fewer in the ward. Not
+## on a Deeper Night, which you chose to make harder. (Duff, Nov 25, "Gentler first 3 nights":
+## first-timer bot won 15% of nights, 24% with one thrall fewer.)
+static func start_dealt(room_text: String, seed: int, deeper := false, gentle := false) -> RefCounted:
+	var ward: String = Ward.carve(room_text, seed) if seed > 0 else room_text
+	if gentle and not deeper and seed > 0:
+		ward = Ward.thin(ward, GENTLE_SPARE)   # same walls, a thrall fewer
+	var n = start(ward, seed)
 	n.deep = deeper
+	n.gentle = gentle and not deeper and seed > 0
 	if deeper:
 		n.oil = DEEP_OIL
 	return n
