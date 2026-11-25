@@ -479,7 +479,8 @@ The art pass checks that the modeled variant is visible when lit, hides its stan
 Duff (Nov 24): "start making what we need to pull that game fully three-dimensional and terrifying". Budget he
 picked: ~260 Meshy credits ("Monsters + hands"). Spent 250 (705 -> 455).
 
-- `scripts/rig_horror.gd`: a horror on Meshy's 24-bone humanoid rig. The view sets a state from the rules
+- `scripts/rig_horror.gd`: a horror on Meshy's 24-bone humanoid rig.
+  Heights (Nov 24 evening, Duff: "Why are the monsters so big?"): thralls 0.88-1.0 tiles, bride 1.1, eye 0.82. The view sets a state from the rules
   (idle, walk, crouch, lunge, dead, rise); missing clips fall back. `fp_view.gd` `RIGS` maps a look to
   `assets/models/rig_<name>.glb` (+ height, + yaw fix: the bride's mesh faces -X). `_drive_rig` picks the
   state each frame; `_pose` lays corpses in the dead clip's last frame and plays "rise" when they get up.
