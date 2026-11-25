@@ -198,7 +198,7 @@ func _ready() -> void:
 	capture_mode = "--capture" in OS.get_cmdline_user_args()
 	record = Record.blank()
 	_load_hints()
-	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER), Record.gentle(record))
+	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER), Record.gentle(record) or _asked("LM_GENTLE", "gentle") == "1")
 	room = game.room
 	fog = game.fog
 	_build_world()
@@ -224,14 +224,20 @@ func _ready() -> void:
 func _pick_night() -> int:
 	if capture_mode:
 		return 0
-	var asked := OS.get_environment("LM_NIGHT")
-	if OS.has_feature("web"):
-		var q = JavaScriptBridge.eval("new URLSearchParams(location.search).get('night') || ''", true)
-		if q is String and q != "":
-			asked = q
+	var asked := _asked("LM_NIGHT", "night")
 	if asked.is_valid_int() and int(asked) > 0:
 		return int(asked)
 	return randi_range(1, 9999)
+
+
+## A tester's replay request: env var `env` on desktop, `?key=` on the web build.
+func _asked(env: String, key: String) -> String:
+	var asked := OS.get_environment(env)
+	if OS.has_feature("web"):
+		var q = JavaScriptBridge.eval("new URLSearchParams(location.search).get('%s') || ''" % key, true)
+		if q is String and q != "":
+			asked = q
+	return asked
 
 
 func _tex(name: String) -> Texture2D:
@@ -2912,7 +2918,7 @@ func _show_end() -> void:
 	else:
 		big.text = "THE DARK TOOK YOU"
 		small.text = "%s\n\n%d turns  ·  %d oil left" % [game.cause, game.turn, game.oil]
-	small.text += ("\n\nNight %d" % game.seed + ("  ·  DEEPER" if game.deep else "")) if game.seed > 0 else ""
+	small.text += ("\n\nNight %d" % game.seed + ("  ·  DEEPER" if game.deep else "") + ("  ·  FIRST NIGHTS" if game.gentle else "")) if game.seed > 0 else ""
 	if not night_counted and not capture_mode:
 		night_counted = true
 		var news: Array = Record.add_night(record, game.rang, game.grade() if game.rang else "", game.deep)
@@ -2998,7 +3004,7 @@ func _verdict_text() -> String:
 	var how := "rang the bell, grade %s (oil %d, letters %d/%d)" % [game.grade(), game.oil, game.letters_read.size(), room.letters.size()] \
 			if game.rang else "died: %s" % game.cause
 	return "Lethemoor verdict: fun %d/10, play again: %s. Night %d%s: %s, %d turns. Build %s, %s %s." % [
-		verdict_fun, verdict_again, game.seed, " deeper" if game.deep else "", how, game.turn, build, OS.get_name(), OS.get_model_name()]
+		verdict_fun, verdict_again, game.seed, (" deeper" if game.deep else "") + (" first-nights" if game.gentle else ""), how, game.turn, build, OS.get_name(), OS.get_model_name()]
 
 
 func _send_verdict(status: Label, by_text: bool) -> void:

@@ -113,8 +113,10 @@ var seed := 0                   # which night was dealt (0 = the map as drawn); 
 ## on a Deeper Night, which you chose to make harder. (Duff, Nov 25, "Gentler first 3 nights":
 ## first-timer bot won 15% of nights, 24% with one thrall fewer.)
 static func start_dealt(room_text: String, seed: int, deeper := false, gentle := false) -> RefCounted:
-	var spare: int = Ward.SPARE_THRALLS + (GENTLE_SPARE if gentle and not deeper else 0)
-	var n = start(Ward.carve(room_text, seed, spare) if seed > 0 else room_text, seed)
+	var ward: String = Ward.carve(room_text, seed) if seed > 0 else room_text
+	if gentle and not deeper and seed > 0:
+		ward = Ward.thin(ward, GENTLE_SPARE)   # same walls, a thrall fewer
+	var n = start(ward, seed)
 	n.deep = deeper
 	n.gentle = gentle and not deeper and seed > 0
 	if deeper:

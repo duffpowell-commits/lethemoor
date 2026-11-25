@@ -23,18 +23,33 @@ const CARDINALS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, V
 
 
 ## The ward for night `seed`, built from `template` (map text). Same seed, same ward.
-## `spare`: how many of the template's thralls to leave out (more on a newcomer's first nights).
-static func carve(template: String, seed: int, spare := SPARE_THRALLS) -> String:
+static func carve(template: String, seed: int) -> String:
 	var t = Room.parse(template)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed * 7919 + 17
 	var t_start: Dictionary = t.reachable(t.hunter, t.size.x * t.size.y)
 	var t_bell: int = t_start.get(t.bells[0], 0) if not t.bells.is_empty() else 0
 	for _i in TRIES:
-		var out := _try(t, t_start, t_bell, rng, spare)
+		var out := _try(t, t_start, t_bell, rng, SPARE_THRALLS)
 		if out != "":
 			return out
 	return template
+
+
+## The same ward with `count` thralls fewer: the ones farthest a walk off the road to the bell.
+## The walls don't change, so a night reported by number still has the same walls (a newcomer's
+## gentle first nights, Night.start_dealt).
+static func thin(text: String, count: int) -> String:
+	var r = Room.parse(text)
+	if r.bells.is_empty() or count <= 0:
+		return text
+	var route: Array = r.path_in(r.reachable(r.hunter, r.size.x * r.size.y), r.hunter, r.bells[0])
+	var keep := _keep_nearest(r.thralls, _road_walk(r, route), count)
+	var rows := text.split("\n")
+	for p: Vector2i in r.thralls:
+		if not p in keep:
+			rows[p.y] = rows[p.y].substr(0, p.x) + "." + rows[p.y].substr(p.x + 1)
+	return "\n".join(rows)
 
 
 static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator, spare: int) -> String:

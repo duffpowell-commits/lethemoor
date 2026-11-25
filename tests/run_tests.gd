@@ -1005,6 +1005,11 @@ func test_first_nights_are_gentler() -> void:
 		var n = Night.start_dealt(text, s)
 		var g = Night.start_dealt(text, s, false, true)
 		check(g.gentle and not n.gentle, "night %d: the gentle one says so" % s)
+		var same := true
+		for y in n.room.size.y:
+			for x in n.room.size.x:
+				same = same and n.room.is_wall(Vector2i(x, y)) == g.room.is_wall(Vector2i(x, y))
+		check(same, "night %d: the same walls, so a reported night replays" % s)
 		check(g.room.thralls.size() == t.thralls.size() - Ward.SPARE_THRALLS - Night.GENTLE_SPARE, "night %d: a thrall fewer on a first night" % s)
 		var d = Night.start_dealt(text, s, true, true)
 		check(not d.gentle and d.room.thralls.size() == n.room.thralls.size(), "night %d: never gentler on a Deeper Night" % s)
