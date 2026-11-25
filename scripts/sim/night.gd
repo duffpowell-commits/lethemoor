@@ -22,9 +22,14 @@ const PANIC_RESET := 60        # ...and dread drops back to here
 const THRALL_EVERY := 2
 ## The Stalker: frozen while it stands in your light AND inside your view (you're looking at
 ## it). Otherwise it takes STALKER_STEPS steps a turn. Looking away (a turn) is how it gets you.
-const STALKER_STEPS := 2
+const STALKER_STEPS := 1
+const STALKER_WAKES := 30       # from this turn the bride hunts you blind, not just your light (Nov 25)
+const STALKER_HUNT_EVERY := 3   # hunting blind she takes a step every this many turns (seeing your light: STALKER_STEPS a turn)
+const STALKER_SHADOW := 6       # blind, she closes to this many walking tiles and waits there for your light
+const STALKER_RECOIL := 3       # held lit and looked at this many turns running, she can't bear it and is gone into the dark
+const BELL_EVERY := 10          # the bell tolls by itself on turn 1 and every this many turns after: follow it
 const VIEW_COS := 0.64          # ~50 degrees either side of where you face
-const FLASK_OIL := 10          # an oil flask found on the floor
+const FLASK_OIL := 12          # an oil flask found on the floor
 const LETTER_POINTS := 5       # grade: each letter read is worth this much oil
 ## Grade at the bell: oil left + LETTER_POINTS per letter read. [min points, grade]
 ## The boathook (`K` on the map): swing it at the first thing 1-2 tiles straight ahead.
@@ -71,6 +76,7 @@ var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
 var killer := ""                # what took you: "thrall" or "stalker" ("" = not a horror)
+var bell_heard := false        # it has tolled once: the map knows where it hangs
 var rang := false               # rang the bell (One Night's goal): escaped with a grade
 var letters_read: Array = []    # letter tiles read (needs BRIGHT on the tile)
 var flasks_left: Array = []     # oil flasks still on the floor
@@ -408,6 +414,9 @@ func _end_turn(events: Array) -> Array:
 			events.append("letter")
 		else:
 			events.append("letter_dim")
+	if turn % BELL_EVERY == 1 and not room.bells.is_empty():
+		bell_heard = true
+		events.append("toll")   # the bell rings itself: you hear which way it is
 	fog.update(lights())
 	dread += DREAD_LIT if lit else DREAD_DARK
 	_horrors(events)
@@ -467,6 +476,11 @@ func in_view(p: Vector2i) -> bool:
 	return d.normalized().dot(Vector2(facing)) >= VIEW_COS
 
 
+## Is the bride hunting you now (awake, not burned)? She shadows you just past your light.
+func stalker_hunting(th: Dictionary) -> bool:
+	return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and turn >= STALKER_WAKES
+
+
 ## A Stalker holds still only while it's lit and you're looking right at it.
 func watched(th: Dictionary) -> bool:
 	return fog.get_state(th.pos) == Fog.LIT and in_view(th.pos)
@@ -477,7 +491,19 @@ func _stalker_act(i: int, events: Array) -> void:
 	if th.get("stun", 0) > 0:
 		th.stun -= 1
 		return
-	for s in STALKER_STEPS:
+	# she hunts: from STALKER_WAKES she always knows where you are and comes, slowly, blind;
+	# when she sees your light she comes fast
+	var blind_hunt: bool = turn >= STALKER_WAKES and not _sees_light(th) and th.target == null \
+			and not room.reachable(th.pos, STALKER_SHADOW).has(hunter)
+	if blind_hunt and turn % STALKER_HUNT_EVERY != 0:
+		return
+	if watched(th):
+		th.lit_for = th.get("lit_for", 0) + 1
+		if th.lit_for >= STALKER_RECOIL:
+			_recoil(i, events)
+		return
+	th.lit_for = 0
+	for s in (1 if blind_hunt else STALKER_STEPS):
 		if watched(th):
 			return
 		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
@@ -487,11 +513,12 @@ func _stalker_act(i: int, events: Array) -> void:
 			return
 		if _sees_light(th):
 			th.target = hunter
-		if th.target == null or th.pos == th.target:
+		var goal = hunter if blind_hunt else th.target
+		if goal == null or th.pos == goal:
 			th.target = null
 			return
 		var reach: Dictionary = room.reachable(th.pos, room.size.x * room.size.y, live_positions(i))
-		var path: Array = room.path_in(reach, th.pos, th.target)
+		var path: Array = room.path_in(reach, th.pos, goal)
 		if path.size() < 2:
 			th.target = null
 			return
@@ -504,6 +531,32 @@ func _stalker_act(i: int, events: Array) -> void:
 		if not events.has("stalker_moved"):
 			events.append("stalker_moved")
 		fog.update(lights())
+
+
+## The light was on her too long: she's gone, back into the dark at least STALKER_SHADOW + 1
+## walking tiles from you (the nearest such tile to where she stood). She'll be back.
+func _recoil(i: int, events: Array) -> void:
+	var th: Dictionary = thralls[i]
+	var from_you: Dictionary = room.reachable(hunter, room.size.x * room.size.y)
+	var from_her: Dictionary = room.reachable(th.pos, room.size.x * room.size.y)
+	var best = null
+	var best_d := 1 << 30
+	var taken := live_positions(i)
+	for q: Vector2i in from_her:
+		if from_you.get(q, 0) <= STALKER_SHADOW or q in taken or fog.get_state(q) == Fog.LIT:
+			continue
+		var dq: int = from_her[q] * 1000 + q.x * 37 + q.y   # nearest to her; ties broken by place, not dictionary order
+		if dq < best_d:
+			best_d = dq
+			best = q
+	th.lit_for = 0
+	th.target = null
+	if best == null:
+		return
+	th.pos = best
+	th.seen = false
+	if not events.has("recoiled"):
+		events.append("recoiled")
 
 
 func _thralls_act(events: Array) -> void:

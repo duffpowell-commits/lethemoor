@@ -536,3 +536,26 @@ All look only, no rule changes, no Meshy credits.
 - `Audio.hook_sfx(name, db, pitch)`: one-shot from outside the autoload.
 - Capture: KILL3D, HEAD LOOK, PHANTOM (+ renders `fp_killshot`, `fp_art_bride_face`, `fp_art_bride_head`,
   `fp_art_phantom`). `--art-only` after `--capture` jumps straight to the art pass for quick looks.
+
+## All four: toll, early thrall, hunting bride, oil (Nov 25)
+
+Duff asked Claude to play the build and rank fixes. Claude's night (seed 4242): 66 turns, no horror seen, bell never
+found, oil out. The bot on main: 54% win, about 4 oil left at the bell, and the bride killed 4 of 300. Duff picked "All four".
+- Toll (`night.gd` `BELL_EVERY` 10): on turn 1 and every 10 turns the bell rings by itself. The turn's events
+  get "toll" and `bell_heard` is set. `audio.gd` `_toll` plays the bell from where it hangs, as a long-range
+  AudioStreamPlayer3D, panned. The map draws the bell once heard: where it hangs, or on the rim with a pointer.
+  Capture: BELL MAP, render `fp_art_bell_map`.
+- Early thrall (`room.gd` `_early_thrall`, `EARLY` 9-12): on dealt nights only (seed 0 is unchanged), the thrall
+  dealt nearest the start moves to a tile 9-12 steps in, 2-3 tiles off the road to the bell, clear of other horrors.
+  At 1-2 tiles off the road it killed too often in the bot runs.
+- Bride (`night.gd`): from `STALKER_WAKES` (30) she hunts blind, a step every `STALKER_HUNT_EVERY` (3) turns,
+  until she is `STALKER_SHADOW` (6) walking tiles from you. Then she waits for your light, as before. She now
+  takes 1 step a turn (`STALKER_STEPS`, was 2); at 2 she killed in about 3 nights of 4 by closing from beyond
+  NORMAL's 2-tile light. Held lit and looked at for `STALKER_RECOIL` (3) turns running, she recoils (`_recoil`):
+  she is gone to the nearest unlit tile at least SHADOW + 1 from you. The view snaps her there, with no slide.
+  `Audio.stalker_free` (the silence) is now also on while she hunts within SHADOW + 2.
+- Oil: `FLASK_OIL` 12 (was 10).
+- Balance bot (now looks at the bride when it hears her or she's lit within 4, and stares her down): 50% win,
+  24 oil left at the bell, deaths 101 thrall, 31 walked into one, 19 bride. Median death turn 84.
+- Field notes: the goal card says the bell tolls; the bride card says to hold the light on her and that silence
+  means she's close; the flask card says +12; the map card mentions the bell.

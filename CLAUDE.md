@@ -28,6 +28,9 @@ Search it for a system before you change it.
   Painted cards are out of the thrall rotation. Re-bake/re-shrink steps: `docs/HANDOFF_LOG.md` "Fully 3D horrors".
 - Nov 25 "more scary": heads snap round to watch you, the 3D kill (it comes into your face, you go down),
   and at dread 50+ a grey figure in the dark ahead that isn't there. `docs/HANDOFF_LOG.md` "More scary".
+- Nov 25 "all four" (rule changes, Duff picked them after Claude played): the bell tolls every 10 turns and the
+  map points to it, a thrall waits just off the road early, the bride hunts from turn 30 and is driven off by 3
+  turns of held light, flasks +12. Bot: 50% win, 24 oil at the bell. `docs/HANDOFF_LOG.md` "All four".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and

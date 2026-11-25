@@ -76,7 +76,9 @@ func _play(g) -> void:
 			first_seen = g.turn
 		if trace:
 			print(g.turn, " me=", g.hunter, " f=", g.facing, " oil=", g.oil, " lit=", near.map(func(x): return x.pos), " all=", g.thralls.map(func(x): return x.pos))
-		if near.any(func(th): return _md(th.pos, g.hunter) <= 2):
+		if _face_bride(g):   # the field note's rule: never turn your back on her
+			continue
+		if near.any(func(th): return th.get("kind", "thrall") == "thrall" and _md(th.pos, g.hunter) <= 2):
 			_evade(g, near)
 			continue
 		var path := _safe_path(g, near, true)   # round where you last saw them, if there's a way
@@ -92,6 +94,27 @@ func _play(g) -> void:
 			g.step_dir(d)        # back up toward it: keeps your eyes where they were
 		else:
 			g.turn_by(1 if d == Vector2i(-g.facing.y, g.facing.x) else -1)
+
+
+## The bride lit and close: look at her (she freezes), then back away with your eyes on her,
+## or hook her if she's in reach. False if she isn't a problem this turn.
+func _face_bride(g) -> bool:
+	for th in g.thralls:
+		if th.get("kind", "thrall") != "stalker" or th.get("gone", false):
+			continue
+		var heard: bool = not g.in_view(th.pos) and g.room.reachable(th.pos, 2).has(g.hunter)   # her breath at your neck
+		if not heard and (g.fog.get_state(th.pos) != Fog.LIT or _md(th.pos, g.hunter) > 4):
+			continue
+		if not g.in_view(th.pos):
+			var d: Vector2i = th.pos - g.hunter
+			var want := Vector2i(signi(d.x), 0) if absi(d.x) >= absi(d.y) else Vector2i(0, signi(d.y))
+			g.turn_by(1 if want == Vector2i(-g.facing.y, g.facing.x) else -1)
+			return true
+		if g.watched(th):
+			g.wait()   # hold the light on her till she can't bear it (STALKER_RECOIL)
+			return true
+		return false
+	return false
 
 
 func _evade(g, near: Array) -> void:

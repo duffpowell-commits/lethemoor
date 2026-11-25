@@ -40,6 +40,7 @@ var pool: Array[AudioStreamPlayer] = []
 var muted := false
 var last_step := -1
 const STEP_SYNC := 0.09            # s after a step starts: the boot lands as the head dips (fp_view glide)
+const TOLL_DB := -3.0
 const BEHIND_NEAR := 2             # walking tiles: this close and out of your view cone, you hear it breathe
 var was_behind := {}               # thrall index -> turns in a row it has breathed at your neck
 var prev_pos: Array = []          # thrall positions after the last refresh
@@ -189,6 +190,29 @@ func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> void:
 	p.play()
 
 
+## The bell tolling by itself, from where it hangs: carries the whole ward, softer with distance,
+## panned so you can tell which way to go.
+func _toll(tile: Vector2i) -> void:
+	var scene := get_tree().current_scene
+	if not streams.has("bell") or not (scene is Node3D):
+		sfx("bell", -12.0, 0.8)
+		return
+	if log_cues:
+		print("SOUND3D toll at ", tile)
+	var p := AudioStreamPlayer3D.new()
+	p.stream = streams["bell"]
+	p.volume_db = TOLL_DB
+	p.pitch_scale = 0.8   # lower and heavier than the ring that wins
+	p.unit_size = 9.0
+	p.max_distance = 80.0
+	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_LOGARITHMIC
+	p.panning_strength = 1.6
+	p.position = Vector3(tile.x, 2.0, tile.y)
+	p.finished.connect(p.queue_free)
+	scene.add_child(p)
+	p.play()
+
+
 func _fade(p: AudioStreamPlayer, db: float, time: float) -> void:
 	if tweens.has(p) and tweens[p].is_valid():
 		tweens[p].kill()
@@ -246,6 +270,9 @@ func on_turn(kind: String, events: Array, game, spent: bool) -> void:
 			"bell":
 				sfx("bell", 0.0)
 				_end(-22.0)
+			"toll":   # the bell rings itself, far off: turn your head and you hear which way
+				if not game.room.bells.is_empty():
+					_toll(game.room.bells[0])
 			"dawn":
 				sfx("night_start", 0.0, 1.2)
 				_end(-22.0)
@@ -286,6 +313,9 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 				out.append(e)
 			"rang":
 				out.append("bell")
+			"toll":
+				if not "rang" in events:
+					out.append("toll")
 			"escaped":
 				if not "rang" in events:
 					out.append("dawn")
@@ -394,6 +424,8 @@ static func stalker_free(game) -> bool:
 			continue
 		if th.target != null or game._sees_light(th):
 			return true
+		if game.stalker_hunting(th) and game.room.reachable(th.pos, game.STALKER_SHADOW + 2).has(game.hunter):
+			return true   # she's hunting and near: the night holds its breath
 	return false
 
 

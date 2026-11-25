@@ -1104,8 +1104,9 @@ func act(kind: String) -> void:
 		var head := Vector3(0, -arc * 0.035, 0) + side * (arc * 0.018 * foot) if walking else Vector3.ZERO
 		var yaw := lerpf(from_yaw, to_yaw, k) if kind == "about" else lerp_angle(from_yaw, to_yaw, k)
 		_place_cam(from_pos.lerp(to_pos, k) + head, yaw, -turn_dir * arc * (0.04 if kind == "about" else 0.025))
-		for j in thrall_nodes.size():
-			thrall_nodes[j].position = _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
+		for j in thrall_nodes.size():   # a step glides; a bride driven off by the light is simply gone
+			var far: bool = (from_t[j] - game.thralls[j].pos).length() > 2.5
+			thrall_nodes[j].position = _w(game.thralls[j].pos) if far else _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
 		await get_tree().process_frame
 	step_k = 0.0
 	turn_events = events
@@ -1932,6 +1933,19 @@ func _draw_map() -> void:
 			var red := Color(0.55, 0.03, 0.04, 0.75 * _map_fade(m))
 			minimap.draw_line(m + Vector2(-4, -4), m + Vector2(4, 4), red, 2.0, true)
 			minimap.draw_line(m + Vector2(4, -4), m + Vector2(-4, 4), red, 2.0, true)
+	# the bell, once you've heard it toll: on the chart where it hangs, or on the rim pointing at it
+	if game.bell_heard and not room.bells.is_empty():
+		var bp: Vector2i = room.bells[0]
+		var bq := _map_xf(Vector2(bp) + Vector2(0.5, 0.5))
+		var off := bq - mid
+		if off.length() > MAP_R - 12.0:
+			bq = mid + off.normalized() * (MAP_R - 12.0)
+			var dir := off.normalized()
+			var sd := Vector2(-dir.y, dir.x)
+			minimap.draw_colored_polygon(PackedVector2Array([bq + dir * 11.0, bq + dir * 5.0 + sd * 4.0, bq + dir * 5.0 - sd * 4.0]), UI.AMBER)
+		if off.length() > MAP_R - 12.0 or fog.get_state(bp) == Fog.DARK:
+			minimap.draw_circle(bq, c * 0.62, Color(0.06, 0.04, 0.03, 0.75))
+			_map_sign(bp, Rect2(bq - Vector2(c, c) / 2.0, Vector2(c, c)))
 	# you: the brass arrow, the way you face as a faint wedge of light
 	var f := Vector2(game.facing).rotated(map_rot)
 	var side := Vector2(-f.y, f.x)
@@ -3372,6 +3386,16 @@ func _capture_art() -> void:
 		and harbor_fixtures[bell].mesh is ArrayMesh and harbor_fixtures[lamp].mesh is ArrayMesh \
 		and harbor_fixtures[bell].visible == (fog.get_state(bell) != Fog.DARK)
 	print("HARBOR ", "PASS" if harbor_ok else "FAIL")
+	# the bell tolls on the first turn; from then the chart points to it, here from the far end of the ward
+	var toll_ev: Array = game.wait()
+	game.hunter = entry
+	game.facing = Vector2i.UP
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	_refresh()
+	await _shot("fp_art_bell_map")
+	var bell_map_ok: bool = "toll" in toll_ev and game.bell_heard
+	print("BELL MAP ", "PASS" if bell_map_ok else "FAIL")
 	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
@@ -3502,6 +3526,6 @@ func _capture_art() -> void:
 		await _shot("fp_art_phantom")
 		_hide_phantom()
 	print("PHANTOM ", "PASS" if phantom_ok else "FAIL", " at=", game.hunter, " facing=", game.facing)
-	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen
+	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen and bell_map_ok
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)
