@@ -55,6 +55,7 @@ const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL
 const THRALL_LOOKS := ["thrall_nightmare", "thrall_hooded", "thrall_dockwoman"]
 const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
 const RigHorror = preload("res://scripts/rig_horror.gd")
+const Hands = preload("res://scripts/hands.gd")
 ## Looks that have a rigged, animated body (assets/models/<rig>.glb + <rig>_clips.res). A rig wins
 ## over the rigid model and the painted card; a look without one keeps what it had.
 ## [model, height, yaw fix]. The bride needs none: the old quarter turn left her side-on (render fp_art_bride_face, Nov 25).
@@ -590,34 +591,19 @@ func _build_world() -> void:
 	_build_viewmodel()
 
 
-## Your hands, in 3D (Meshy models, Nov 25): the gloved right arm holds the lantern out by its bail,
-## and the light lives inside the globe, so the shadows come from where the lantern really hangs.
-## The left arm carries the boathook while you have one. The look only: rules never read these.
-const VM_ARM := Vector3(0.11, -0.03, -0.3)      # right fist, camera space (lantern hangs below it)
-const VM_ARM_SCALE := 0.16
-const VM_ARM_DIR := Vector3(0.8, -0.4, 0.45)    # fist -> elbow: off to the right, back toward you
-const VM_POLE_X := 1.0
-const VM_POLE_TILT := 0.14
-const VM_HOOK_DIR := Vector3(-0.6, -0.5, 0.6)
-const VM_LAMP_SCALE := 0.07
-const VM_HOOK_ARM := Vector3(-0.17, -0.2, -0.4)
+## Your hands, in 3D (Meshy models, Nov 25; grips fixed the same day, scripts/hands.gd): the
+## right fist holds the lantern up by an iron link, and the light lives inside the globe, so the
+## shadows come from where the lantern really hangs. The left fist closes round the boathook's
+## handle while you have one. The look only: rules never read these.
 func _build_viewmodel() -> void:
 	vm_lantern = Node3D.new()
-	vm_lantern.position = VM_ARM
+	vm_lantern.position = Hands.LAMP_AT
 	cam.add_child(vm_lantern)
-	var arm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
-	arm.scale = Vector3.ONE * VM_ARM_SCALE
-	# the model stands sleeve-up, fist-down: lay the sleeve back toward you, down and to the right
-	arm.basis = Basis(Quaternion(Vector3.UP, VM_ARM_DIR.normalized())) * Basis.from_scale(Vector3.ONE * VM_ARM_SCALE)
-	arm.position = -(arm.basis * Vector3(0, -0.95, 0))   # fist at the pivot
-	vm_lantern.add_child(arm)
-	vm_lamp = Node3D.new()   # pivot at the fist: the lantern hangs and swings from here
-	vm_lantern.add_child(vm_lamp)
-	var lamp: Node3D = (load("res://assets/models/fp_lantern.glb") as PackedScene).instantiate()
-	lamp.scale = Vector3.ONE * VM_LAMP_SCALE
-	lamp.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.01, 0)   # bail top at the fist
-	vm_lamp.add_child(lamp)
-	for vm: Node3D in [arm, lamp]:
+	var rig: Array = Hands.lantern_rig(vm_lantern)
+	vm_lamp = rig[0]
+	var lamp: Node3D = rig[1]
+	var arm: Node3D = rig[2]
+	for vm: Node3D in [arm, vm_lamp]:
 		for m in vm.find_children("*", "MeshInstance3D", true, false):
 			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# the light sits inside the globe, so the lantern glows from within rather than catching it
@@ -632,11 +618,11 @@ func _build_viewmodel() -> void:
 			mi.material_override = vm_lamp_mat
 	# the flame and the light sit in the globe
 	flame.reparent(vm_lamp, false)
-	flame.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.012, 0)
-	flame.scale = Vector3.ONE * 0.45
+	flame.position = lamp.position + Vector3(0, -0.002, 0)
+	flame.scale = Vector3.ONE * 0.45 * Hands.LAMP_SCALE / 0.07
 	vm_glow = MeshInstance3D.new()
 	var gq := QuadMesh.new()
-	gq.size = Vector2(0.075, 0.09)
+	gq.size = Vector2(0.075, 0.09) * Hands.LAMP_SCALE / 0.07
 	vm_glow.mesh = gq
 	var gm := StandardMaterial3D.new()
 	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -659,36 +645,13 @@ func _build_viewmodel() -> void:
 	light.reparent(vm_lamp, false)
 	light.position = flame.position + Vector3(0, 0, -0.04)
 	vm_hook = Node3D.new()
-	vm_hook.position = VM_HOOK_ARM
+	vm_hook.position = Hands.HOOK_AT
 	vm_hook.visible = false
 	cam.add_child(vm_hook)
-	var larm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
-	larm.basis = Basis(Quaternion(Vector3.UP, VM_HOOK_DIR.normalized())) * Basis.from_scale(Vector3(-1, 1, 1) * VM_ARM_SCALE)
-	larm.position = -(larm.basis * Vector3(0, -0.95, 0))
-	vm_hook.add_child(larm)
-	var hook: Node3D = (load("res://assets/models/fp_boathook.glb") as PackedScene).instantiate()
-	hook.scale = Vector3.ONE * 0.12
-	hook.rotation = Vector3(-0.25, PI, -0.35)    # head up and ahead, the hook curling in toward the middle
-	hook.position = Vector3(0.0, 0.12, -0.03)
-	vm_hook.add_child(hook)
-	var pole := MeshInstance3D.new()   # the model's shaft is short: the pole runs on down out of sight
-	var pc := CylinderMesh.new()
-	pc.top_radius = 0.09
-	pc.bottom_radius = 0.1
-	pc.height = 6.0
-	pc.radial_segments = 8
-	pole.mesh = pc
-	var pmat := StandardMaterial3D.new()
-	pmat.albedo_color = Color("#a08a6c")   # matched to the model's shaft
-	pmat.roughness = 0.9
-	pole.material_override = pmat
-	var pole_pivot := Node3D.new()   # at the end of the model's shaft
-	pole_pivot.position = Vector3(VM_POLE_X, -0.9, 0)
-	pole_pivot.rotation.z = VM_POLE_TILT
-	hook.add_child(pole_pivot)
-	pole.position = Vector3(0, -2.9, 0)
-	pole_pivot.add_child(pole)
-	for vm: Node3D in [larm, hook]:
+	var hrig: Array = Hands.hook_rig(vm_hook)
+	var hook: Node3D = hrig[0]
+	var larm: Node3D = hrig[1]
+	for vm: Node3D in [larm, hook, hrig[2]]:
 		for m in vm.find_children("*", "MeshInstance3D", true, false):
 			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -699,7 +662,7 @@ func _sway_viewmodel(delta: float) -> void:
 	if vm_lantern == null:
 		return
 	var bob := sin(t * 2.1) * 0.004 + step_k * 0.018
-	vm_lantern.position = VM_ARM + Vector3(sin(t * 1.3) * 0.003, -bob, 0)
+	vm_lantern.position = Hands.LAMP_AT + Vector3(sin(t * 1.3) * 0.003, -bob, 0)
 	vm_swing_v += (-vm_swing * 38.0 - vm_swing_v * 2.2) * delta + step_k * delta * 1.6
 	vm_swing += vm_swing_v * delta
 	vm_lamp.rotation = Vector3(vm_swing, 0, vm_swing * 0.6 + sin(t * 0.9) * 0.02)
@@ -710,7 +673,7 @@ func _sway_viewmodel(delta: float) -> void:
 	vm_hook.visible = game.hook_wear > 0 and not game.dead
 	if vm_hook.visible:
 		var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
-		vm_hook.position = VM_HOOK_ARM + Vector3(0.05 * j, -bob + 0.04 * j, -0.16 * j)
+		vm_hook.position = Hands.HOOK_AT + Vector3(0.05 * j, -bob + 0.04 * j, -0.16 * j)
 		vm_hook.rotation = Vector3(-0.5 * j, 0, 0)
 
 
@@ -3605,6 +3568,7 @@ func _capture_art() -> void:
 	# and the boathook shows in your left exactly while you carry one
 	game.hook_wear = 3
 	await get_tree().process_frame
+	await _shot("fp_hands")   # both fists: the lantern on its link, the boathook's handle
 	var vm_ok: bool = vm_lantern.is_visible_in_tree() and light.get_parent() == vm_lamp and vm_hook.is_visible_in_tree() \
 		and not hook_art.is_visible_in_tree() and not hand_art.is_visible_in_tree()
 	game.hook_wear = 0

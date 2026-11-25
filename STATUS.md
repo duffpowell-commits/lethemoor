@@ -59,6 +59,8 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: hands hold things. The right fist holds the lantern by an iron link through its fingers (it was a left glove floating beside it); the left fist closes round the boathook's handle with the hook standing up. `scripts/hands.gd`, render `docs/renders/fp_hands.png`.
+
 - Nov 25: your first three nights deal one thrall fewer (Duff's pick after the first-timer review: a newcomer won 15% of nights, 22% with one fewer).
 - Nov 25: review fix 5 of 5. At most one keepsake a night, and the last one only for an S on a Deeper Night, so a perfect first night doesn't unlock everything at once.
 - Nov 25: review fix 4 of 5. A bell tower stands over the walls so you can steer by it, and each open hall has a landmark: an upturned boat, a door to nowhere, or stacked lobster pots.
