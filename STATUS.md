@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: review fix 3 of 5. A stone beam no longer floats in the sky over corridors you haven't seen yet.
 - Nov 25: review fix 2 of 5. A thrall that crouches now always lunges: backing off a tile used to freeze it, a standoff while dread climbed. The early thrall waits a few steps further in so the first minute stays fair. Bot: 39% win, 5% dead by turn 20.
 - Nov 25: review fix 1 of 5. In Claude's play-through, some new-walls nights had no horror at all. Horrors are now placed by how far you'd walk from the road, not by straight-line distance, so a night with no horror in your light went from 23% to 7%. A ward has 3 fewer thralls so the corridors stay survivable. Bot: 40% win, 25 oil at the bell.
 
