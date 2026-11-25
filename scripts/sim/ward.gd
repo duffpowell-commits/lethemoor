@@ -15,8 +15,8 @@ const HORROR_NEAR := 13    # no horror dealt nearer the start than this (the dea
 const ROAD_MIN := 3        # horrors stand as far a WALK off the road as the template has them, but at least
                            # this far (a template one nearer keeps its own): in the corridor's mouth, not in it
 const ROAD_MAX := 6        # bodies lie in a dead end at most this +3 walk off the road
-const SPARE_THRALLS := 2   # a ward deals this many fewer thralls than the harbour: corridors leave no way round
-                           # them (bot, all six: 23% of nights won)
+const SPARE_THRALLS := 3   # a ward deals this many fewer thralls than the harbour: corridors leave no way round
+                           # them (bot, all six: 23% of nights won; three spare: 40%)
 const TRIES := 40          # wards to try before giving up and keeping the template walls
 
 const CARDINALS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
@@ -87,7 +87,7 @@ static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator
 	var horrors := {}
 	# everything else in the template, in this order: tools first, then the horrors (they keep
 	# clear of each other), then letters and flasks
-	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", t.thralls.slice(0, maxi(0, t.thralls.size() - SPARE_THRALLS))],
+	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", _keep_nearest(t.thralls, t_walk, SPARE_THRALLS)],
 		["C", t.corpses], ["N", t.letters], ["O", t.oil_flasks]]
 	for kind in kinds:
 		for p: Vector2i in kind[1]:
@@ -146,6 +146,17 @@ static func _fits(kind: String, q: Vector2i, r, from: Dictionary, route: Array, 
 			var lo := maxi(mini(t_road, ROAD_MIN), 1 if kind == "S" else 0)
 			return rd >= lo and rd <= maxi(lo + 1, t_road + 1)   # as far a WALK off the road as the template has it
 	return true
+
+
+## `tiles` minus the `spare` farthest a walk off the road (ties by position), so which ones go
+## is a rule, not the map's row order.
+static func _keep_nearest(tiles: Array, walk: Dictionary, spare: int) -> Array:
+	var by := tiles.duplicate()
+	by.sort_custom(func(a: Vector2i, b: Vector2i):
+		var da: int = walk.get(a, 99)
+		var db: int = walk.get(b, 99)
+		return da < db if da != db else a < b)
+	return by.slice(0, maxi(0, by.size() - spare))
 
 
 ## Walking steps from each floor tile to the nearest tile of `route`.

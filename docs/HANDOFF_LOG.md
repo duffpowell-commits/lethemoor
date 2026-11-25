@@ -604,10 +604,11 @@ From the mock review: one map with fixed walls got learned by night three, and n
 - In Claude's play of build 160, night 2026 had no horror in the light for 54 turns. The cause: ward.gd measured how far a horror stands from the road as the crow flies (Manhattan). In a maze, two tiles off the road can be fifteen steps of walking, so you never met them.
 - Now `_road_walk` gives the real walking distance from the road. Horrors keep the template's walk from the road, at least `ROAD_MIN` 3. Bodies lie in dead ends 1 to `ROAD_MAX`+3 walk off the road.
 - Placement had been silently failing: 40% of nights fell back to the handmade walls, and that is why the old bot said 54%. It now fails 0 of 200 nights.
-- With every horror where you meet it, corridors leave no way round. Six thralls won 23%, so a ward deals `SPARE_THRALLS` 2 fewer.
-- Bot result (now prints "horrors met per night"):
-  - 40% of nights won, 28.6 oil left at the bell;
-  - 5.1 horrors met per night (the handmade night: 4.0);
-  - 4% dead by turn 20.
+- With every horror where you meet it, corridors leave no way round. Six thralls won 23%, so a ward deals `SPARE_THRALLS` 3 fewer: the ones farthest a walk off the template's road go (`_keep_nearest`, a rule, not row order).
+- Bot result (now prints "horrors met per night" and how often none at all; counted by thrall index, since a Dictionary key hashes by content and a moving thrall would count twice):
+  - 40% of nights won, 25 oil left at the bell;
+  - nights with no horror in your light: 23% on main, now 7%;
+  - 1.7 horrors met per night (main 1.3; the bot steers clear, a player meets more);
+  - 3% dead by turn 20.
 - Dealt nights on the handmade walls (`BOT_WALLS=0`) now win 100% for the bot. The game no longer plays them (only night 0), so they don't matter.
 - `tools/eyes/pilot.gd` is the bot's policy one move at a time, so Eyes can play a whole night through the real view: `v.act(load('res://tools/eyes/pilot.gd').choose(v.game))`.

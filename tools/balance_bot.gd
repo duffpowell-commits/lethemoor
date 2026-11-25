@@ -9,8 +9,9 @@ extends SceneTree
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const EARLY := 20                       # ~the first minute on a phone
-var first_seen := -1
-var seen_count := {}                    # horrors that came into the light this night                    # turn the first horror came into the light this night
+var first_seen := -1                    # turn the first horror came into the light this night
+var seen_count := {}                    # thrall index -> true for each horror that came into the light this night
+                                        # (keyed by index: a Dictionary key hashes by content, so a moving thrall would count again)
 
 
 func _init() -> void:
@@ -28,6 +29,7 @@ func _init() -> void:
 	var death_turns: Array = []
 	var seen_turns: Array = []
 	var seen_sum := 0
+	var none_met := 0                   # nights no horror ever came into the light (review of build 160)
 	var first := int(OS.get_environment("BOT_FIRST")) if OS.get_environment("BOT_FIRST") != "" else 1
 	var walls := OS.get_environment("BOT_WALLS") != "0"   # 1 (default): new walls every night, as the game plays
 	for s in range(first, first + count):
@@ -37,6 +39,8 @@ func _init() -> void:
 		_play(g)
 		seen_turns.append(first_seen if first_seen >= 0 else 999)
 		seen_sum += seen_count.size()
+		if seen_count.is_empty():
+			none_met += 1
 		if g.rang:
 			won += 1
 			oil_sum += g.oil
@@ -60,7 +64,7 @@ func _init() -> void:
 	var quiet := seen_turns.filter(func(x): return x > EARLY).size()
 	print("first horror seen: median turn %d, after turn %d in %.0f%% of nights" % [
 		seen_turns[seen_turns.size() / 2], EARLY, 100.0 * quiet / count])
-	print("horrors met (came into your light) per night: %.1f" % (float(seen_sum) / count))
+	print("horrors met (came into your light) per night: %.1f, none at all in %d%% of nights" % [float(seen_sum) / count, 100 * none_met / count])
 	quit()
 
 
@@ -82,7 +86,9 @@ func _play(g) -> void:
 		if first_seen < 0 and near.size() > 0:
 			first_seen = g.turn
 		for th in near:
-			seen_count[th] = true
+			for i in g.thralls.size():
+				if is_same(g.thralls[i], th):
+					seen_count[i] = true
 		if trace:
 			print(g.turn, " me=", g.hunter, " f=", g.facing, " oil=", g.oil, " lit=", near.map(func(x): return x.pos), " all=", g.thralls.map(func(x): return x.pos))
 		if _face_bride(g):   # the field note's rule: never turn your back on her
