@@ -119,6 +119,78 @@ static func bell() -> MeshInstance3D:
 	return _fixture("HarborBell", mesh)
 
 
+## The bell tower: a stone shaft rising from the wall behind the bell, rising far over the ward walls
+## (2.4) with an open belfry and a dim lamp in it, so you can steer by it from anywhere.
+## No fog on it: a black shape against the clouds, like a church over rooftops.
+static func bell_tower() -> MeshInstance3D:
+	var stone := _surface()
+	_box(stone, Vector3(0.9, 3.53, 0.9), Vector3(0, 3.865, 0))        # the shaft, from 2.1 up (inside even a ruined wall's top):
+	                                                                    # the wall below keeps its own stone and fog
+	_box(stone, Vector3(1.12, 0.14, 1.12), Vector3(0, 5.67, 0))       # belfry floor ledge
+	for x in [-0.48, 0.48]:
+		for z in [-0.48, 0.48]:
+			_box(stone, Vector3(0.16, 1.3, 0.16), Vector3(x, 6.39, z))  # four corner posts
+	_box(stone, Vector3(1.2, 0.16, 1.2), Vector3(0, 7.12, 0))         # cornice
+	for i in 5:                                                         # stepped spire
+		var w := 0.95 - i * 0.18
+		_box(stone, Vector3(w, 0.32, w), Vector3(0, 7.36 + i * 0.32, 0))
+	_box(stone, Vector3(0.05, 0.7, 0.05), Vector3(0, 9.3, 0))         # iron finial
+	var mesh := stone.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#11141a")
+	mat.roughness = 1.0
+	mat.metallic_specular = 0.0
+	mat.disable_fog = true
+	mesh.surface_set_material(0, mat)
+	var lamp := _surface()
+	_box(lamp, Vector3(0.22, 0.3, 0.22), Vector3(0, 6.05, 0))
+	lamp.commit(mesh)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.albedo_color = Color(0.85, 0.55, 0.25)
+	glow.disable_fog = true
+	mesh.surface_set_material(1, glow)
+	var tower := _fixture("BellTower", mesh)
+	tower.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return tower
+
+
+## Landmarks for the open halls of a ward, so one maze corner doesn't look like the next.
+## Each stands against a wall (local -z faces the wall), low enough not to hide a horror.
+static func landmark(kind: String) -> MeshInstance3D:
+	var wood := _surface()
+	var mesh: ArrayMesh
+	match kind:
+		"boat":      # a rowing boat upturned along the wall, keel up, bow and stern drawn in
+			for i in 4:
+				var l := 1.5 - i * 0.22
+				var w := 0.7 - i * 0.14
+				_box(wood, Vector3(l, 0.1, w), Vector3(0, 0.05 + i * 0.1, -0.12))
+				for side in [-1.0, 1.0]:   # the narrowing ends
+					_box(wood, Vector3(0.16, 0.1, w * 0.55), Vector3(side * (l * 0.5 + 0.08), 0.05 + i * 0.1, -0.12))
+			_box(wood, Vector3(1.9, 0.07, 0.06), Vector3(0, 0.43, -0.12))   # the keel
+			_box(wood, Vector3(1.2, 0.04, 0.09), Vector3(0.1, 0.03, 0.36), Transform3D(Basis(Vector3.UP, 0.25), Vector3.ZERO))   # an oar
+		"door":      # a door in the wall that goes nowhere, iron-banded, shut
+			_box(wood, Vector3(0.8, 2.0, 0.06), Vector3(0, 1.0, -0.47))
+			_box(wood, Vector3(0.12, 2.15, 0.1), Vector3(-0.46, 1.07, -0.46))
+			_box(wood, Vector3(0.12, 2.15, 0.1), Vector3(0.46, 1.07, -0.46))
+			_box(wood, Vector3(1.04, 0.14, 0.1), Vector3(0, 2.15, -0.46))
+			for y in [0.45, 1.55]:
+				_box(wood, Vector3(0.74, 0.05, 0.03), Vector3(0, y, -0.43))
+			_box(wood, Vector3(0.06, 0.06, 0.06), Vector3(0.28, 1.0, -0.42))   # the ring
+		_:           # lobster pots and a crate, stacked against the wall
+			_box(wood, Vector3(0.5, 0.42, 0.5), Vector3(-0.22, 0.21, -0.2))
+			_box(wood, Vector3(0.46, 0.4, 0.46), Vector3(0.3, 0.2, -0.22))
+			_box(wood, Vector3(0.44, 0.38, 0.44), Vector3(0.02, 0.61, -0.24), Transform3D(Basis(Vector3.UP, 0.3), Vector3.ZERO))
+	mesh = wood.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#2e241b") if kind != "pots" else Color("#33291e")
+	mat.roughness = 0.95
+	mat.metallic_specular = 0.1
+	mesh.surface_set_material(0, mat)
+	return _fixture("Landmark_" + kind, mesh)
+
+
 static func _fixture(label: String, mesh: ArrayMesh) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
 	instance.name = label

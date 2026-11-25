@@ -130,6 +130,8 @@ var flame: MeshInstance3D
 var tile_mats := {}                # letters have their own material
 var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
 var lintels := {}
+var bell_tower: MeshInstance3D       # the tower over the bell, seen over the walls (review fix 4)
+var landmarks := {}                     # tile -> kind (boat, door, pots) dressed in a ward's open halls
 var harbor_fixtures := {}
 var tile_tex := {}                 # floor/wall tile -> texture name
 var shared_mats := {}              # "tex|shade" -> one material shared by every tile like it
@@ -381,6 +383,16 @@ func _build_world() -> void:
 				break
 		add_child(bell)
 		harbor_fixtures[bp] = bell
+		# the tower over it, on the wall at its back: seen over the walls from anywhere
+		if bell_tower == null:
+			bell_tower = Harbor.bell_tower()
+			bell_tower.position = _w(bp) + Vector3(0, 0.3, 0)   # no wall beside the bell (rare): the belfry stands over it, clear of its yoke (2.3)
+			for direction: Vector2i in Harbor.CARDINALS:
+				if room.is_wall(bp + direction):
+					bell_tower.position = _w(bp + direction)
+					break
+			add_child(bell_tower)
+	_place_landmarks()
 
 	# letters: a pale page nailed at chest height, facing the open floor. Read under BRIGHT.
 	for np: Vector2i in room.letters:
@@ -732,6 +744,48 @@ func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
 		m.metallic_specular = 0.0   # unseen stone is black, not a sheen of sky
 	shared_mats[key] = m
 	return m
+
+
+## Dress each open hall (a 3x3 of floor) with one landmark against its wall: an upturned boat,
+## a door that goes nowhere, a stack of lobster pots. Picked by position, so the same night
+## always has the same ones, and no two halls the same kind if it can help it. Shown once seen,
+## like the lamps (harbor_fixtures). Review of build 160: every corner of a ward looked alike.
+func _place_landmarks() -> void:
+	var centres: Array[Vector2i] = []
+	for y in range(1, room.size.y - 1):
+		for x in range(1, room.size.x - 1):
+			var c := Vector2i(x, y)
+			var open := true
+			for dy in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					open = open and not room.is_wall(c + Vector2i(dx, dy))
+			var apart := true
+			for o in centres:
+				apart = apart and (absi(o.x - c.x) + absi(o.y - c.y)) > 4
+			if open and apart:
+				centres.append(c)
+	var kinds := ["boat", "door", "pots"]
+	var taken := {}
+	for p in room.lamps + room.bells + room.letters + room.exits + room.hooks + room.oil_flasks \
+			+ room.thralls + room.stalkers + room.corpses + [room.hunter]:   # never on a horror (a body half inside a boat) or the start
+		taken[p] = true
+	var k0 := posmod(room.size.x * 3 + centres.size() * 5 + (centres[0].x if not centres.is_empty() else 0), 3)
+	for ci in centres.size():
+		var c: Vector2i = centres[ci]
+		var kind: String = kinds[(k0 + ci) % kinds.size()]
+		# the hall tile on its rim with a wall behind it and nothing on it
+		for d in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN]:
+			var t: Vector2i = c + d
+			if not room.is_wall(t + d) or taken.has(t) or harbor_fixtures.has(t):
+				continue
+			var mark := Harbor.landmark(kind)
+			mark.position = _w(t)
+			mark.rotation.y = atan2(-float(d.x), -float(d.y))
+			mark.visibility_range_end = VIEW_RANGE
+			add_child(mark)
+			harbor_fixtures[t] = mark
+			landmarks[t] = kind
+			break
 
 
 func _refresh_fog() -> void:
@@ -3460,6 +3514,11 @@ func _capture_art() -> void:
 		and harbor_fixtures[bell].mesh is ArrayMesh and harbor_fixtures[lamp].mesh is ArrayMesh \
 		and harbor_fixtures[bell].visible == (fog.get_state(bell) != Fog.DARK)
 	print("HARBOR ", "PASS" if harbor_ok else "FAIL")
+	# the bell tower stands on the wall behind the bell and rises far over the walls (2.4)
+	var tower_at := Vector2i(roundi(bell_tower.position.x), roundi(bell_tower.position.z)) if bell_tower else Vector2i(-9, -9)
+	var tower_ok: bool = bell_tower != null and room.is_wall(tower_at) and (tower_at - bell).length_squared() == 1 \
+		and bell_tower.mesh.get_aabb().end.y > 8.0 and bell_tower.visible
+	print("TOWER ", "PASS" if tower_ok else "FAIL")
 	# the bell tolls on the first turn; from then the chart points to it, here from the far end of the ward
 	var toll_ev: Array = game.wait()
 	game.hunter = entry
@@ -3600,6 +3659,6 @@ func _capture_art() -> void:
 		await _shot("fp_art_phantom")
 		_hide_phantom()
 	print("PHANTOM ", "PASS" if phantom_ok else "FAIL", " at=", game.hunter, " facing=", game.facing)
-	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen and bell_map_ok
+	var art_ok := harbor_ok and tower_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen and bell_map_ok
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)
