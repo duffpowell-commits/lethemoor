@@ -633,3 +633,8 @@ From the mock review: one map with fixed walls got learned by night three, and n
 - In Claude's play of build 160, night 555 was won with an S on the first bell, which unlocked Deeper Night and all three keepsakes at once. After that there was nothing left to chase.
 - `record.gd` `add_night` now gives at most one keepsake a night: the first one in the list that the grade earns. Keepsake III ("THE LAST LANTERN") now needs an S on a Deeper Night (`KEEPSAKES` has a fifth field, Deeper only). So a perfect first night gives Deeper Night and keepsake I, and the shelf takes at least three good nights to fill.
 - In the Field Guide, a locked keepsake shows `Record.lock_text`: the grade it needs, "on a Deeper Night" for the last one, and "One keepsake a night."
+
+## Gentler first three nights (Nov 25, Duff picked "Gentler first 3 nights")
+- Re-review as a genuine first-timer (`tools/eyes/first_timer.gd`, `docs/EYES.md`): a newcomer won 15% of nights on build 175. Two thirds of deaths were thralls grabbing with oil left, one third came after the oil ran out from wandering.
+- Your first `Record.GENTLE_NIGHTS` (3) nights, counting any ending, deal `Night.GENTLE_SPARE` (1) thrall fewer: `Night.start_dealt(..., gentle)` passes `Ward.carve(..., spare)`. Never on a Deeper Night. Test: `test_first_nights_are_gentler`.
+- First-timer bot, 200 nights: 24% won on a gentle night, 15% on a full one. The expert bot is unchanged on full nights (39%). Run with `BOT_GENTLE=1 godot --headless --path . --script tools/first_timer_bot.gd -- 200`.

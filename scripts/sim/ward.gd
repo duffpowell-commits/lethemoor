@@ -23,20 +23,21 @@ const CARDINALS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, V
 
 
 ## The ward for night `seed`, built from `template` (map text). Same seed, same ward.
-static func carve(template: String, seed: int) -> String:
+## `spare`: how many of the template's thralls to leave out (more on a newcomer's first nights).
+static func carve(template: String, seed: int, spare := SPARE_THRALLS) -> String:
 	var t = Room.parse(template)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed * 7919 + 17
 	var t_start: Dictionary = t.reachable(t.hunter, t.size.x * t.size.y)
 	var t_bell: int = t_start.get(t.bells[0], 0) if not t.bells.is_empty() else 0
 	for _i in TRIES:
-		var out := _try(t, t_start, t_bell, rng)
+		var out := _try(t, t_start, t_bell, rng, spare)
 		if out != "":
 			return out
 	return template
 
 
-static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator) -> String:
+static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator, spare: int) -> String:
 	var w: int = t.size.x
 	var h: int = t.size.y
 	var g: Array = []           # rows of single-char strings
@@ -87,7 +88,7 @@ static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator
 	var horrors := {}
 	# everything else in the template, in this order: tools first, then the horrors (they keep
 	# clear of each other), then letters and flasks
-	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", _keep_nearest(t.thralls, t_walk, SPARE_THRALLS)],
+	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", _keep_nearest(t.thralls, t_walk, spare)],
 		["C", t.corpses], ["N", t.letters], ["O", t.oil_flasks]]
 	for kind in kinds:
 		for p: Vector2i in kind[1]:

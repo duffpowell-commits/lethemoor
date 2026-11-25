@@ -39,6 +39,8 @@ Search it for a system before you change it.
   Bot 39% win, 5% dead by turn 20. `docs/HANDOFF_LOG.md` "Review fix 2".
 - Nov 25 review fix 3-4: no stone beam floating over unseen tiles; a bell tower over the walls, and a boat, a door or
   lobster pots in each open hall. `docs/HANDOFF_LOG.md` "Review fix 3", "Review fix 4".
+- Nov 25: reviews play as a genuine first-timer (`tools/eyes/first_timer.gd`, Duff). First 3 nights deal a thrall fewer
+  (`Record.gentle`): newcomer bot 24% won vs 15%. `docs/HANDOFF_LOG.md` "Gentler first three nights".
 - Nov 25: real recorded sound (CC0/public domain, `tools/real_audio.py`): bell, harbour bed, steps, fire, paper,
   thrall moans. Run it after `gen_audio.py`. `docs/HANDOFF_LOG.md` "Real recorded sound".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD

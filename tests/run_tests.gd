@@ -998,6 +998,23 @@ func test_deeper_night_is_harder() -> void:
 	check(deep.wakes() < easy.wakes(), "the bride wakes sooner")
 
 
+func test_first_nights_are_gentler() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	var t = Room.parse(text)
+	for s in [3, 41, 2026]:
+		var n = Night.start_dealt(text, s)
+		var g = Night.start_dealt(text, s, false, true)
+		check(g.gentle and not n.gentle, "night %d: the gentle one says so" % s)
+		check(g.room.thralls.size() == t.thralls.size() - Ward.SPARE_THRALLS - Night.GENTLE_SPARE, "night %d: a thrall fewer on a first night" % s)
+		var d = Night.start_dealt(text, s, true, true)
+		check(not d.gentle and d.room.thralls.size() == n.room.thralls.size(), "night %d: never gentler on a Deeper Night" % s)
+	var rec := Record.blank()
+	for i in Record.GENTLE_NIGHTS:
+		check(Record.gentle(rec), "night %d is still a first night" % (i + 1))
+		Record.add_night(rec, false, "", false)
+	check(not Record.gentle(rec), "after %d nights, the full ward" % Record.GENTLE_NIGHTS)
+
+
 func test_the_record_unlocks_things() -> void:
 	var rec := Record.blank()
 	check(Record.add_night(rec, false, "", false).is_empty(), "dying unlocks nothing")

@@ -198,7 +198,7 @@ func _ready() -> void:
 	capture_mode = "--capture" in OS.get_cmdline_user_args()
 	record = Record.blank()
 	_load_hints()
-	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER))
+	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER), Record.gentle(record))
 	room = game.room
 	fog = game.fog
 	_build_world()
