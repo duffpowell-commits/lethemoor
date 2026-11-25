@@ -948,7 +948,7 @@ func test_every_dealt_night_has_its_own_walls() -> void:
 	for s in range(1, 41):
 		var r = Room.parse(Ward.carve(text, s))
 		check(r.size == t.size, "same size")
-		check(r.thralls.size() == t.thralls.size() and r.stalkers.size() == t.stalkers.size() \
+		check(r.thralls.size() == t.thralls.size() - Ward.SPARE_THRALLS and r.stalkers.size() == t.stalkers.size() \
 				and r.corpses.size() == t.corpses.size() and r.letters.size() == t.letters.size() \
 				and r.oil_flasks.size() == t.oil_flasks.size() and r.hooks.size() == t.hooks.size() \
 				and r.bells.size() == 1, "night %d: everything the handmade night has" % s)
@@ -959,6 +959,10 @@ func test_every_dealt_night_has_its_own_walls() -> void:
 		check(absi(walk - t_from[t.bells[0]] - Ward.BELL_EXTRA) <= Ward.BELL_SLACK, "night %d: the bell is as far a walk as tuned (%d)" % [s, walk])
 		for p: Vector2i in r.thralls + r.stalkers + r.corpses:
 			check(from[p] >= Ward.HORROR_NEAR, "night %d: no horror drawn near the start" % s)
+		# you meet them: some horrors stand a short WALK off the road, not just near it as the crow flies
+		var road: Dictionary = Ward._road_walk(r, r.path_in(from, r.hunter, r.bells[0]))
+		var close: int = (r.thralls + r.stalkers).filter(func(p): return road.get(p, 99) <= 6).size()
+		check(close >= 2, "night %d: at least two horrors a short walk off the road (%d)" % [s, close])
 
 
 func test_deeper_night_is_harder() -> void:

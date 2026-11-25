@@ -33,7 +33,8 @@ Search it for a system before you change it.
   turns of held light, flasks +12. Bot: 50% win, 24 oil at the bell. `docs/HANDOFF_LOG.md` "All four".
 - Nov 25 "2 and 4" (Duff): every dealt night has its own walls (`scripts/sim/ward.gd`, night 0 keeps the
   handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S,
-  `scripts/sim/record.gd`). Bot on new walls: 54% win, 29 oil at the bell. `docs/HANDOFF_LOG.md` "New walls".
+  `scripts/sim/record.gd`). Bot on new walls (after review fix 1, horrors placed by walking distance): 40% win,
+  25 oil at the bell, a night with no horror met 7% (was 23%). `docs/HANDOFF_LOG.md` "New walls", "Review fix 1".
 - Nov 25: real recorded sound (CC0/public domain, `tools/real_audio.py`): bell, harbour bed, steps, fire, paper,
   thrall moans. Run it after `gen_audio.py`. `docs/HANDOFF_LOG.md` "Real recorded sound".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
