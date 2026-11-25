@@ -52,7 +52,7 @@ jobs:
         # The view can be broken while every rule test passes (Nov 19: steps moved the sim but
         # not the camera). This plays title -> hint -> walk -> bell -> letter -> death -> Stalker.
         run: |
-          sudo apt-get install -y -qq xvfb >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null   # update first: a stale runner index 404s (Nov 25)
           timeout 600 xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 \
             --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture 2>&1 | tee capture.log | grep -E "PASS|FAIL|SCRIPT ERROR" || true
           ! grep -qE "FAIL|SCRIPT ERROR|^ERROR: .*(Failed loading|Cannot open|Node not found|Invalid)" capture.log
