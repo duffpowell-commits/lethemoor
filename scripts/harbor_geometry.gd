@@ -124,7 +124,7 @@ static func bell() -> MeshInstance3D:
 ## No fog on it: a black shape against the clouds, like a church over rooftops.
 static func bell_tower() -> MeshInstance3D:
 	var stone := _surface()
-	_box(stone, Vector3(0.9, 3.26, 0.9), Vector3(0, 4.0, 0))          # the shaft, from the wall top (2.4) up:
+	_box(stone, Vector3(0.9, 3.53, 0.9), Vector3(0, 3.865, 0))        # the shaft, from 2.1 up (inside even a ruined wall's top):
 	                                                                    # the wall below keeps its own stone and fog
 	_box(stone, Vector3(1.12, 0.14, 1.12), Vector3(0, 5.67, 0))       # belfry floor ledge
 	for x in [-0.48, 0.48]:

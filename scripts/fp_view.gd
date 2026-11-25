@@ -386,7 +386,7 @@ func _build_world() -> void:
 		# the tower over it, on the wall at its back: seen over the walls from anywhere
 		if bell_tower == null:
 			bell_tower = Harbor.bell_tower()
-			bell_tower.position = _w(bp)   # no wall beside the bell (rare): the belfry stands over it
+			bell_tower.position = _w(bp) + Vector3(0, 0.3, 0)   # no wall beside the bell (rare): the belfry stands over it, clear of its yoke (2.3)
 			for direction: Vector2i in Harbor.CARDINALS:
 				if room.is_wall(bp + direction):
 					bell_tower.position = _w(bp + direction)
@@ -767,7 +767,7 @@ func _place_landmarks() -> void:
 	var kinds := ["boat", "door", "pots"]
 	var taken := {}
 	for p in room.lamps + room.bells + room.letters + room.exits + room.hooks + room.oil_flasks \
-			+ room.thralls + room.stalkers + room.corpses:   # never on a horror (a body half inside a boat)
+			+ room.thralls + room.stalkers + room.corpses + [room.hunter]:   # never on a horror (a body half inside a boat) or the start
 		taken[p] = true
 	var k0 := posmod(room.size.x * 3 + centres.size() * 5 + (centres[0].x if not centres.is_empty() else 0), 3)
 	for ci in centres.size():
