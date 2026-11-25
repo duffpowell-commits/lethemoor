@@ -59,6 +59,8 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: real recorded sound (Duff picked "Free library, I pick"). The bell is a real church peal, the ambience is a real harbour at night, and the footsteps, fire, paper and thrall moans are real recordings. All are CC0 or public domain, listed in `assets/audio/SOURCES.md`. Each is level-matched to the clip it replaced.
+
 - Nov 25: new walls every night and unlocks (Duff: "Lets do 2 and 4 now"). Every dealt night carves its own ward from the handmade map, with the same things at the same pacing. Ringing the bell once unlocks Deeper Night (the bride wakes at turn 18, flasks +8, 50 oil to start). Grades B, A and S each find a keepsake letter in the Field Guide. The title shows bells rung and best grade. Bot on new walls: 54% win, 29 oil at the bell.
 
 - Nov 25: all four fixes from Claude's play-through (Duff picked "All four"). The bell tolls so you can find it, and the map points to it. A thrall waits near the start. The bride hunts you; hold your light on her to drive her off. Flasks give +12. Bot: 50% win, 24 oil at the bell, the bride 19 of 151 deaths.

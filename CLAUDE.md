@@ -34,6 +34,8 @@ Search it for a system before you change it.
 - Nov 25 "2 and 4" (Duff): every dealt night has its own walls (`scripts/sim/ward.gd`, night 0 keeps the
   handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S,
   `scripts/sim/record.gd`). Bot on new walls: 54% win, 29 oil at the bell. `docs/HANDOFF_LOG.md` "New walls".
+- Nov 25: real recorded sound (CC0/public domain, `tools/real_audio.py`): bell, harbour bed, steps, fire, paper,
+  thrall moans. Run it after `gen_audio.py`. `docs/HANDOFF_LOG.md` "Real recorded sound".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
