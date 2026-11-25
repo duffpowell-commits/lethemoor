@@ -59,6 +59,8 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: more scary (Duff: "Lets get more scary"). Heads snap round to follow you, the kill is in 3D (the thing comes into your face and you go down under it), and at dread 50+ a grey figure stands in the dark ahead for a second. Fixed the bride standing side-on. Look only, no rule changes.
+
 - 2026-11-25. Fully 3D horrors: rigged, animated, faceless thralls + bride (Meshy), 3D lantern arm and boathook, lantern gutters at low oil (PR #45).
 
 - 2026-11-23. Added the skippable 3 Eyed Fox Studios splash and publisher credits in the Field Guide.

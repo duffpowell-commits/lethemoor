@@ -22,6 +22,7 @@ var skeleton: Skeleton3D
 var player: AnimationPlayer
 var state := ""
 var clip := ""
+var look: SkeletonModifier3D       # head_look.gd: the head turns to you (set look.target)
 
 
 ## Build one from res://assets/models/<who>.glb, scaled to `height` world units (crown).
@@ -51,6 +52,10 @@ static func make(who: String, height: float) -> Node3D:
 	if aabb.size.y > 0.001:
 		actor.body.scale = Vector3.ONE * (height / aabb.size.y)
 		actor.body.position.y = -aabb.position.y * actor.body.scale.y
+	if actor.skeleton:
+		actor.look = (load("res://scripts/head_look.gd") as GDScript).new()
+		actor.look.actor = actor
+		actor.skeleton.add_child(actor.look)
 	actor.set_state("idle")
 	return actor
 
@@ -59,9 +64,10 @@ func has(c: String) -> bool:
 	return player.has_animation("rig/" + c)
 
 
-## Switch to a state; a one-shot (lunge, dead, rise) restarts only when the state changes.
-func set_state(s: String, speed := 1.0) -> void:
-	if s == state:
+## Switch to a state; a one-shot (lunge, dead, rise) restarts only when the state changes
+## (or when `again` is set: the kill replays the lunge even if it was already lunging).
+func set_state(s: String, speed := 1.0, again := false) -> void:
+	if s == state and not again:
 		player.speed_scale = speed
 		return
 	state = s
@@ -76,6 +82,8 @@ func set_state(s: String, speed := 1.0) -> void:
 	player.speed_scale = speed
 	var blend := 0.0 if s == "dead" else (0.06 if s == "lunge" else BLEND)   # the dead were lying already
 	player.play("rig/" + want, blend)
+	if again:
+		player.seek(0.0, true)
 
 
 ## Jump to the last frame of the current clip (a body that was already lying there).
