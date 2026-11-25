@@ -57,8 +57,10 @@ const RigHorror = preload("res://scripts/rig_horror.gd")
 ## Looks that have a rigged, animated body (assets/models/<rig>.glb + <rig>_clips.res). A rig wins
 ## over the rigid model and the painted card; a look without one keeps what it had.
 ## [model, height, yaw fix]: Meshy turned the bride to face -X, so she gets a quarter turn.
-const RIGS := {"stalker_bride": ["rig_bride", 2.15, PI / 2], "thrall_nightmare": ["rig_nightmare", 2.1],
-	"thrall_hooded": ["rig_hooded", 1.85], "thrall_dockwoman": ["rig_dockwoman", 1.8]}
+## Heights are crown heights in tiles against EYE 0.82: thralls man-sized, the bride a head taller
+## (Duff, Nov 24: "Why are the monsters so big?"; they were 1.8-2.15, carried over from the cards).
+const RIGS := {"stalker_bride": ["rig_bride", 1.1, PI / 2], "thrall_nightmare": ["rig_nightmare", 1.0],
+	"thrall_hooded": ["rig_hooded", 0.92], "thrall_dockwoman": ["rig_dockwoman", 0.88]}
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
