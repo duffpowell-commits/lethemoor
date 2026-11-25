@@ -73,7 +73,8 @@ static func news(ids: Array) -> String:
 static func summary(rec: Dictionary) -> String:
 	if rec.get("rung", 0) == 0:
 		return ""
-	var s := "Bells rung %d · best %s" % [rec.rung, rec.best if rec.best != "" else "-"]
+	var best: String = str(rec.get("best", ""))
+	var s := "Bells rung %d · best %s" % [rec.rung, best if best != "" else "-"]
 	if rec.get("best_deep", "") != "":
 		s += " · deeper %s" % rec.best_deep
 	return s

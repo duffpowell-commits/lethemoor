@@ -2554,7 +2554,8 @@ func _load_hints() -> void:
 	map_north_up = cfg.get_value("controls", "map_north_up", false)
 	for id in cfg.get_value("hints", "seen", []):
 		seen[id] = true
-	record = cfg.get_value("record", "data", Record.blank())
+	var rd = cfg.get_value("record", "data", Record.blank())
+	record = rd if rd is Dictionary else Record.blank()   # a damaged save starts a fresh record, never a crash
 	deep_on = cfg.get_value("record", "deep_on", false)
 
 
