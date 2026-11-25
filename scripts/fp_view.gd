@@ -728,6 +728,8 @@ func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
 	else:
 		m.roughness = 0.65
 	m.albedo_color = Color(base.r * k, base.g * k, base.b * k)
+	if k == 0.0:
+		m.metallic_specular = 0.0   # unseen stone is black, not a sheen of sky
 	shared_mats[key] = m
 	return m
 
@@ -738,6 +740,9 @@ func _refresh_fog() -> void:
 		if tile_nodes[p].material_override != mat:
 			tile_nodes[p].material_override = mat
 	for p: Vector2i in lintels:
+		# a beam over a tile you've never seen stays hidden: its black stone still caught the sky,
+		# a plank floating over the dark (review of build 160)
+		lintels[p].visible = fog.get_state(p) != Fog.DARK
 		lintels[p].material_override = _tile_mat("wall_granite", Color(0.72, 0.72, 0.78), SHADE[fog.get_state(p)])
 	for p: Vector2i in harbor_fixtures:
 		harbor_fixtures[p].visible = fog.get_state(p) != Fog.DARK

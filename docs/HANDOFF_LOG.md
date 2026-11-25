@@ -618,3 +618,7 @@ From the mock review: one map with fixed walls got learned by night three, and n
 - Now a crouch always ends in a move (`night.gd`, the lunge): still two off, it lands beside you; backed off a tile, it still lurches a tile after you and takes its `LUNGE_COOLDOWN` rest. No more stepping in and out to freeze it. Test: `test_a_crouch_always_ends_in_a_lunge`.
 - That made the dealer's early thrall deadlier (bot dead by turn 20: 3% to 8%: with no hook yet, backing into the start's dead end was the only move). It now waits 12-17 steps in (`room.gd` `EARLY`, was 10-15): 5%.
 - Bot, 200 nights: 39% won, 25.5 oil at the bell, 5% dead by turn 20, no horror met on 7% of nights. The IT LUNGED field note says backing off doesn't stop it.
+
+## Review fix 3: no plank floating over the dark (Nov 25)
+- In Claude's play of build 160 a stone beam hung in the sky at the end of a corridor. It was a lintel (`harbor.lintel`, on every seventh one-wide corridor tile) over a tile you had never seen: its material was black, but `metallic_specular` 0.25 still caught the teal sky, so it showed while the walls under it didn't.
+- Lintels now hide while their tile is DARK, like the lamps, and any DARK material has no specular (unseen stone is black). Before/after: `docs/renders/fp_lintel_before.png`, `docs/renders/fp_lintel_after.png`.
