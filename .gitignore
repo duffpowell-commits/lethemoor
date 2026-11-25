@@ -27,3 +27,8 @@ build_code.txt
 
 # Meshy clip GLBs (each carries a full mesh copy). Kept in project files lethemoor-3d/meshy_source/.
 tools/clips_src/*.glb
+
+# tools/eyes (docs/EYES.md): deps, scratch screenshots, godot-mcp-runtime scratch
+tools/eyes/node_modules/
+docs/renders/eyes/
+.mcp/

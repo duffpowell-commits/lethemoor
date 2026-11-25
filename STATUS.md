@@ -18,6 +18,10 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
 - Both are build 123, commit `de5bf2a`, with the 3D nightmare Thrall.
 
+## Tools
+
+Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, step, read the HUD, screenshot) before calling work done.
+
 ## In progress
 
 Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.

@@ -365,6 +365,18 @@ Moved word for word out of CLAUDE.md on Nov 21 2026 (lean harness: CLAUDE.md loa
   room, real sound. Also: real tile art for 3D, and one-step-per-tap vs the 4-tile placeholder
   move (pivot says step-based; decide with Duff on the phone build).
 
+
+## Eyes: Claude plays the running game (Nov 24)
+- Duff: "Add eyes to lethemoor". Same tool as godot-game-starter (PRs #22-#24): godot-mcp-runtime
+  4.0.1 (MIT, pinned in `tools/eyes/package-lock.json`) driven by `tools/eyes/eyes.mjs` under xvfb.
+  Steps: list UI, click by text, keys, waits, screenshots, live GDScript. `docs/EYES.md`.
+- Nothing ships: `tools/` and `docs/` are outside the export. The runtime adds a temporary autoload
+  while the game runs and removes it on exit (scratch in `.mcp/`, git-ignored).
+- Smoke: BEGIN THE NIGHT, up to three Field Notes dismissed (fresh save only), WAIT, step (`Up`).
+  Oil 60 -> 59 -> 58 confirms turns advance. Swipes aren't a step type; arrow keys work.
+- Gotcha it found: `fp_view.gd:1502` (`_build_hud`) sets a size on a node with unequal anchors, so
+  Godot warns "size will be overridden" every launch. Harmless today; warnings are listed, not fatal.
+
 ## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
 Duff's change happened: see the pivot doc. Size is now decided (64 px characters, 48 px tiles).
 - **Target look:** Final Fantasy Resonance (Square Enix, HD-2D, out Oct 22 2026). HD-2D =
