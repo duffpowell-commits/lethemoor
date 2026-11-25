@@ -704,14 +704,16 @@ func _refresh_fog() -> void:
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
-		if thrall_rigs.has(i):   # perf: a body you can't see doesn't animate (a rise or lunge resumes where it was)
+		_pose(i)
+		if thrall_rigs.has(i):   # perf: a body you can't see doesn't animate. A corpse keeps its pose and a
+			# rise plays out even in the dark, so it never resumes half-risen somewhere else.
 			var ap: AnimationPlayer = thrall_rigs[i].player
-			var on: bool = thrall_nodes[i].visible or thrall_rigs[i].state == "dead"
+			var st: String = thrall_rigs[i].state
+			var on: bool = thrall_nodes[i].visible or st == "dead" or (st == "rise" and ap.is_playing())
 			if on != ap.active:
 				ap.active = on
 				if on:
 					ap.advance(0.0)   # pose it at once, no stale frame
-		_pose(i)
 	_sync_prints()
 	for kp: Vector2i in hook_nodes:
 		hook_nodes[kp].visible = game.hooks_left.has(kp) and fog.get_state(kp) != Fog.DARK
