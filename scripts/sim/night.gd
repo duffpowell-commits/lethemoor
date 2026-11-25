@@ -637,10 +637,13 @@ func _thralls_act(events: Array) -> void:
 			th.target = null   # no way through: it gives up
 			th.roused = false
 			continue
-		# the lunge: two tiles off and it sees you, it crouches a turn (the tell), then if you're
-		# still two off it closes the gap in a heartbeat, slow or not
+		# the lunge: two tiles off and it sees you, it crouches a turn (the tell), then it comes a
+		# tile, slow or not: still two off and it lands beside you (the grab is its next turn);
+		# backed off and it still lurches after you and must rest. A crouch always ends in a move
+		# (review of build 160: stepping in and out of reach kept it crouching forever, a
+		# standoff while dread climbed and panic spilled oil).
 		var in_reach: bool = sees and th.lunge_cd == 0 and path.size() == 3
-		var lunge: bool = in_reach and th.crouched
+		var lunge: bool = th.crouched
 		th.crouched = in_reach and not lunge
 		if th.crouched:
 			if not events.has("crouch"):

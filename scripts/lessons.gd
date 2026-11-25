@@ -22,7 +22,7 @@ const CARDS := {
 	"horror": ["THRALLS",
 		"They come to light. BRIGHT is seen from 8 tiles, NORMAL from 5, HOODED only up close. One beside you on its turn is death.\n\nThey shamble, a step every other turn. But two tiles off they crouch, then lunge, and one held under BRIGHT light two turns stops shambling. Close up they make no sound at all. Wet prints on the stones mean one passed here."],
 	"lunge": ["IT LUNGED",
-		"Two tiles off and seeing your light, a thrall crouches for a turn, then closes the gap in one jerk. Then it must rest a few turns.\n\nMove now: back off, hook it, or step round a corner. Standing still is death."],
+		"Two tiles off and seeing your light, a thrall crouches for a turn, then jerks a tile at you. Backing off doesn't stop it coming; it only buys room. Then it must rest a few turns.\n\nMove now: back off, hook it, or step round a corner. Standing still is death."],
 	"rose": ["THE DEAD GET UP",
 		"Not every body is dead. Some lie still till you've walked past and look away, then rise behind you.\n\nGetting up costs it a turn. Keep bodies in front of you, or give them a wide berth."],
 	"stalker": ["THE BRIDE",

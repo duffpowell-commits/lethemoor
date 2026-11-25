@@ -612,3 +612,9 @@ From the mock review: one map with fixed walls got learned by night three, and n
   - 3% dead by turn 20.
 - Dealt nights on the handmade walls (`BOT_WALLS=0`) now win 100% for the bot. The game no longer plays them (only night 0), so they don't matter.
 - `tools/eyes/pilot.gd` is the bot's policy one move at a time, so Eyes can play a whole night through the real view: `v.act(load('res://tools/eyes/pilot.gd').choose(v.game))`.
+
+## Review fix 2: a crouch always ends in a lunge (Nov 25, Duff: "fix them all step by step")
+- In Claude's play of build 160 (night 77) a thrall two tiles off crouched, Claude stepped back, the crouch was spent, Claude stepped in, it crouched again... a standoff while dread climbed and panic spilled oil, until it killed him.
+- Now a crouch always ends in a move (`night.gd`, the lunge): still two off, it lands beside you; backed off a tile, it still lurches a tile after you and takes its `LUNGE_COOLDOWN` rest. No more stepping in and out to freeze it. Test: `test_a_crouch_always_ends_in_a_lunge`.
+- That made the dealer's early thrall deadlier (bot dead by turn 20: 3% to 8%: with no hook yet, backing into the start's dead end was the only move). It now waits 12-17 steps in (`room.gd` `EARLY`, was 10-15): 5%.
+- Bot, 200 nights: 39% won, 25.5 oil at the bell, 5% dead by turn 20, no horror met on 7% of nights. The IT LUNGED field note says backing off doesn't stop it.

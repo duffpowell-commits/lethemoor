@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: review fix 2 of 5. A thrall that crouches now always lunges: backing off a tile used to freeze it, a standoff while dread climbed. The early thrall waits a few steps further in so the first minute stays fair. Bot: 39% win, 5% dead by turn 20.
 - Nov 25: review fix 1 of 5. In Claude's play-through, some new-walls nights had no horror at all. Horrors are now placed by how far you'd walk from the road, not by straight-line distance, so a night with no horror in your light went from 23% to 7%. A ward has 3 fewer thralls so the corridors stay survivable. Bot: 40% win, 25 oil at the bell.
 
 - Nov 25: real recorded sound (Duff picked "Free library, I pick"). The bell is a real church peal, the ambience is a real harbour at night, and the footsteps, fire, paper and thrall moans are real recordings. All are CC0 or public domain, listed in `assets/audio/SOURCES.md`. Each is level-matched to the clip it replaced.
