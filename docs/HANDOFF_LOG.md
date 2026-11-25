@@ -473,3 +473,33 @@ The art pass checks that the modeled variant is visible when lit, hides its stan
 
 - The veiled bride uses a 6,193-triangle, opaque textured GLB derived from the existing bride reference and cleaned in Blender. The first-person view places it on the existing Stalker holder, which shares the simulation fog gate and turn interpolation. The model keeps its facing until she moves to another tile. The death card still uses its painted close-up.
 - Owner review is pending. See `docs/renders/fp_stalker_3d.png` for the lantern encounter and `docs/renders/stalker_3d_turnaround.jpg` for three model views. This preview uses rigid movement.
+
+## Fully 3D horrors and hands (Nov 25, PR #45)
+
+Duff (Nov 24): "start making what we need to pull that game fully three-dimensional and terrifying". Budget he
+picked: ~260 Meshy credits ("Monsters + hands"). Spent 250 (705 -> 455).
+
+- `scripts/rig_horror.gd`: a horror on Meshy's 24-bone humanoid rig. The view sets a state from the rules
+  (idle, walk, crouch, lunge, dead, rise); missing clips fall back. `fp_view.gd` `RIGS` maps a look to
+  `assets/models/rig_<name>.glb` (+ height, + yaw fix: the bride's mesh faces -X). `_drive_rig` picks the
+  state each frame; `_pose` lays corpses in the dead clip's last frame and plays "rise" when they get up.
+  The bride always turns to you and breathes at quarter speed.
+- Clips per thrall (Meshy action ids): idle 0, walk 113 Mummy Stagger, crouch (the tell) 386 Zombie Scream,
+  lunge 4 Attack, dead 8 Dead, rise 3 Arise. Bride: idle 0, lunge 4, walk = the rig's free walk.
+- Clip GLBs are not in git (each carries a mesh copy): project files `lethemoor-3d/meshy_source/`. Copy them to
+  `tools/clips_src/` as `rig_<who>_<clip>.glb`, then
+  `godot --headless --path . --script tools/bake_clips.gd -- rig_nightmare rig_hooded rig_dockwoman rig_bride`.
+- Meshy ships 2K/4K textures: run `python3 tools/shrink_glb.py <meshy.glb> assets/models/<name>.glb` (1K JPEG,
+  ~0.8 MB a body). Bodies are ~9k triangles (smart topology).
+- Viewmodel (`_build_viewmodel`, `_sway_viewmodel`): `fp_glove.glb` right arm holding `fp_lantern.glb` by the bail,
+  the OmniLight and an additive glow quad inside the globe, lantern emission follows the flame (HOODED goes dark),
+  a damped pendulum swing kicked by steps. Left arm + `fp_boathook.glb` (short gaff head + a code pole) shows
+  while `hook_wear > 0`. The painted hand column is hidden, kept as a fallback.
+- Removed: `thrall.glb` (had a face, broke the faceless rule) and the rigid `stalker.glb`. Painted looks
+  clawed/wired/dock/net-mender left `THRALL_LOOKS`.
+- Lantern gutters at <= 12 oil (`LOW_OIL_SPUTTER`, light only).
+- Capture: THRALL MODEL checks the scream/attack states, CORPSE checks the dead clip, VIEWMODEL checks the hands.
+- Meshy tasks: models nightmare 01a21023-edea, hooded 01a21023-fd20, dockwoman 01a21024-09b2, bride 01a21024-171d;
+  rigs 01a21025-dfdd / -eecc / 01a21026-0339 / -10c9; lantern refine 01a21026-1f8c, glove 01a21026-296e,
+  boathook 01a21027-c3cf. Login: `meshy auth login --device` (Duff approves the code on his phone).
+- Not checked yet: 60 fps on Duff's phone with four skinned bodies on screen. Perf LOW could drop rigs to sprites.
