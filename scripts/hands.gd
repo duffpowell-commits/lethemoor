@@ -62,7 +62,7 @@ static func lantern_rig(root: Node3D) -> Array:
 
 
 ## The left hand closed round the boathook's handle, the hook standing up out of the fist and
-## the pole running on down out of sight. Returns [hook, arm].
+## the pole running on down out of sight. Returns [hook, arm, pole].
 static func hook_rig(root: Node3D) -> Array:
 	var arm := glove(false)
 	root.add_child(arm)
@@ -122,6 +122,7 @@ static func align(a: Vector3, z: Vector3, to: Vector3, up_hint: Vector3) -> Basi
 static func _keep_largest_part(mi: MeshInstance3D, mirror: bool) -> void:
 	var mesh := mi.mesh
 	if mesh == null or mesh.get_surface_count() != 1:
+		push_warning("hands: %s is not one surface, left as it is" % mi.name)
 		return
 	var arr: Array = mesh.surface_get_arrays(0)
 	var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
