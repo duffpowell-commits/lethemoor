@@ -622,3 +622,9 @@ From the mock review: one map with fixed walls got learned by night three, and n
 ## Review fix 3: no plank floating over the dark (Nov 25)
 - In Claude's play of build 160 a stone beam hung in the sky at the end of a corridor. It was a lintel (`harbor.lintel`, on every seventh one-wide corridor tile) over a tile you had never seen: its material was black, but `metallic_specular` 0.25 still caught the teal sky, so it showed while the walls under it didn't.
 - Lintels now hide while their tile is DARK, like the lamps, and any DARK material has no specular (unseen stone is black). Before/after: `docs/renders/fp_lintel_before.png`, `docs/renders/fp_lintel_after.png`.
+
+## Review fix 4: landmarks (Nov 25)
+- In Claude's play of build 160 every corner of a new-walls ward looked the same, so you steered only by the map.
+- **Bell tower** (`Harbor.bell_tower()`, placed by `fp_view.gd` on the wall tile behind the bell): a stone shaft with an open belfry and a dim lamp, about 9.6 tall against walls of 2.4. It has no fog and no view-range cut, so it stands black against the clouds from anywhere, and you can walk toward it. It's a look only: the map already points to the bell from the first toll. Capture checks it (`TOWER PASS`).
+- **Hall landmarks** (`_place_landmarks`, `Harbor.landmark(kind)`): every open 3x3 hall gets one, set against its wall. The kinds are an upturned rowing boat, a door that goes nowhere, and stacked lobster pots and crates. They're picked by position, so the same night always has the same ones, and they cycle so no two halls match. Like the lamps, they show only once seen (`harbor_fixtures`). Over 100 dealt nights: 3 landmarks in 72, 2 in 24, 1 or 0 in 4.
+- Renders: `docs/renders/fp_landmark_{tower,boat,door,pots}.png`.
