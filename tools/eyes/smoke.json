@@ -1,0 +1,72 @@
+[
+  {
+    "click": "SKIP",
+    "optional": true
+  },
+  {
+    "wait": 1500
+  },
+  {
+    "shot": "title"
+  },
+  {
+    "click": "BEGIN THE NIGHT"
+  },
+  {
+    "wait": 2500
+  },
+  {
+    "ui": true
+  },
+  {
+    "shot": "game"
+  },
+  {
+    "click": "GOT IT",
+    "optional": true
+  },
+  {
+    "wait": 700
+  },
+  {
+    "click": "GOT IT",
+    "optional": true
+  },
+  {
+    "wait": 700
+  },
+  {
+    "click": "GOT IT",
+    "optional": true
+  },
+  {
+    "wait": 700
+  },
+  {
+    "click": "WAIT"
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "ui": true
+  },
+  {
+    "shot": "after-wait"
+  },
+  {
+    "key": "Up"
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "ui": true
+  },
+  {
+    "shot": "after-step"
+  },
+  {
+    "gd": "return scene_tree.current_scene.name"
+  }
+]

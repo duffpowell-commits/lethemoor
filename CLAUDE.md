@@ -26,6 +26,8 @@ Search it for a system before you change it.
   hooded and dock-woman thralls + the bride. Clips: idle, stagger walk, zombie-scream tell, attack lunge,
   fall dead, arise. Your hands are 3D too (gloved arm + lantern with the light in its globe, boathook).
   Painted cards are out of the thrall rotation. Re-bake/re-shrink steps: `docs/HANDOFF_LOG.md` "Fully 3D horrors".
+- Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
+  and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
   web https://duffpowell-commits.github.io/lethemoor/ (gh-pages, pushed by CI on main).
 - Art still needed: `docs/art_needs.md` (P0 first). Shared copy: https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj
@@ -78,5 +80,8 @@ Search it for a system before you change it.
 - Capture (real input, prints PASS lines; CI needs the last line `ART PASS`):
   `xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture`
 - Balance: `godot --headless --path . --script tools/balance_bot.gd -- 300` (`BOT_FIRST=0` = handmade night).
+- Eyes (Claude plays the running game; `docs/EYES.md`): `tools/eyes/setup.sh` once, then
+  `xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs tools/eyes/smoke.json` -> `EYES PASS`.
+  Self-test: `tools/test_eyes.sh`.
 - CI: `gh api repos/duffpowell-commits/lethemoor/actions/runs?per_page=3` (gh GraphQL is blocked).
   Run `gh run list -L 3` before calling a milestone done. Exports run in CI only.
