@@ -74,7 +74,8 @@ func set_state(s: String, speed := 1.0) -> void:
 		return
 	clip = want
 	player.speed_scale = speed
-	player.play("rig/" + want, 0.06 if s == "lunge" else BLEND)
+	var blend := 0.0 if s == "dead" else (0.06 if s == "lunge" else BLEND)   # the dead were lying already
+	player.play("rig/" + want, blend)
 
 
 ## Jump to the last frame of the current clip (a body that was already lying there).

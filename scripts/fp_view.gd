@@ -58,7 +58,7 @@ const RigHorror = preload("res://scripts/rig_horror.gd")
 ## over the rigid model and the painted card; a look without one keeps what it had.
 ## [model, height, yaw fix]: Meshy turned the bride to face -X, so she gets a quarter turn.
 const RIGS := {"stalker_bride": ["rig_bride", 2.15, PI / 2], "thrall_nightmare": ["rig_nightmare", 2.1],
-	"thrall_hooded": ["rig_hooded", 1.85], "thrall_dockwoman": ["rig_dockwoman", 1.8], "thrall_dock": ["rig_dock", 1.9]}
+	"thrall_hooded": ["rig_hooded", 1.85], "thrall_dockwoman": ["rig_dockwoman", 1.8]}
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -432,7 +432,7 @@ func _build_world() -> void:
 		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
 		if stalker:
 			th.texture = _tex("stalker_bride")
-		else:   # the drowned of the quay, in turn: the hooded one, dock worker, net-mender, dock woman
+		else:   # the drowned of the quay, in turn: the sack-headed one, the hooded one, the dock woman
 			th.texture = _tex(THRALL_LOOKS[looks % THRALL_LOOKS.size()])
 			looks += 1
 		th.set_meta("look", th.texture)
@@ -704,6 +704,13 @@ func _refresh_fog() -> void:
 		tile_mats[p].albedo_color = Color(base.r * k, base.g * k, base.b * k)
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
+		if thrall_rigs.has(i):   # perf: a body you can't see doesn't animate (a rise or lunge resumes where it was)
+			var ap: AnimationPlayer = thrall_rigs[i].player
+			var on: bool = thrall_nodes[i].visible or thrall_rigs[i].state == "dead"
+			if on != ap.active:
+				ap.active = on
+				if on:
+					ap.advance(0.0)   # pose it at once, no stale frame
 		_pose(i)
 	_sync_prints()
 	for kp: Vector2i in hook_nodes:
@@ -3230,7 +3237,11 @@ func _capture_art() -> void:
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
 	await _shot("fp_art_corpse")
-	var corpse_ok: bool = thrall_nodes[-2].visible and _rig_state(thrall_nodes.size() - 2) == "dead" and print_nodes.size() == 2
+	var corpse_i := -1   # the corpse by what it is (lying), never by index
+	for i in game.thralls.size():
+		if game.thralls[i].get("lying", false) and game.thralls[i].pos == Vector2i(17, 12):
+			corpse_i = i
+	var corpse_ok: bool = corpse_i >= 0 and thrall_nodes[corpse_i].visible and _rig_state(corpse_i) == "dead" and print_nodes.size() == 2
 	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
 	# your hands are 3D: the lantern hangs in your right fist with the light inside its globe,
 	# and the boathook shows in your left exactly while you carry one
