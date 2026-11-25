@@ -1,6 +1,7 @@
 extends SceneTree
 ## Plays many dealt nights headless with a careful-player policy and prints how they end.
 ##   godot --headless --path . --script tools/balance_bot.gd -- [nights=200] [night_script]
+## BOT_DEEP=1 plays Deeper Night. BOT_WALLS=0 keeps the handmade walls (only the dealer moves things), as before Nov 25.
 ## Policy: NORMAL lantern; walk the shortest road to the bell that keeps 2 tiles clear of
 ## every lit horror; one within 2 -> hook it if it's ahead, else step forward/back away from it
 ## (never turn with one that close); boxed in -> wait. Crude on purpose: it's a yardstick for
@@ -26,8 +27,9 @@ func _init() -> void:
 	var death_turns: Array = []
 	var seen_turns: Array = []
 	var first := int(OS.get_environment("BOT_FIRST")) if OS.get_environment("BOT_FIRST") != "" else 1
+	var walls := OS.get_environment("BOT_WALLS") != "0"   # 1 (default): new walls every night, as the game plays
 	for s in range(first, first + count):
-		var g = load(script_path).start(text, s)
+		var g = load(script_path).start_dealt(text, s, OS.get_environment("BOT_DEEP") == "1") if walls else load(script_path).start(text, s)
 		first_seen = -1
 		_play(g)
 		seen_turns.append(first_seen if first_seen >= 0 else 999)

@@ -559,3 +559,27 @@ found, oil out. The bot on main: 54% win, about 4 oil left at the bell, and the 
   24 oil left at the bell, deaths 101 thrall, 31 walked into one, 19 bride. Median death turn 84.
 - Field notes: the goal card says the bell tolls; the bride card says to hold the light on her and that silence
   means she's close; the flask card says +12; the map card mentions the bell.
+
+
+## New walls every night + unlocks (Nov 25, Duff: "Lets do 2 and 4 now")
+From the mock review: one map with fixed walls got learned by night three, and nothing was earned.
+- **New walls** (`scripts/sim/ward.gd`, pure): `Night.start_dealt(text, seed, deeper)` carves a fresh
+  27x21 ward from the seed when seed > 0. Depth-first maze on odd tiles, `LOOPS` 12% of inner walls
+  knocked through, `HALLS` 3 open 3x3 rooms. Start on the bottom corridor; the bell a walk of the
+  template's +`BELL_EXTRA` (6) +-`BELL_SLACK` (3), at a dead end if one fits. Everything else in
+  `one_night.txt` is placed at the same fraction of the road as the template has it, with the
+  dealer's rules (horrors >= `HORROR_NEAR` 13 from the start, apart, as near the road as the template,
+  bride never on the road, bodies in dead ends, letters on walls, lamp on the road, hook beside it).
+  Then `room.shuffle` deals on top as before. Same seed = same ward, so reported nights replay.
+  Night 0 (capture, most tests) keeps the handmade walls. `Night.start` is unchanged.
+- **Early thrall** (room.gd `_early_thrall`) now waits down a side passage: a walk of `EARLY_OFF` 3+
+  from the road and in a straight line from it within `EARLY_SIGHT` 5, 10-15 steps in. Walk 2 killed
+  the bot by turn 20 in 13% of nights; Manhattan 2-3 (the old rule) did 8% on wards.
+- **Bot** (`BOT_WALLS=0` = old walls, `BOT_DEEP=1` = Deeper): wards 54% win, 29.1 oil at the bell,
+  60 turns, 2% dead by turn 20. Deeper 48% win but 12.4 oil at the bell (grades are the hard part).
+- **Record** (`scripts/sim/record.gd`, saved in `user://lethemoor.cfg` [record]): nights, bells rung,
+  best grade per mode, unlocks. First bell -> DEEPER NIGHT (title toggle beside HINTS; reloads to
+  deal a new night): bride wakes turn 18 (not 30), flasks +8 (not 12), start oil 50 (not 60).
+  Grade B / A / S -> keepsakes I / II / III, short letters listed under KEEPSAKES in the Field Guide
+  (locked ones say what they need). The end card names anything unlocked that night. The title shows
+  "BELLS RUNG n · BEST g". Capture never reads or writes the record.

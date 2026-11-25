@@ -11,6 +11,7 @@ const StudioSplash = preload("res://branding/studio_splash.gd")
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Night = preload("res://scripts/sim/night.gd")
+const Record = preload("res://scripts/sim/record.gd")
 const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing without the autoload
 const Lessons = preload("res://scripts/lessons.gd")
 const Letters = preload("res://scripts/letters.gd")
@@ -185,14 +186,19 @@ var minimap: Control
 var map_rot := 0.0                  # the chart turns so what's ahead is up (unless NORTH UP)
 var map_north_up := false
 var end_screen: Control
+var record := {}                    # nights, bells rung, best grades, unlocks (record.gd; saved in user://)
+var deep_on := false                # DEEPER NIGHT picked on the title (only once it's unlocked)
+var night_counted := false
+var unlocked_now: Array = []        # unlocked by this night, for the end card
 
 
 func _ready() -> void:
 	capture_mode = "--capture" in OS.get_cmdline_user_args()
-	game = Night.start(FileAccess.get_file_as_string(ROOM), _pick_night())
+	record = Record.blank()
+	_load_hints()
+	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER))
 	room = game.room
 	fog = game.fog
-	_load_hints()
 	_build_world()
 	_build_hud()
 	perf = Perf.new()
@@ -2142,7 +2148,35 @@ func _show_title() -> void:
 		hints_on = not hints_on
 		hints.text = "HINTS: " + ("ON" if hints_on else "OFF")
 		_save_hints())
-	_center(hints, modal, by + 152, 340)
+	if Record.has(record, Record.DEEPER):
+		# HINTS and DEEPER NIGHT share the row, half each
+		hints.position = Vector2((UI_W - 340) / 2.0, by + 152)
+		hints.size.x = 166
+		hints.text = "HINTS " + ("ON" if hints_on else "OFF")
+		hints.pressed.connect(func(): hints.text = "HINTS " + ("ON" if hints_on else "OFF"))
+		modal.add_child(hints)
+		var deep := Button.new()
+		deep.name = "Deeper"
+		deep.focus_mode = Control.FOCUS_NONE
+		deep.size = Vector2(166, 54)
+		deep.position = Vector2((UI_W - 340) / 2.0 + 174, by + 152)
+		deep.text = "DEEPER " + ("ON" if deep_on else "OFF")
+		if deep_on:
+			UI.lit(deep)
+		deep.pressed.connect(func():   # a different night: deal it again
+			deep_on = not deep_on
+			_save_record()
+			get_tree().reload_current_scene())
+		modal.add_child(deep)
+	else:
+		_center(hints, modal, by + 152, 340)
+	var rec_line := Record.summary(record)
+	if rec_line != "":
+		var rl := _label(rec_line.to_upper(), 15, UI.DIM, UI.head())
+		rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rl.add_theme_constant_override("outline_size", 8)
+		rl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.03, 0.85))
+		_center(rl, modal, by - 34, UI_W)
 	var bug := Button.new()
 	bug.text = "REPORT A BUG"
 	bug.focus_mode = Control.FOCUS_NONE
@@ -2324,6 +2358,21 @@ func _open_guide() -> void:
 			var lg := Control.new()
 			lg.custom_minimum_size.y = 8
 			list.add_child(lg)
+	list.add_child(_label("KEEPSAKES", 18, UI.AMBER, UI.head()))
+	for k in Record.KEEPSAKES:
+		var got := Record.has(record, k[0])
+		var kt := _label(("%s\n%s" % [k[2], k[3]]) if got else "LOCKED. Ring the bell with grade %s or better." % k[1], 18, UI.TEXT if got else UI.DIM, UI.italic())
+		kt.autowrap_mode = TextServer.AUTOWRAP_WORD
+		kt.custom_minimum_size.x = UI_W - 100
+		list.add_child(kt)
+		var kg := Control.new()
+		kg.custom_minimum_size.y = 8
+		list.add_child(kg)
+	if not Record.has(record, Record.DEEPER):
+		var dl := _label("DEEPER NIGHT: LOCKED. Ring the bell once.", 18, UI.DIM, UI.italic())
+		dl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		dl.custom_minimum_size.x = UI_W - 100
+		list.add_child(dl)
 	list.add_child(_label("GRADES", 18, UI.AMBER, UI.head()))
 	var gl := _label(Lessons.GRADE_LINE, 18, UI.TEXT)
 	gl.autowrap_mode = TextServer.AUTOWRAP_WORD
@@ -2505,6 +2554,18 @@ func _load_hints() -> void:
 	map_north_up = cfg.get_value("controls", "map_north_up", false)
 	for id in cfg.get_value("hints", "seen", []):
 		seen[id] = true
+	record = cfg.get_value("record", "data", Record.blank())
+	deep_on = cfg.get_value("record", "deep_on", false)
+
+
+func _save_record() -> void:
+	if capture_mode:
+		return
+	var cfg := ConfigFile.new()
+	cfg.load("user://lethemoor.cfg")   # keep the other sections
+	cfg.set_value("record", "data", record)
+	cfg.set_value("record", "deep_on", deep_on)
+	cfg.save("user://lethemoor.cfg")
 
 
 func _save_hints() -> void:
@@ -2791,7 +2852,14 @@ func _show_end() -> void:
 	else:
 		big.text = "THE DARK TOOK YOU"
 		small.text = "%s\n\n%d turns  ·  %d oil left" % [game.cause, game.turn, game.oil]
-	small.text += "\n\nNight %d" % game.seed if game.seed > 0 else ""
+	small.text += ("\n\nNight %d" % game.seed + ("  ·  DEEPER" if game.deep else "")) if game.seed > 0 else ""
+	if not night_counted and not capture_mode:
+		night_counted = true
+		var news: Array = Record.add_night(record, game.rang, game.grade() if game.rang else "", game.deep)
+		_save_record()
+		unlocked_now = news
+	if not unlocked_now.is_empty():
+		small.text += "\n" + Record.news(unlocked_now)
 	end_screen.visible = true
 	_fit_end_card.call_deferred()
 
@@ -2869,8 +2937,8 @@ func _verdict_text() -> String:
 		build = FileAccess.get_file_as_string("res://build.txt").strip_edges()
 	var how := "rang the bell, grade %s (oil %d, letters %d/%d)" % [game.grade(), game.oil, game.letters_read.size(), room.letters.size()] \
 			if game.rang else "died: %s" % game.cause
-	return "Lethemoor verdict: fun %d/10, play again: %s. Night %d: %s, %d turns. Build %s, %s %s." % [
-		verdict_fun, verdict_again, game.seed, how, game.turn, build, OS.get_name(), OS.get_model_name()]
+	return "Lethemoor verdict: fun %d/10, play again: %s. Night %d%s: %s, %d turns. Build %s, %s %s." % [
+		verdict_fun, verdict_again, game.seed, " deeper" if game.deep else "", how, game.turn, build, OS.get_name(), OS.get_model_name()]
 
 
 func _send_verdict(status: Label, by_text: bool) -> void:
