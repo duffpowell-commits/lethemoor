@@ -119,12 +119,13 @@ static func bell() -> MeshInstance3D:
 	return _fixture("HarborBell", mesh)
 
 
-## The bell tower: a stone shaft on the wall behind the bell, rising far over the ward walls
+## The bell tower: a stone shaft rising from the wall behind the bell, rising far over the ward walls
 ## (2.4) with an open belfry and a dim lamp in it, so you can steer by it from anywhere.
 ## No fog on it: a black shape against the clouds, like a church over rooftops.
 static func bell_tower() -> MeshInstance3D:
 	var stone := _surface()
-	_box(stone, Vector3(1.0, 5.6, 1.0), Vector3(0, 2.8, 0))           # the shaft
+	_box(stone, Vector3(0.9, 3.26, 0.9), Vector3(0, 4.0, 0))          # the shaft, from the wall top (2.4) up:
+	                                                                    # the wall below keeps its own stone and fog
 	_box(stone, Vector3(1.12, 0.14, 1.12), Vector3(0, 5.67, 0))       # belfry floor ledge
 	for x in [-0.48, 0.48]:
 		for z in [-0.48, 0.48]:

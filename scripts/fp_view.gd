@@ -384,11 +384,14 @@ func _build_world() -> void:
 		add_child(bell)
 		harbor_fixtures[bp] = bell
 		# the tower over it, on the wall at its back: seen over the walls from anywhere
-		for direction: Vector2i in Harbor.CARDINALS:
-			if room.is_wall(bp + direction) and bell_tower == null:
-				bell_tower = Harbor.bell_tower()
-				bell_tower.position = _w(bp + direction)
-				add_child(bell_tower)
+		if bell_tower == null:
+			bell_tower = Harbor.bell_tower()
+			bell_tower.position = _w(bp)   # no wall beside the bell (rare): the belfry stands over it
+			for direction: Vector2i in Harbor.CARDINALS:
+				if room.is_wall(bp + direction):
+					bell_tower.position = _w(bp + direction)
+					break
+			add_child(bell_tower)
 	_place_landmarks()
 
 	# letters: a pale page nailed at chest height, facing the open floor. Read under BRIGHT.
@@ -763,7 +766,8 @@ func _place_landmarks() -> void:
 				centres.append(c)
 	var kinds := ["boat", "door", "pots"]
 	var taken := {}
-	for p in room.lamps + room.bells + room.letters + room.exits + room.hooks + room.oil_flasks:
+	for p in room.lamps + room.bells + room.letters + room.exits + room.hooks + room.oil_flasks \
+			+ room.thralls + room.stalkers + room.corpses:   # never on a horror (a body half inside a boat)
 		taken[p] = true
 	var k0 := posmod(room.size.x * 3 + centres.size() * 5 + (centres[0].x if not centres.is_empty() else 0), 3)
 	for ci in centres.size():
@@ -3511,8 +3515,8 @@ func _capture_art() -> void:
 		and harbor_fixtures[bell].visible == (fog.get_state(bell) != Fog.DARK)
 	print("HARBOR ", "PASS" if harbor_ok else "FAIL")
 	# the bell tower stands on the wall behind the bell and rises far over the walls (2.4)
-	var tower_ok: bool = bell_tower != null and room.is_wall(Vector2i(roundi(bell_tower.position.x), roundi(bell_tower.position.z))) \
-		and (Vector2i(roundi(bell_tower.position.x), roundi(bell_tower.position.z)) - bell).length_squared() == 1 \
+	var tower_at := Vector2i(roundi(bell_tower.position.x), roundi(bell_tower.position.z)) if bell_tower else Vector2i(-9, -9)
+	var tower_ok: bool = bell_tower != null and room.is_wall(tower_at) and (tower_at - bell).length_squared() == 1 \
 		and bell_tower.mesh.get_aabb().end.y > 8.0 and bell_tower.visible
 	print("TOWER ", "PASS" if tower_ok else "FAIL")
 	# the bell tolls on the first turn; from then the chart points to it, here from the far end of the ward
