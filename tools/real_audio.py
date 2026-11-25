@@ -80,7 +80,7 @@ def load(path, start=0.0, dur=None, channels=1):
 ## Loudness (RMS dB; the stereo bed per channel) of the synthesized clips these replace, measured once
 ## (Nov 25) and fixed here, so the game's mix doesn't move and a re-run doesn't creep louder.
 LOUD = {"bell": -18.6, "amb_moor": -15.2, "step_0": -27.9, "step_1": -27.9, "step_2": -29.5,
-        "step_3": -28.8, "fire_loop": -22.6, "shuffle_0": -25.2, "shuffle_2": -25.2,
+        "step_3": -28.8, "fire_loop": -22.6, "shuffle_0": -25.2, "shuffle_2": -22.9,
         "letter": -33.3, "letter_dim": -35.9}
 
 
@@ -93,7 +93,7 @@ def put(name, x, stereo=None, target=None):
     target = LOUD[name] if target is None else target
     both = x if stereo is None else np.concatenate([x, stereo])   # stereo: per-channel RMS
     gain = 10 ** (target / 20) / (np.sqrt(np.mean(both ** 2)) + 1e-12)
-    lim = lambda v: 0.8 * np.tanh(v * gain / 0.8)     # soft knee: real transients (a mast knocking) stay under 0 dB after Vorbis
+    lim = lambda v: 0.75 * np.tanh(v * gain / 0.75)     # soft knee: real transients (a mast knocking) stay under 0 dB after Vorbis
     x = lim(x)
     if stereo is not None:
         stereo = lim(stereo)
@@ -123,8 +123,10 @@ def amb_moor():
 
 def steps():
     """Boots on stone, four takes, with the small cave tail the old ones had."""
-    for i, f in enumerate(["Fantozzi-StoneL1.ogg", "Fantozzi-StoneR1.ogg", "Fantozzi-StoneL2.ogg", "Fantozzi-StoneR3.ogg"]):
+    for i, f in enumerate(["Fantozzi-StoneL1.ogg", "Fantozzi-StoneR1.ogg", "Fantozzi-StoneL2.ogg", "Fantozzi-StoneL3.ogg"]):
         x = load(unpack("fantozzi.7z", f))
+        # start on the heel: the loudest hit lands 2 ms in, like the old ones (audio.gd syncs it to the head dip)
+        x = x[max(0, int(np.argmax(np.abs(x))) - int(0.002 * SR)):]
         x = highpass(x, 60)
         x = G.reverb(G.fit(x, 0.8), size=0.9, wet=0.28, damp=2500)[: int(0.8 * SR)]
         put(f"step_{i}", G.fade(x, 0.002, 0.15))
