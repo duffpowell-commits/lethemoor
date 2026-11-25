@@ -905,6 +905,18 @@ func test_a_crouch_always_ends_in_a_lunge() -> void:
 		var e: Array = m.step_dir(Vector2i.RIGHT) if i % 2 == 0 else m.step_dir(Vector2i.LEFT)
 		lunged = lunged or "lunge" in e
 	check(lunged, "stepping in and out of reach: within 2 turns of the crouch it lunges")
+	# a crouch that ends some other way (it lost you) doesn't hide a lunge for later
+	var q = Night.start(LONG)
+	q.facing = Vector2i.RIGHT
+	var t3 := _thrall_at(q, Vector2i(3, 1))
+	check("crouch" in q.wait(), "it crouches")
+	q.set_lantern(Fog.Lantern.HOODED)    # it can't see you now
+	t3.target = null                     # and it has lost you
+	var e2: Array = q.wait()
+	check(not "lunge" in e2 and not t3.crouched and t3.pos == Vector2i(3, 1), "it lost you: the crouch is gone, no lunge")
+	q.set_lantern(Fog.Lantern.NORMAL)
+	e2 = q.wait()
+	check("crouch" in e2 and not "lunge" in e2, "seen again: a fresh tell first, never a lunge out of nowhere")
 
 
 func test_corpse_never_rises_through_a_wall() -> void:

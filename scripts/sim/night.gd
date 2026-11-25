@@ -598,6 +598,8 @@ func _thralls_act(events: Array) -> void:
 				return
 			continue
 		th.merge({lunge_cd = 0, lit_for = 0, roused = false, lying = false, crouched = false})   # hand-made entries (tests)
+		var coiled: bool = th.crouched   # crouched last turn: this turn it lunges, if it gets that far
+		th.crouched = false              # every way out of this turn but a new crouch leaves it standing
 		if th.lying:
 			# playing dead: it waits till you're close and looking elsewhere (you walked past it)
 			if room.reachable(th.pos, CORPSE_WAKE).has(hunter) and not in_view(th.pos):   # walking tiles: never through a wall
@@ -607,7 +609,7 @@ func _thralls_act(events: Array) -> void:
 			th.lunge_cd -= 1
 		if th.get("stun", 0) > 0:
 			th.stun -= 1       # knocked down by the hook (or still getting up): no move, no grab
-			th.crouched = false   # knocked out of its crouch: the next lunge needs a new tell
+			                   # (and out of its crouch: the next lunge needs a new tell)
 			continue
 		if _dist(th.pos) == 1:
 			killer = "thrall"
@@ -643,7 +645,7 @@ func _thralls_act(events: Array) -> void:
 		# (review of build 160: stepping in and out of reach kept it crouching forever, a
 		# standoff while dread climbed and panic spilled oil).
 		var in_reach: bool = sees and th.lunge_cd == 0 and path.size() == 3
-		var lunge: bool = th.crouched
+		var lunge: bool = coiled
 		th.crouched = in_reach and not lunge
 		if th.crouched:
 			if not events.has("crouch"):
