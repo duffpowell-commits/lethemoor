@@ -2420,7 +2420,7 @@ func _open_guide() -> void:
 	list.add_child(_label("KEEPSAKES", 18, UI.AMBER, UI.head()))
 	for k in Record.KEEPSAKES:
 		var got := Record.has(record, k[0])
-		var kt := _label(("%s\n%s" % [k[2], k[3]]) if got else "LOCKED. Ring the bell with grade %s or better." % k[1], 18, UI.TEXT if got else UI.DIM, UI.italic())
+		var kt := _label(("%s\n%s" % [k[2], k[3]]) if got else Record.lock_text(k), 18, UI.TEXT if got else UI.DIM, UI.italic())
 		kt.autowrap_mode = TextServer.AUTOWRAP_WORD
 		kt.custom_minimum_size.x = UI_W - 100
 		list.add_child(kt)

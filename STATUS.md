@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: review fix 5 of 5. At most one keepsake a night, and the last one only for an S on a Deeper Night, so a perfect first night doesn't unlock everything at once.
 - Nov 25: review fix 4 of 5. A bell tower stands over the walls so you can steer by it, and each open hall has a landmark: an upturned boat, a door to nowhere, or stacked lobster pots.
 - Nov 25: review fix 3 of 5. A stone beam no longer floats in the sky over corridors you haven't seen yet.
 - Nov 25: review fix 2 of 5. A thrall that crouches now always lunges: backing off a tile used to freeze it, a standoff while dread climbed. The early thrall waits a few steps further in so the first minute stays fair. Bot: 39% win, 5% dead by turn 20.

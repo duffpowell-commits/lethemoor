@@ -32,7 +32,7 @@ Search it for a system before you change it.
   map points to it, a thrall waits just off the road early, the bride hunts from turn 30 and is driven off by 3
   turns of held light, flasks +12. Bot: 50% win, 24 oil at the bell. `docs/HANDOFF_LOG.md` "All four".
 - Nov 25 "2 and 4" (Duff): every dealt night has its own walls (`scripts/sim/ward.gd`, night 0 keeps the
-  handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S,
+  handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S on Deeper, one a night,
   `scripts/sim/record.gd`). Bot on new walls (after review fix 1, horrors placed by walking distance): 40% win,
   25 oil at the bell, a night with no horror met 7% (was 23%). `docs/HANDOFF_LOG.md` "New walls", "Review fix 1".
 - Nov 25 review fix 2: a crouched thrall always lunges (backing off a tile no longer freezes it); early thrall 12-17 steps in.
