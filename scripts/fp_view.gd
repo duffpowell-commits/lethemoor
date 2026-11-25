@@ -1105,7 +1105,7 @@ func act(kind: String) -> void:
 		var yaw := lerpf(from_yaw, to_yaw, k) if kind == "about" else lerp_angle(from_yaw, to_yaw, k)
 		_place_cam(from_pos.lerp(to_pos, k) + head, yaw, -turn_dir * arc * (0.04 if kind == "about" else 0.025))
 		for j in thrall_nodes.size():   # a step glides; a bride driven off by the light is simply gone
-			var far: bool = game.thralls[j].get("recoiled_on", -1) == game.turn or (from_t[j] - game.thralls[j].pos).length() > 2.5
+			var far: bool = game.thralls[j].get("recoiled_on", -1) > turn0 or (from_t[j] - game.thralls[j].pos).length() > 2.5
 			thrall_nodes[j].position = _w(game.thralls[j].pos) if far else _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
 		await get_tree().process_frame
 	step_k = 0.0
