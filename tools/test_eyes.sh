@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-test for tools/eyes: the smoke run must pass, and two broken runs must fail.
-# A tool that can't fail proves nothing (eval E4). Prints EYES TEST PASS at the end.
+# A tool that can't fail proves nothing. Prints EYES TEST PASS at the end.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 run() { timeout 280 xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs "$1" 2>&1; }

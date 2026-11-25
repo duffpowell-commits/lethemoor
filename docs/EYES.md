@@ -19,7 +19,7 @@ runs and removes it on exit; its scratch files live in `.mcp/` (git-ignored).
 ## Use
 ```sh
 xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs tools/eyes/smoke.json
-xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs '[{"click":"NEW GAME"},{"shot":"x"}]'
+xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs '[{"click":"BEGIN THE NIGHT"},{"shot":"x"}]'
 ```
 Steps, run in order: `{"ui":true}` lists visible text; `{"click":"PLAY"}` taps a visible button
 by its text or node name (retries 3 s; add `"optional":true` to skip if it never shows);
@@ -41,12 +41,6 @@ GDScript and a game runtime error must fail). Run it after touching `tools/eyes/
 `tools/eyes/smoke.json` begins the night, dismisses up to three Field Notes (they only show on a
 fresh save), taps WAIT and steps forward (`{"key":"Up"}`); oil should drop 60 -> 59 -> 58.
 Swipes aren't a step type; use the arrow keys.
-
-## In a game repo
-Write a `tools/eyes/smoke.json` that reaches your core screen. After a gameplay change, play a few
-turns the way a new player would (follow the on-screen hints only), look at every shot, and write
-what confused you into `STATUS.md` or `docs/HANDOFF_LOG.md`. First real run (Rush, Nov 24) caught the template intro
-text left in and a dead-end hint after FIRE.
 
 ## Optional: as a live MCP tool
 `.mcp.json` registers the same server for Claude Code sessions that load project MCP servers (it
