@@ -45,3 +45,7 @@ Swipes aren't a step type; use the arrow keys.
 ## Optional: as a live MCP tool
 `.mcp.json` registers the same server for Claude Code sessions that load project MCP servers (it
 may ask for approval once). If it doesn't load, use the script above: same engine, same results.
+
+
+## Playing a whole night
+`tools/eyes/pilot.gd` picks the balance bot's next move from the live game. Repeat the pair of steps `{"gd": "var v = scene_tree.current_scene; v.act(load('res://tools/eyes/pilot.gd').choose(v.game))"}` and `{"wait": 420}`, with a `shot` every so often. Set `LM_NIGHT` to pick the night.

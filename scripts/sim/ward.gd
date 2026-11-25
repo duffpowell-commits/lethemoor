@@ -7,11 +7,16 @@ extends RefCounted
 
 const Room = preload("res://scripts/sim/room.gd")
 
-const LOOPS := 0.12        # share of the leftover inner walls knocked through, so you can circle a thrall
+const LOOPS := 0.2         # share of the leftover inner walls knocked through, so you can circle a thrall
 const HALLS := 3           # small open rooms (3x3) per ward, so it isn't all one-wide corridor
 const BELL_SLACK := 3      # the bell's walk from the start stays within this many tiles of the template's
 const BELL_EXTRA := 6      # wards walk shorter than the handmade night (fewer detours): put the bell this much further
 const HORROR_NEAR := 13    # no horror dealt nearer the start than this (the dealer's one early thrall still comes in closer, on purpose)
+const ROAD_MIN := 3        # horrors stand as far a WALK off the road as the template has them, but at least
+                           # this far (a template one nearer keeps its own): in the corridor's mouth, not in it
+const ROAD_MAX := 6        # bodies lie in a dead end at most this +3 walk off the road
+const SPARE_THRALLS := 2   # a ward deals this many fewer thralls than the harbour: corridors leave no way round
+                           # them (bot, all six: 23% of nights won)
 const TRIES := 40          # wards to try before giving up and keeping the template walls
 
 const CARDINALS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
@@ -73,21 +78,26 @@ static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator
 	var route: Array = r.path_in(from, start, bell)
 	var road_len := float(maxi(1, from[bell]))
 	var t_route: Array = t.path_in(t_start, t.hunter, t.bells[0]) if not t.bells.is_empty() else []
+	# how far a WALK each tile is from the road (not as the crow flies: in a maze a thrall two
+	# tiles off the road can be fifteen steps from it, and you never meet it. Review of build 160:
+	# whole nights with no horror in your light)
+	var t_walk := _road_walk(t, t_route)
+	var walk := _road_walk(r, route)
 	var put := {start: "H", bell: "B"}
 	var horrors := {}
 	# everything else in the template, in this order: tools first, then the horrors (they keep
 	# clear of each other), then letters and flasks
-	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", t.thralls],
+	var kinds := [["K", t.hooks], ["L", t.lamps], ["E", t.exits], ["S", t.stalkers], ["T", t.thralls.slice(0, maxi(0, t.thralls.size() - SPARE_THRALLS))],
 		["C", t.corpses], ["N", t.letters], ["O", t.oil_flasks]]
 	for kind in kinds:
 		for p: Vector2i in kind[1]:
 			var frac: float = float(t_start.get(p, 0)) / float(maxi(1, t_bell))
 			var want := frac * road_len
-			var t_road := _road(p, t_route)
+			var t_road: int = t_walk.get(p, 99)
 			var best: Array[Vector2i] = []
 			var best_err := 999.0
 			for q: Vector2i in from:
-				if put.has(q) or not _fits(kind[0], q, r, from, route, horrors, t_road):
+				if put.has(q) or not _fits(kind[0], q, r, from, route, horrors, t_road, walk):
 					continue
 				var err := absf(from[q] - want)
 				if err < best_err - 0.5:
@@ -111,7 +121,7 @@ static func _try(t, t_start: Dictionary, t_bell: int, rng: RandomNumberGenerator
 
 
 ## The same rules the dealer keeps (room.gd shuffle), applied to a ward with no drawn places yet.
-static func _fits(kind: String, q: Vector2i, r, from: Dictionary, route: Array, horrors: Dictionary, t_road: int) -> bool:
+static func _fits(kind: String, q: Vector2i, r, from: Dictionary, route: Array, horrors: Dictionary, t_road: int, walk: Dictionary) -> bool:
 	var on_road := q in route
 	match kind:
 		"L":
@@ -130,9 +140,30 @@ static func _fits(kind: String, q: Vector2i, r, from: Dictionary, route: Array, 
 				return false
 			if kind == "C" and not r.dead_end(q):
 				return false
-			var rd := _road(q, route)
-			return rd >= mini(t_road, 3) and rd <= t_road + 1   # as near the road as the template has it: you still have to pass it
+			var rd: int = walk.get(q, 99)
+			if kind == "C":
+				return rd >= 1 and rd <= ROAD_MAX + 3   # a body in a dead end a short walk off the road
+			var lo := maxi(mini(t_road, ROAD_MIN), 1 if kind == "S" else 0)
+			return rd >= lo and rd <= maxi(lo + 1, t_road + 1)   # as far a WALK off the road as the template has it
 	return true
+
+
+## Walking steps from each floor tile to the nearest tile of `route`.
+static func _road_walk(r, route: Array) -> Dictionary:
+	var d := {}
+	var q: Array = []
+	for p: Vector2i in route:
+		d[p] = 0
+		q.append(p)
+	var i := 0
+	while i < q.size():
+		var p: Vector2i = q[i]
+		i += 1
+		for n: Vector2i in [p + Vector2i.UP, p + Vector2i.DOWN, p + Vector2i.LEFT, p + Vector2i.RIGHT]:
+			if not d.has(n) and not r.is_wall(n):
+				d[n] = d[p] + 1
+				q.append(n)
+	return d
 
 
 static func _road(q: Vector2i, route: Array) -> int:
