@@ -5,7 +5,7 @@
 This repo is public. Never commit secrets, passwords, keys, tokens, keystore passes, or `.env` files (secrets only in GitHub Actions secrets added by Duff). Never commit AI prompts, bot instructions, persona text, or private chat handoffs. Never commit personal or family info. Never copy code, data, signals, or results from swinglifeaway or other private trading repos.
 
 Gothic turn-based survival horror, **first person** grid crawler, Android phones (portrait) + web for
-iPhone testers. Godot 4.5, GDScript only. Owner: Duff. This is the handoff; keep it short.
+iPhone testers. Godot 4.7.2, GDScript only. Owner: Duff. This is the handoff; keep it short.
 **Everything built so far, with the details and gotchas of each system: `docs/HANDOFF_LOG.md`.**
 Search it for a system before you change it.
 **Read `STATUS.md` first and update it last.**
@@ -21,8 +21,15 @@ Search it for a system before you change it.
   Tune oil, thrall speed, Stalker spot from it; then a second round.
 - **Kill test by Nov 28:** median fun 6+/10 and testers choose to replay. Don't start full-game
   systems (safe room, satchel, corpse, Choir) before it passes.
-- One Night has the 3D harbor environment (PR #38). The first modeled Thrall uses the nightmare variant slot. See the handoff and `docs/renders/fp_art_thrall_3d.png`.
-- The Stalker has an in-engine 3D preview on `art/stalker-model`, pending owner approval.
+- One Night has the 3D harbor environment (PR #38).
+- Nov 25: every horror is a rigged, animated, faceless 3D body (Meshy, `scripts/rig_horror.gd`): nightmare,
+  hooded and dock-woman thralls + the bride. Clips: idle, stagger walk, zombie-scream tell, attack lunge,
+  fall dead, arise. Your hands are 3D too (gloved arm + lantern with the light in its globe, boathook).
+  Painted cards are out of the thrall rotation. Re-bake/re-shrink steps: `docs/HANDOFF_LOG.md` "Fully 3D horrors".
+- Nov 25 "more scary": heads snap round to watch you, the 3D kill (it comes into your face, you go down),
+  and at dread 50+ a grey figure in the dark ahead that isn't there. `docs/HANDOFF_LOG.md` "More scary".
+- Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
+  and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
   web https://duffpowell-commits.github.io/lethemoor/ (gh-pages, pushed by CI on main).
 - Art still needed: `docs/art_needs.md` (P0 first). Shared copy: https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj
@@ -69,12 +76,15 @@ Search it for a system before you change it.
 - `tools/` never ships (`balance_bot.gd`, `gen_audio.py`, art generators). `grok_art/`, `docs/` never ship.
 
 ## Commands
-- Godot in the cloud sandbox: 4.5-stable Linux zip from GitHub releases -> `/usr/local/bin/godot`.
+- Godot in the cloud sandbox: 4.7.2-stable Linux zip from GitHub releases -> `/usr/local/bin/godot`.
   Fresh clone: `godot --headless --path . --import`.
 - Tests: `tools/test.sh` (runs `tests/run_tests.gd`, must end `N passed, 0 failed`).
 - Parse check one script: `godot --headless --path . --check-only --script <file>` (a parse error hangs a scene).
 - Capture (real input, prints PASS lines; CI needs the last line `ART PASS`):
   `xvfb-run -a -s "-screen 0 1080x1920x24" godot --path . --rendering-driver opengl3 --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture`
 - Balance: `godot --headless --path . --script tools/balance_bot.gd -- 300` (`BOT_FIRST=0` = handmade night).
+- Eyes (Claude plays the running game; `docs/EYES.md`): `tools/eyes/setup.sh` once, then
+  `xvfb-run -a -s "-screen 0 1080x1920x24" node tools/eyes/eyes.mjs tools/eyes/smoke.json` -> `EYES PASS`.
+  Self-test: `tools/test_eyes.sh`.
 - CI: `gh api repos/duffpowell-commits/lethemoor/actions/runs?per_page=3` (gh GraphQL is blocked).
   Run `gh run list -L 3` before calling a milestone done. Exports run in CI only.

@@ -41,6 +41,7 @@ const UI_DIM := Color("#7d8fa8")
 const UI_BLOOD := Color("#c81e2e")
 const SHADE := {Fog.DARK: 0.0, Fog.REMEMBERED: 0.2, Fog.LIT: 1.0}
 ## Lantern light per setting: [range, energy]. Close up, so less energy than top-down.
+const LOW_OIL_SPUTTER := 12   # at or under this much oil the lantern gutters (look only, never a rule)
 const LIGHT := {
 	Fog.Lantern.HOODED: [0.8, 0.25],
 	Fog.Lantern.NORMAL: [3.4, 1.7],
@@ -48,10 +49,28 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
-const STALKER_MODEL = preload("res://assets/models/stalker.glb")
-const THRALL_MODEL = preload("res://assets/models/thrall.glb")
+## Every look in the rotation has a rigged 3D body (RIGS). The painted cards (clawed, wired, dock,
+## net-mender) left the rotation on Nov 25: a flat card among 3D bodies broke the spell.
+const THRALL_LOOKS := ["thrall_nightmare", "thrall_hooded", "thrall_dockwoman"]
 const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
+const RigHorror = preload("res://scripts/rig_horror.gd")
+## Looks that have a rigged, animated body (assets/models/<rig>.glb + <rig>_clips.res). A rig wins
+## over the rigid model and the painted card; a look without one keeps what it had.
+## [model, height, yaw fix]. The bride needs none: the old quarter turn left her side-on (render fp_art_bride_face, Nov 25).
+## Heights are crown heights in tiles against EYE 0.82: thralls man-sized, the bride a head taller
+## (Duff, Nov 24: "Why are the monsters so big?"; they were 1.8-2.15, carried over from the cards).
+const RIGS := {"stalker_bride": ["rig_bride", 1.1, 0.0], "thrall_nightmare": ["rig_nightmare", 1.0],
+	"thrall_hooded": ["rig_hooded", 0.92], "thrall_dockwoman": ["rig_dockwoman", 0.88]}
+const BODY_TURN := 1.2               # how fast a standing horror's body follows its head round to you
+const PHANTOM_EVERY := Vector2(7.0, 16.0)   # s between figures that aren't there, once dread hallucinates
+const PHANTOM_LIFE := 0.9            # s it stands there before it's gone
+const PHANTOM_TINT := Color(0.3, 0.33, 0.42)   # grey-blue, drowned: enough to see, not enough to be sure
+const T_KILL_3D := 1.05              # s: the 3D kill, lunge to lying under it
+const KILL_REACH := 0.34             # tiles in front of your eyes it stops
+const KILL_LOOK_UP := 0.4            # rad you tip back as you go down
+const KILL_ROLL := 0.22
+const KILL_DROP := 0.3               # tiles your eyes fall
+const KILL_WHIP := 0.15              # s to wrench you round to it when it comes from the side or behind
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -65,6 +84,11 @@ var room
 var fog
 var busy := false
 var t := 0.0
+var kill_rig := -1                 # the horror that has you: the kill drives it, not the rules
+var kill_3d_ok := false
+static var kill_3d_seen := false   # capture: the death pass saw a good 3D kill (the art pass gates on it)
+var phantom: Node3D                # a figure at the edge of the light that isn't there (dread >= 50; look only)
+var phantom_t := 0.0               # s left on it, or (negative) s until the next one
 var lunge_hit := 0.0                # 1 the moment something lunges at you, fades: red edge + shake
 var lunge_flash: TextureRect
 var flicker := false
@@ -86,6 +110,13 @@ var swipe_fired := false           # this finger already made its move
 var hold_kind := ""                # finger still down after a forward/back swipe: repeat it
 var queued := ""                   # one move made while the last one was still gliding
 var chain_from := ""               # the move this one carries straight on from ("" = from rest)
+var vm_lantern: Node3D             # 3D viewmodel: your gloved right arm and the lantern hanging from it
+var vm_lamp: Node3D                # the lantern itself (swings on the bail)
+var vm_hook: Node3D                # left arm with the boathook, while you carry one
+var vm_glow: MeshInstance3D         # the flame seen through the glass: a soft additive glow
+var vm_lamp_mat: StandardMaterial3D   # its glow follows the flame
+var vm_swing := 0.0                # the lantern's pendulum angle and speed
+var vm_swing_v := 0.0
 var step_k := 0.0                  # 0..1..0 over each step: drives the hand-lantern bob
 var foot := 1.0                    # which foot: the head sways the other way each step
 
@@ -104,6 +135,7 @@ var shared_mats := {}              # "tex|shade" -> one material shared by every
 var tile_base := {}
 var thrall_nodes: Array = []
 var thrall_models: Dictionary[int, Node3D] = {}
+var thrall_rigs: Dictionary[int, Node3D] = {}   # index -> rig_horror.gd body (also in thrall_models)
 var thrall_sprites: Array = []     # the Sprite3D inside each holder (corpses lie flat, thralls twitch)
 var print_nodes := {}              # tile -> wet footprints decal on the floor
 var pool_nodes := {}               # tile -> blood pool decal where a body lay
@@ -417,7 +449,7 @@ func _build_world() -> void:
 		var stalker: bool = thrall.get("kind", "thrall") == "stalker"
 		if stalker:
 			th.texture = _tex("stalker_bride")
-		else:   # the drowned of the quay, in turn: the hooded one, dock worker, net-mender, dock woman
+		else:   # the drowned of the quay, in turn: the sack-headed one, the hooded one, the dock woman
 			th.texture = _tex(THRALL_LOOKS[looks % THRALL_LOOKS.size()])
 			looks += 1
 		th.set_meta("look", th.texture)
@@ -436,12 +468,19 @@ func _build_world() -> void:
 			# hunched and broken: squat and wide, leaning into you (the stalker stands tall)
 			th.scale = Vector3(1.12, 0.84, 1.0)
 		holder.add_child(th)
-		if stalker or th.texture == _tex("thrall_nightmare"):
-			var model := (STALKER_MODEL if stalker else THRALL_MODEL).instantiate() as Node3D
-			if not stalker:
-				model.scale = THRALL_MODEL_SCALE
-			holder.add_child(model)
-			thrall_models[thrall_nodes.size()] = model
+		var rig_look: String = "stalker_bride" if stalker else String(th.texture.resource_path.get_file().get_basename())
+		var rig: Array = RIGS.get(rig_look, [])
+		if not rig.is_empty() and ResourceLoader.exists("res://assets/models/%s.glb" % rig[0]):
+			var body: Node3D = RigHorror.make(rig[0], rig[1])
+			if rig.size() > 2:
+				body.body.rotation.y = rig[2]
+			if body.look and stalker:   # she turns her head further than a person can, and slower to let go
+				body.look.max_yaw = 1.95
+				body.look.hold = Vector2(0.6, 1.6)
+			holder.add_child(body)
+			th.visible = false
+			thrall_models[thrall_nodes.size()] = body
+			thrall_rigs[thrall_nodes.size()] = body
 		add_child(holder)
 		if thrall.get("lying", false):   # the dead lie in what ran out of them; the pool stays if they rise
 			var pool := MeshInstance3D.new()
@@ -470,12 +509,34 @@ func _build_world() -> void:
 	cam.projection = Camera3D.PROJECTION_FRUSTUM
 	_fit_camera()
 	add_child(cam)
+	for i: int in thrall_rigs:   # every head turns to you
+		if thrall_rigs[i].look:
+			thrall_rigs[i].look.target = cam
+	if ResourceLoader.exists("res://assets/models/rig_hooded.glb"):   # the figure that isn't there
+		phantom = RigHorror.make("rig_hooded", 1.0)
+		for m in phantom.find_children("*", "MeshInstance3D", true, false):   # unlit and cold: it
+			var mi := m as MeshInstance3D                                     # shows where no light reaches
+			if mi.mesh == null:
+				continue
+			for si in mi.mesh.get_surface_count():
+				var src := mi.get_active_material(si) as StandardMaterial3D
+				var cold := (src.duplicate() if src else StandardMaterial3D.new()) as StandardMaterial3D
+				cold.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				cold.albedo_color = PHANTOM_TINT
+				cold.disable_fog = true
+				mi.set_surface_override_material(si, cold)
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		phantom.player.speed_scale = 0.0   # utterly still
+		if phantom.look:
+			phantom.look.target = cam
+		add_child(phantom)
+		_hide_phantom()
 
 	# her hand and lantern, low right, riding with the camera
 	hand = Node3D.new()
 	hand.position = Vector3(HAND_X, HAND_Y, -0.55)
 	cam.add_child(hand)
-	hand.visible = false   # the painted hand overlay (HUD) replaces the placeholder box
+	hand.visible = false   # the 3D arm (_build_viewmodel) carries the lantern now
 	var frame := MeshInstance3D.new()
 	var fb := BoxMesh.new()
 	fb.size = Vector3(0.05, 0.075, 0.05)
@@ -502,6 +563,131 @@ func _build_world() -> void:
 	light.omni_attenuation = 1.1
 	light.position = Vector3(HAND_X, HAND_Y + 0.12, -0.5)
 	cam.add_child(light)
+	_build_viewmodel()
+
+
+## Your hands, in 3D (Meshy models, Nov 25): the gloved right arm holds the lantern out by its bail,
+## and the light lives inside the globe, so the shadows come from where the lantern really hangs.
+## The left arm carries the boathook while you have one. The look only: rules never read these.
+const VM_ARM := Vector3(0.11, -0.03, -0.3)      # right fist, camera space (lantern hangs below it)
+const VM_ARM_SCALE := 0.16
+const VM_ARM_DIR := Vector3(0.8, -0.4, 0.45)    # fist -> elbow: off to the right, back toward you
+const VM_POLE_X := 1.0
+const VM_POLE_TILT := 0.14
+const VM_HOOK_DIR := Vector3(-0.6, -0.5, 0.6)
+const VM_LAMP_SCALE := 0.07
+const VM_HOOK_ARM := Vector3(-0.17, -0.2, -0.4)
+func _build_viewmodel() -> void:
+	vm_lantern = Node3D.new()
+	vm_lantern.position = VM_ARM
+	cam.add_child(vm_lantern)
+	var arm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
+	arm.scale = Vector3.ONE * VM_ARM_SCALE
+	# the model stands sleeve-up, fist-down: lay the sleeve back toward you, down and to the right
+	arm.basis = Basis(Quaternion(Vector3.UP, VM_ARM_DIR.normalized())) * Basis.from_scale(Vector3.ONE * VM_ARM_SCALE)
+	arm.position = -(arm.basis * Vector3(0, -0.95, 0))   # fist at the pivot
+	vm_lantern.add_child(arm)
+	vm_lamp = Node3D.new()   # pivot at the fist: the lantern hangs and swings from here
+	vm_lantern.add_child(vm_lamp)
+	var lamp: Node3D = (load("res://assets/models/fp_lantern.glb") as PackedScene).instantiate()
+	lamp.scale = Vector3.ONE * VM_LAMP_SCALE
+	lamp.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.01, 0)   # bail top at the fist
+	vm_lamp.add_child(lamp)
+	for vm: Node3D in [arm, lamp]:
+		for m in vm.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# the light sits inside the globe, so the lantern glows from within rather than catching it
+	for m in lamp.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var src := mi.get_active_material(0) as StandardMaterial3D
+		if src:
+			vm_lamp_mat = src.duplicate() as StandardMaterial3D
+			vm_lamp_mat.emission_enabled = true
+			vm_lamp_mat.emission_texture = src.albedo_texture
+			vm_lamp_mat.emission = Color("#ff9440")
+			mi.material_override = vm_lamp_mat
+	# the flame and the light sit in the globe
+	flame.reparent(vm_lamp, false)
+	flame.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.012, 0)
+	flame.scale = Vector3.ONE * 0.45
+	vm_glow = MeshInstance3D.new()
+	var gq := QuadMesh.new()
+	gq.size = Vector2(0.075, 0.09)
+	vm_glow.mesh = gq
+	var gm := StandardMaterial3D.new()
+	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	gm.no_depth_test = true
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(1.0, 0.78, 0.4, 1.0), Color(1.0, 0.45, 0.1, 0.45), Color(0.6, 0.2, 0.0, 0.0)])
+	grad.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(0.5, 0.0)
+	gm.albedo_texture = gt
+	vm_glow.material_override = gm
+	vm_glow.position = flame.position + Vector3(0, 0.002, 0.01)
+	vm_lamp.add_child(vm_glow)
+	light.reparent(vm_lamp, false)
+	light.position = flame.position + Vector3(0, 0, -0.04)
+	vm_hook = Node3D.new()
+	vm_hook.position = VM_HOOK_ARM
+	vm_hook.visible = false
+	cam.add_child(vm_hook)
+	var larm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
+	larm.basis = Basis(Quaternion(Vector3.UP, VM_HOOK_DIR.normalized())) * Basis.from_scale(Vector3(-1, 1, 1) * VM_ARM_SCALE)
+	larm.position = -(larm.basis * Vector3(0, -0.95, 0))
+	vm_hook.add_child(larm)
+	var hook: Node3D = (load("res://assets/models/fp_boathook.glb") as PackedScene).instantiate()
+	hook.scale = Vector3.ONE * 0.12
+	hook.rotation = Vector3(-0.25, PI, -0.35)    # head up and ahead, the hook curling in toward the middle
+	hook.position = Vector3(0.0, 0.12, -0.03)
+	vm_hook.add_child(hook)
+	var pole := MeshInstance3D.new()   # the model's shaft is short: the pole runs on down out of sight
+	var pc := CylinderMesh.new()
+	pc.top_radius = 0.09
+	pc.bottom_radius = 0.1
+	pc.height = 6.0
+	pc.radial_segments = 8
+	pole.mesh = pc
+	var pmat := StandardMaterial3D.new()
+	pmat.albedo_color = Color("#a08a6c")   # matched to the model's shaft
+	pmat.roughness = 0.9
+	pole.material_override = pmat
+	var pole_pivot := Node3D.new()   # at the end of the model's shaft
+	pole_pivot.position = Vector3(VM_POLE_X, -0.9, 0)
+	pole_pivot.rotation.z = VM_POLE_TILT
+	hook.add_child(pole_pivot)
+	pole.position = Vector3(0, -2.9, 0)
+	pole_pivot.add_child(pole)
+	for vm: Node3D in [larm, hook]:
+		for m in vm.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Each frame: the arm bobs with your step, the lantern swings on its bail (a real pendulum
+## kicked by steps and turns), the boathook jabs when you swing it.
+func _sway_viewmodel(delta: float) -> void:
+	if vm_lantern == null:
+		return
+	var bob := sin(t * 2.1) * 0.004 + step_k * 0.018
+	vm_lantern.position = VM_ARM + Vector3(sin(t * 1.3) * 0.003, -bob, 0)
+	vm_swing_v += (-vm_swing * 38.0 - vm_swing_v * 2.2) * delta + step_k * delta * 1.6
+	vm_swing += vm_swing_v * delta
+	vm_lamp.rotation = Vector3(vm_swing, 0, vm_swing * 0.6 + sin(t * 0.9) * 0.02)
+	if vm_lamp_mat:
+		vm_lamp_mat.emission_energy_multiplier = 0.06 if game.effective() == Fog.Lantern.HOODED else 0.14 * light.light_energy / LIGHT[Fog.Lantern.NORMAL][1]
+		vm_glow.visible = game.effective() != Fog.Lantern.HOODED
+		vm_glow.scale = Vector3.ONE * (1.35 if game.effective() == Fog.Lantern.BRIGHT else 1.0) * clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.3, 1.4)
+	vm_hook.visible = game.hook_wear > 0 and not game.dead
+	if vm_hook.visible:
+		var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
+		vm_hook.position = VM_HOOK_ARM + Vector3(0.05 * j, -bob + 0.04 * j, -0.16 * j)
+		vm_hook.rotation = Vector3(-0.5 * j, 0, 0)
 
 
 # ---------------------------------------------------------------- rules -> look
@@ -561,6 +747,15 @@ func _refresh_fog() -> void:
 	for i in thrall_nodes.size():
 		thrall_nodes[i].visible = fog.get_state(game.thralls[i].pos) == Fog.LIT and not game.thralls[i].get("gone", false)
 		_pose(i)
+		if thrall_rigs.has(i):   # perf: a body you can't see doesn't animate. A corpse keeps its pose and a
+			# rise plays out even in the dark, so it never resumes half-risen somewhere else.
+			var ap: AnimationPlayer = thrall_rigs[i].player
+			var st: String = thrall_rigs[i].state
+			var on: bool = thrall_nodes[i].visible or st == "dead" or (st == "rise" and ap.is_playing())
+			if on != ap.active:
+				ap.active = on
+				if on:
+					ap.advance(0.0)   # pose it at once, no stale frame
 	_sync_prints()
 	for kp: Vector2i in hook_nodes:
 		hook_nodes[kp].visible = game.hooks_left.has(kp) and fog.get_state(kp) != Fog.DARK
@@ -578,11 +773,66 @@ func _refresh_fog() -> void:
 		minimap.queue_redraw()
 
 
+## What clip a rigged horror is playing ("" when it has no rig). Captures check it.
+func _rig_state(i: int) -> String:
+	var rig: Node3D = thrall_rigs.get(i)
+	return rig.state if rig else ""
+
+
+## Turn a horror to face you (only when it isn't mid-step, so a walk reads as a walk).
+func _face_cam(i: int, body: Node3D) -> void:
+	if cam == null:
+		return
+	var toward: Vector3 = cam.global_position - thrall_nodes[i].global_position
+	body.rotation.y = atan2(toward.x, toward.z)   # glTF bodies face +Z
+
+
+## The rules say crouched / lunging / moving; the rig plays the clip for it. A risen one plays
+## its rise to the end before it shambles.
+func _drive_rig(i: int, rig: Node3D, th: Dictionary, delta := 0.0) -> void:
+	var holder: Node3D = thrall_nodes[i]
+	var moving: bool = holder.get_meta("last_pos", holder.position).distance_to(holder.position) > 0.0005
+	holder.set_meta("last_pos", holder.position)
+	if rig.state == "rise" and rig.player.is_playing():
+		return
+	if th.get("crouched", false):
+		rig.set_state("crouch", 0.8)
+	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
+		rig.set_state("lunge", 1.4)
+	elif moving:
+		rig.set_state("walk", 0.75)   # slow, dragging
+	else:
+		rig.set_state("idle", 0.6 + 0.08 * sin(t * 0.7 + i))
+	if rig.state == "crouch" or rig.state == "lunge":
+		_face_cam(i, rig)   # the tell and the lunge come straight at you
+	elif rig.state != "walk":
+		# standing: the head finds you first (head_look.gd); the body comes round after, slowly
+		var toward: Vector3 = cam.global_position - holder.global_position if cam else Vector3.ZERO
+		if toward.length() > 0.01:
+			rig.rotation.y = lerp_angle(rig.rotation.y, atan2(toward.x, toward.z), 1.0 - exp(-delta * BODY_TURN))
+	else:
+		var dir: Vector3 = _w(game.thralls[i].pos) - holder.position
+		if dir.length() > 0.01:
+			rig.rotation.y = atan2(dir.x, dir.z)
+
+
 ## A corpse lies flat on the stones, feet toward the wall; once it gets up it stands like the rest.
 func _pose(i: int) -> void:
 	var sp: Sprite3D = thrall_sprites[i]
 	var lying: bool = game.thralls[i].get("lying", false)
 	var model: Node3D = thrall_models.get(i)
+	var rig: Node3D = thrall_rigs.get(i)
+	if rig:   # the body itself lies there, and gets up
+		rig.visible = true
+		sp.visible = false
+		if lying:
+			if rig.state != "dead":
+				rig.set_state("dead")
+				rig.hold_end()   # it was dead before you came
+		elif rig.state == "dead":
+			rig.set_state("rise")
+		_face_cam(i, rig)
+		return
 	if model:
 		model.visible = not lying
 		sp.visible = lying
@@ -1000,11 +1250,23 @@ func _process(delta: float) -> void:
 			map_rot = want if capture_mode else lerp_angle(map_rot, want, 1.0 - exp(-delta * 9.0))
 			minimap.queue_redraw()
 	_flicker_fires()
+	_sway_viewmodel(delta)
+	_haunt(delta)
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
 		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
 		if g:
 			var ph := t * 1.3 + float(fp.x * 7 + fp.y * 3)
 			g.modulate.a = 0.15 + 0.75 * pow(maxf(0.0, sin(ph)), 6.0)
+	# the bride, barely breathing (her clip runs at a crawl). Her body squares up to you only when
+	# she has moved; in between it stays put and her head comes round after you, too far.
+	for i: int in thrall_rigs:
+		if i == kill_rig:
+			continue
+		if game.thralls[i].get("kind", "thrall") == "stalker" and thrall_nodes[i].visible:
+			thrall_rigs[i].set_state("idle", 0.25)
+			if thrall_rigs[i].get_meta("faced_at", Vector2i(-99, -99)) != game.thralls[i].pos:
+				thrall_rigs[i].set_meta("faced_at", game.thralls[i].pos)
+				_face_cam(i, thrall_rigs[i])
 	# standing thralls twitch: a jerk of the head now and then, never smooth. Crouched (the tell
 	# before a lunge) it drops low and wide, shivers and goes dark red; just after a lunge it rears up.
 	for i in thrall_sprites.size():
@@ -1014,6 +1276,11 @@ func _process(delta: float) -> void:
 			var jerk := 0.0
 			if fmod(t * (1.3 + i * 0.17), 2.3) < 0.07:
 				jerk = 0.05 * sin(t * 90.0 + i)
+			var rig: Node3D = thrall_rigs.get(i)
+			if rig:
+				if i != kill_rig:
+					_drive_rig(i, rig, th, delta)
+				continue
 			var model: Node3D = thrall_models.get(i)
 			if model:
 				var toward: Vector3 = cam.global_position - thrall_nodes[i].global_position
@@ -1083,7 +1350,11 @@ func _process(delta: float) -> void:
 	var wobble := sin(t * 7.0) * 0.05 + sin(t * 13.0) * 0.04
 	if (flicker or fake_flicker) and fmod(t, 1.1) < 0.18:
 		wobble -= 0.6 * absf(sin(t * 60.0))
-	light.light_energy = base + wobble
+	if game.oil > 0 and game.oil <= LOW_OIL_SPUTTER:   # the wick gutters: the dark leans in (look only)
+		var gap := fmod(t + 0.9, 2.6 - 1.2 * (1.0 - float(game.oil) / LOW_OIL_SPUTTER))
+		if gap < 0.32:
+			wobble -= base * 0.7 * sin(gap / 0.32 * PI)
+	light.light_energy = maxf(0.05, base + wobble)
 	hand.position.y = HAND_Y + sin(t * 2.1) * 0.006   # the hand isn't quite steady
 	if hand_art:
 		var k: float = clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.55, 1.25)
@@ -1207,6 +1478,7 @@ func _build_hud() -> void:
 	# Back to front: the hand lantern (column), the vignette (whole screen), the HUD (column).
 	var hand_col := _column()
 	layer.add_child(hand_col)
+	hand_col.visible = false   # the painted hands: kept as a fallback, the 3D arms (_build_viewmodel) show instead
 	hud = _column()
 	hud.theme = UI.theme()
 
@@ -2244,6 +2516,12 @@ func _thrall_art(sp: Sprite3D, tex: Texture2D, tall: float) -> void:
 
 
 func _kill_shot() -> void:
+	for i in game.thralls.size():   # the one that took you: if it has a body, it does it in 3D
+		var th: Dictionary = game.thralls[i]
+		if th.get("kind", "thrall") == game.killer and not th.get("gone", false) and not th.get("lying", false) \
+				and absi(th.pos.x - game.hunter.x) + absi(th.pos.y - game.hunter.y) <= 1 and thrall_rigs.has(i):
+			await _kill_shot_3d(i)
+			return
 	var stalker: bool = game.killer == "stalker"
 	kill_shot = Control.new()
 	kill_shot.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -2301,6 +2579,136 @@ func _kill_shot() -> void:
 		await _shot("fp_killshot")
 	kill_shot.queue_free()
 	kill_shot = null
+
+
+## The kill, in the world: the body that has you comes off its tile into your face, its head locked
+## on you, and you go down under it, looking up into the lantern light on it. Red flash, blood.
+func _kill_shot_3d(i: int) -> void:
+	kill_rig = i
+	var rig: Node3D = thrall_rigs[i]
+	var holder: Node3D = thrall_nodes[i]
+	holder.visible = true
+	rig.visible = true
+	rig.player.active = true
+	rig.set_state("lunge", 1.5, true)
+	if rig.look:
+		rig.look.locked = true
+	kill_shot = Control.new()
+	kill_shot.set_anchors_preset(Control.PRESET_FULL_RECT)
+	kill_shot.mouse_filter = Control.MOUSE_FILTER_STOP
+	hud.add_child(kill_shot)
+	var red := ColorRect.new()
+	red.color = Color(0.55, 0.0, 0.02, 0.0)
+	red.set_anchors_preset(Control.PRESET_FULL_RECT)
+	red.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kill_shot.add_child(red)
+	var gore := TextureRect.new()
+	gore.texture = _tex("fx_blood_screen")
+	gore.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	gore.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gore.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gore.stretch_mode = TextureRect.STRETCH_SCALE
+	gore.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gore.modulate.a = 0.0
+	kill_shot.add_child(gore)
+	# it may come from beside or behind (she never lets you see her move): you're wrenched round to it
+	var cam0 := cam.transform
+	var fwd := -cam0.basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized()
+	var at := holder.position - Vector3(cam0.origin.x, holder.position.y, cam0.origin.z)
+	if at.length() > 0.05:
+		fwd = at.normalized()
+	var yaw0 := cam.rotation.y
+	var yaw1 := atan2(-fwd.x, -fwd.z)
+	var from := holder.position
+	var to := Vector3(cam0.origin.x, holder.position.y, cam0.origin.z) + fwd * KILL_REACH
+	var e := 0.0
+	var shot := false
+	while e < T_KILL_3D:
+		var dt := get_process_delta_time()
+		e += dt
+		var k := clampf(e / 0.26, 0.0, 1.0)
+		holder.position = from.lerp(to, 1.0 - pow(1.0 - k, 3.0))   # it comes fast and stops in your face
+		_face_cam(i, rig)
+		var fall := clampf((e - 0.22) / 0.5, 0.0, 1.0)
+		fall = fall * fall * (3.0 - 2.0 * fall)
+		var shake := (1.0 - e / T_KILL_3D) * (0.05 if e > 0.2 else 0.015)
+		var base := Basis(Vector3.UP, lerp_angle(yaw0, yaw1, clampf(e / KILL_WHIP, 0.0, 1.0)))
+		var b := base * Basis(Vector3.RIGHT, KILL_LOOK_UP * fall) * Basis(Vector3.FORWARD, KILL_ROLL * fall)
+		cam.transform = Transform3D(b, cam0.origin - fwd * 0.08 * fall + Vector3(0, -KILL_DROP * fall, 0)
+			+ Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake)
+		red.color.a = 0.4 * clampf(1.0 - absf(e - 0.3) / 0.4, 0.0, 1.0)
+		gore.modulate.a = clampf((e - 0.24) / 0.08, 0.0, 0.85)
+		if vm_hook:
+			vm_hook.visible = vm_hook.visible and e < 0.3
+		if capture_mode and not shot and e > 0.62:   # the moment it's over you
+			shot = true
+			kill_3d_ok = Vector2(holder.position.x - cam.position.x, holder.position.z - cam.position.z).length() < 0.8 \
+				and rig.state == "lunge"
+			kill_3d_seen = kill_3d_ok
+			print("KILL3D ", "PASS" if kill_3d_ok else "FAIL", " who=", game.killer)
+			await _shot("fp_killshot")
+		await get_tree().process_frame
+	kill_shot.queue_free()
+	kill_shot = null
+
+
+## Dread at or past half: now and then a figure stands at the edge of the light, down the way you
+## face, black against the fog. Then it isn't there. Look only: it's not in the rules or on the map.
+func _haunt(delta: float) -> void:
+	if phantom == null or game == null:
+		return
+	if phantom.visible:
+		phantom_t -= delta
+		if phantom_t <= 0.0 or busy or _sheet_up():
+			_hide_phantom()
+		return
+	if not game.hallucinating() or game.over() or busy or _sheet_up():
+		return
+	phantom_t += delta
+	if phantom_t < 0.0:
+		return
+	phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
+	_show_phantom()
+
+
+func _sheet_up() -> bool:
+	return modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null
+
+
+func _hide_phantom() -> void:
+	phantom.visible = false
+	phantom.player.active = false   # nothing runs while it isn't there
+	if phantom.look:
+		phantom.look.active = false
+	phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
+
+
+## Put the figure in the first dark tile straight ahead (3-6 tiles), if the corridor runs that far.
+func _show_phantom() -> bool:
+	var f: Vector2i = game.facing
+	var p: Vector2i = game.hunter
+	for d in range(1, 7):
+		p = game.hunter + f * d
+		if room.is_wall(p):
+			return false
+		if d >= 3 and fog.get_state(p) != Fog.LIT:
+			var taken := false
+			for th: Dictionary in game.thralls:
+				taken = taken or (th.pos == p and not th.get("gone", false))
+			if taken:
+				return false
+			phantom.position = _w(p)
+			phantom.rotation.y = atan2(-float(f.x), -float(f.y))   # facing you (glTF bodies face +Z)
+			phantom.visible = true
+			phantom.player.active = true
+			if phantom.look:
+				phantom.look.active = true
+			phantom_t = PHANTOM_LIFE
+			Sound.hook_sfx("whisper", -14.0, randf_range(0.8, 0.95))
+			return true
+	return false
 
 
 func _show_end() -> void:
@@ -2761,6 +3169,9 @@ func _capture() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
 	for i in 20:
 		await get_tree().process_frame
+	if capture_phase == 0 and "--art-only" in OS.get_cmdline_user_args():   # quick look at the art pass
+		capture_phase = 4
+		kill_3d_seen = true   # the kill isn't in this run
 	if capture_phase == 0:
 		await _shot("fp_title")
 		await _press(title_begin)
@@ -2997,7 +3408,7 @@ func _capture_art() -> void:
 	for k in 8:
 		await get_tree().process_frame
 	await _shot("fp_art_crouch")
-	thrall_model_ok = thrall_model_ok and thrall_model.scale.y < THRALL_MODEL_SCALE.y
+	thrall_model_ok = thrall_model_ok and _rig_state(ti) == "crouch"   # the scream, the tell before it comes
 	game.thralls[ti].crouched = false
 	game.thralls[ti].lunge_cd = Night.LUNGE_COOLDOWN
 	game.thralls[ti].pos = Vector2i(7, 18)
@@ -3007,7 +3418,7 @@ func _capture_art() -> void:
 		await get_tree().process_frame
 	lunge_hit = 20.0   # held for the shot (a capture frame can be slow)
 	await _shot("fp_art_lunge")
-	thrall_model_ok = thrall_model_ok and thrall_model.rotation.z < 0.0
+	thrall_model_ok = thrall_model_ok and _rig_state(ti) == "lunge"
 	print("THRALL MODEL ", "PASS" if thrall_model_ok else "FAIL")
 	game.thralls[ti].lunge_cd = 0
 	game.thralls[ti].pos = keep_pos
@@ -3021,8 +3432,76 @@ func _capture_art() -> void:
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
 	await _shot("fp_art_corpse")
-	var corpse_ok: bool = thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2
+	var corpse_i := -1   # the corpse by what it is (lying), never by index
+	for i in game.thralls.size():
+		if game.thralls[i].get("lying", false) and game.thralls[i].pos == Vector2i(17, 12):
+			corpse_i = i
+	var corpse_ok: bool = corpse_i >= 0 and thrall_nodes[corpse_i].visible and _rig_state(corpse_i) == "dead" and print_nodes.size() == 2
 	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
-	var art_ok := harbor_ok and corpse_ok and thrall_model_ok
+	# your hands are 3D: the lantern hangs in your right fist with the light inside its globe,
+	# and the boathook shows in your left exactly while you carry one
+	game.hook_wear = 3
+	await get_tree().process_frame
+	var vm_ok: bool = vm_lantern.is_visible_in_tree() and light.get_parent() == vm_lamp and vm_hook.is_visible_in_tree() \
+		and not hook_art.is_visible_in_tree() and not hand_art.is_visible_in_tree()
+	game.hook_wear = 0
+	await get_tree().process_frame
+	vm_ok = vm_ok and not vm_hook.is_visible_in_tree()
+	print("VIEWMODEL ", "PASS" if vm_ok else "FAIL")
+	# the bride's body turned well away from you; her head comes round anyway
+	var bi := -1
+	for i in game.thralls.size():
+		if game.thralls[i].get("kind", "thrall") == "stalker":
+			bi = i
+	var head_ok := false
+	if bi >= 0 and thrall_rigs.has(bi):
+		var keep_b: Vector2i = game.thralls[bi].pos
+		game.hunter = Vector2i(6, 18)
+		game.facing = Vector2i.RIGHT
+		game.thralls[bi].pos = Vector2i(8, 18)
+		game.fog.update(game.lights())
+		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+		_refresh()
+		var br: Node3D = thrall_rigs[bi]
+		thrall_nodes[bi].position = _w(game.thralls[bi].pos)
+		br.set_meta("faced_at", game.thralls[bi].pos)
+		_face_cam(bi, br)
+		for k in 10:
+			await get_tree().process_frame
+		await _shot("fp_art_bride_face")
+		br.rotation.y += 1.5   # her body faces off down the wall
+		# her head holds up to 1.6 s between snaps: wait (real time) for the next one, not a frame count
+		var waited := 0.0
+		while waited < 3.0 and not (br.look and br.look._want.get_angle() > 1.0 and br.look._cur.get_angle() > 0.9):
+			await get_tree().process_frame
+			waited += get_process_delta_time()
+		head_ok = br.look != null and br.look._want.get_angle() > 1.0 and br.look._cur.get_angle() > 0.9
+		await _shot("fp_art_bride_head")
+		game.thralls[bi].pos = keep_b
+		thrall_nodes[bi].position = _w(keep_b)
+	print("HEAD LOOK ", "PASS" if head_ok else "FAIL")
+	# dread past half: a black figure down the corridor that isn't there
+	var phantom_ok := false
+	game.setting = Fog.Lantern.NORMAL
+	for y in room.size.y:
+		for x in room.size.x:
+			for f: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				if phantom_ok or room.is_wall(Vector2i(x, y)):
+					continue
+				game.hunter = Vector2i(x, y)
+				game.facing = f
+				game.fog.update(game.lights())
+				phantom_ok = _show_phantom() and phantom.position.distance_to(_w(game.hunter)) >= 3.0
+	if phantom_ok:
+		_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+		_refresh()
+		phantom_t = 99.0
+		for k in 4:
+			await get_tree().process_frame
+		phantom_ok = phantom.is_visible_in_tree()
+		await _shot("fp_art_phantom")
+		_hide_phantom()
+	print("PHANTOM ", "PASS" if phantom_ok else "FAIL", " at=", game.hunter, " facing=", game.facing)
+	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)

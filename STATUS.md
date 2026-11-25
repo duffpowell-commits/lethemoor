@@ -18,13 +18,17 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
 - Both are build 123, commit `de5bf2a`, with the 3D nightmare Thrall.
 
+## Tools
+
+Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, step, read the HUD, screenshot) before calling work done.
+
 ## In progress
 
 Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
 
-The 3D harbor shipped in build 119 (PR #38). Milestone B shipped the 3D nightmare Thrall in PR #40. The 3D Stalker preview on `art/stalker-model` is awaiting owner review. Skeletal animation and corpse models are pending.
+The 3D harbor shipped in build 119 (PR #38). Since Nov 25 (PR #45) every horror is a rigged, animated 3D body and your hands and lantern are 3D. Needs a phone FPS check.
 
 Parked until the kill test: safe room, satchel, revenant corpse, Choir. Kill test is Nov 28: median fun 6+/10 and testers choose to replay.
 
@@ -55,6 +59,10 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 25: more scary (Duff: "Lets get more scary"). Heads snap round to follow you, the kill is in 3D (the thing comes into your face and you go down under it), and at dread 50+ a grey figure stands in the dark ahead for a second. Fixed the bride standing side-on. Look only, no rule changes.
+
+- 2026-11-25. Fully 3D horrors: rigged, animated, faceless thralls + bride (Meshy), 3D lantern arm and boathook, lantern gutters at low oil (PR #45).
+
 - 2026-11-23. Added the skippable 3 Eyed Fox Studios splash and publisher credits in the Field Guide.
 
 - 2026-11-21. Public-repo guardrails: rules in `CLAUDE.md`, gitleaks on PRs and main, secret and prompt ignores.
@@ -64,4 +72,4 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 - 2026-11-20. Fluid moves: a swipe fires mid-drag, the next move queues, hold to keep walking, steps chain.
 - 2026-11-19. Slice finished through painted art, nightmare thrall, verdict card, and in-app APK updates.
 
-Updated 2026-11-23.
+Updated 2026-11-25.

@@ -3,19 +3,21 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://capxfwi253o4j"
-path="res://.godot/imported/stalker.glb-88002a88cd033371368f409cb8ef3661.scn"
+uid="uid://d0id73lahqb42"
+path="res://.godot/imported/fp_lantern.glb-0c478197ed630b817ab494d1f370dffe.scn"
 
 [deps]
 
-source_file="res://assets/models/stalker.glb"
-dest_files=["res://.godot/imported/stalker.glb-88002a88cd033371368f409cb8ef3661.scn"]
+source_file="res://assets/models/fp_lantern.glb"
+dest_files=["res://.godot/imported/fp_lantern.glb-0c478197ed630b817ab494d1f370dffe.scn"]
 
 [params]
 
 nodes/root_type=""
 nodes/root_name=""
 nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
 nodes/apply_root_scale=true
 nodes/root_scale=1.0
 nodes/import_as_skeleton_bones=false
@@ -39,4 +41,5 @@ materials/extract_format=0
 materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
-gltf/embedded_image_handling=2
+gltf/embedded_image_handling=1
+gltf/texture_map_mode=1

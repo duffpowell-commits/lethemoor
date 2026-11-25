@@ -365,6 +365,18 @@ Moved word for word out of CLAUDE.md on Nov 21 2026 (lean harness: CLAUDE.md loa
   room, real sound. Also: real tile art for 3D, and one-step-per-tap vs the 4-tile placeholder
   move (pivot says step-based; decide with Duff on the phone build).
 
+
+## Eyes: Claude plays the running game (Nov 24)
+- Duff: "Add eyes to lethemoor". Same tool as godot-game-starter (PRs #22-#24): godot-mcp-runtime
+  4.0.1 (MIT, pinned in `tools/eyes/package-lock.json`) driven by `tools/eyes/eyes.mjs` under xvfb.
+  Steps: list UI, click by text, keys, waits, screenshots, live GDScript. `docs/EYES.md`.
+- Nothing ships: `tools/` and `docs/` are outside the export. The runtime adds a temporary autoload
+  while the game runs and removes it on exit (scratch in `.mcp/`, git-ignored).
+- Smoke: BEGIN THE NIGHT, up to three Field Notes dismissed (fresh save only), WAIT, step (`Up`).
+  Oil 60 -> 59 -> 58 confirms turns advance. Swipes aren't a step type; arrow keys work.
+- Gotcha it found: `fp_view.gd:1502` (`_build_hud`) sets a size on a node with unequal anchors, so
+  Godot warns "size will be overridden" every launch. Harmless today; warnings are listed, not fatal.
+
 ## Art session notes (Nov 7, end of session; Duff is about to change the game "a bit")
 Duff's change happened: see the pivot doc. Size is now decided (64 px characters, 48 px tiles).
 - **Target look:** Final Fantasy Resonance (Square Enix, HD-2D, out Oct 22 2026). HD-2D =
@@ -473,3 +485,54 @@ The art pass checks that the modeled variant is visible when lit, hides its stan
 
 - The veiled bride uses a 6,193-triangle, opaque textured GLB derived from the existing bride reference and cleaned in Blender. The first-person view places it on the existing Stalker holder, which shares the simulation fog gate and turn interpolation. The model keeps its facing until she moves to another tile. The death card still uses its painted close-up.
 - Owner review is pending. See `docs/renders/fp_stalker_3d.png` for the lantern encounter and `docs/renders/stalker_3d_turnaround.jpg` for three model views. This preview uses rigid movement.
+
+## Fully 3D horrors and hands (Nov 25, PR #45)
+
+Duff (Nov 24): "start making what we need to pull that game fully three-dimensional and terrifying". Budget he
+picked: ~260 Meshy credits ("Monsters + hands"). Spent 250 (705 -> 455).
+
+- Heights (Nov 24 evening, Duff: "Why are the monsters so big?"): `RIGS` crown heights are thralls
+  0.88-1.0 tiles, bride 1.1, against eye 0.82 (were 1.8-2.15, carried over from the painted cards).
+- `scripts/rig_horror.gd`: a horror on Meshy's 24-bone humanoid rig. The view sets a state from the rules
+  (idle, walk, crouch, lunge, dead, rise); missing clips fall back. `fp_view.gd` `RIGS` maps a look to
+  `assets/models/rig_<name>.glb` (+ height, + optional yaw fix; the bride needs none, the old quarter turn left her side-on). `_drive_rig` picks the
+  state each frame; `_pose` lays corpses in the dead clip's last frame and plays "rise" when they get up.
+  The bride breathes at quarter speed and squares up to you only when she has moved.
+- Clips per thrall (Meshy action ids): idle 0, walk 113 Mummy Stagger, crouch (the tell) 386 Zombie Scream,
+  lunge 4 Attack, dead 8 Dead, rise 3 Arise. Bride: idle 0, lunge 4, walk = the rig's free walk.
+- Clip GLBs are not in git (each carries a mesh copy): project files `lethemoor-3d/meshy_source/`. Copy them to
+  `tools/clips_src/` as `rig_<who>_<clip>.glb`, then
+  `godot --headless --path . --script tools/bake_clips.gd -- rig_nightmare rig_hooded rig_dockwoman rig_bride`.
+- Meshy ships 2K/4K textures: run `python3 tools/shrink_glb.py <meshy.glb> assets/models/<name>.glb` (1K JPEG,
+  ~0.8 MB a body). Bodies are ~9k triangles (smart topology).
+- Viewmodel (`_build_viewmodel`, `_sway_viewmodel`): `fp_glove.glb` right arm holding `fp_lantern.glb` by the bail,
+  the OmniLight and an additive glow quad inside the globe, lantern emission follows the flame (HOODED goes dark),
+  a damped pendulum swing kicked by steps. Left arm + `fp_boathook.glb` (short gaff head + a code pole) shows
+  while `hook_wear > 0`. The painted hand column is hidden, kept as a fallback.
+- Removed: `thrall.glb` (had a face, broke the faceless rule) and the rigid `stalker.glb`. Painted looks
+  clawed/wired/dock/net-mender left `THRALL_LOOKS`.
+- Lantern gutters at <= 12 oil (`LOW_OIL_SPUTTER`, light only).
+- Capture: THRALL MODEL checks the scream/attack states, CORPSE checks the dead clip, VIEWMODEL checks the hands.
+- Meshy tasks: models nightmare 01a21023-edea, hooded 01a21023-fd20, dockwoman 01a21024-09b2, bride 01a21024-171d;
+  rigs 01a21025-dfdd / -eecc / 01a21026-0339 / -10c9; lantern refine 01a21026-1f8c, glove 01a21026-296e,
+  boathook 01a21027-c3cf. Login: `meshy auth login --device` (Duff approves the code on his phone).
+- Not checked yet: 60 fps on Duff's phone with four skinned bodies on screen. Perf LOW could drop rigs to sprites.
+
+## More scary (Nov 25, Duff: "Lets get more scary")
+
+All look only, no rule changes, no Meshy credits.
+- Heads (`scripts/head_look.gd`, a SkeletonModifier3D on each rig's skeleton): the Head bone turns to the camera
+  on top of the clip, in skeleton space from the body's +Z, so it doesn't care how the bone is oriented. It holds,
+  then snaps (0.35-1.1 s) instead of gliding. Thralls 75 degrees either way; the bride 112, slower to let go
+  (her veil isn't weighted to the head, so it barely shows on her). A standing body follows its head round at
+  `BODY_TURN`; crouch and lunge face you at once. The bride's body turns only when her tile changes.
+- 3D kill (`_kill_shot_3d`): if the killer has a rig, its body comes off its tile to `KILL_REACH` in front of your
+  eyes, replays the attack, head locked on you, while the camera tips back (`KILL_LOOK_UP`, `KILL_ROLL`) and drops
+  (`KILL_DROP`): you look up at it in your own lantern light. Red flash + blood screen as before. No rig: the
+  painted 2D kill still runs. `kill_rig` stops the rules driving that body meanwhile.
+- The figure that isn't there (`_haunt`, `_show_phantom`): at dread >= 50 (`hallucinating()`, which already lets
+  the view lie), every 7-16 s a still hooded body, unlit and grey-blue (`PHANTOM_TINT`, fog off), stands on the
+  first unlit tile 3-6 ahead down your corridor for 0.9 s with a low whisper, head turning to you. Not on the map.
+- `Audio.hook_sfx(name, db, pitch)`: one-shot from outside the autoload.
+- Capture: KILL3D, HEAD LOOK, PHANTOM (+ renders `fp_killshot`, `fp_art_bride_face`, `fp_art_bride_head`,
+  `fp_art_phantom`). `--art-only` after `--capture` jumps straight to the art pass for quick looks.
