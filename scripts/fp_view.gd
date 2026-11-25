@@ -2036,7 +2036,7 @@ func _refresh_hud() -> void:
 		"ignite": "The spark catches. Fire runs along the oil.",
 		"burned": "Something burns in the oil. It doesn't scream.",
 		"crouch": "It crouches, low and still, watching the flame. Move.",
-		"lunge": "It lunges. Two paces gone in a heartbeat. It's on you.",
+		"lunge": "It lunges, a pace gone in a heartbeat. Backing off won't stop it coming.",
 		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
 		"roused": "You held it in the high flame too long. It stops shambling.",
 		"blocked_body": "A body lies there, sodden. You'd have to step over it.",

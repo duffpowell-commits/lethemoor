@@ -886,14 +886,37 @@ func test_close_thralls_go_silent() -> void:
 	check(n.silent(near) and not n.silent(far), "within 3 tiles a thrall makes no sound")
 
 
-func test_crouch_gives_you_a_turn_to_get_clear() -> void:
+func test_a_crouch_always_ends_in_a_lunge() -> void:
 	var n = Night.start(LONG)
 	n.facing = Vector2i.LEFT     # backing away = stepping right, eyes on it
 	n.hunter = Vector2i(3, 1)
 	var th := _thrall_at(n, Vector2i(1, 1))
 	check("crouch" in n.wait(), "it crouches")
 	var ev: Array = n.step_dir(Vector2i.RIGHT)
-	check(not "lunge" in ev and not th.crouched and not n.dead, "you stepped out of reach: no lunge, the crouch is spent")
+	check("lunge" in ev and th.pos == Vector2i(2, 1) and th.lunge_cd == Night.LUNGE_COOLDOWN and not n.dead,
+		"you backed off a tile: it still lurches after you, then must rest (no standoff)")
+	# the review standoff: step in, it crouches; step out, step in... it must not just crouch forever
+	var m = Night.start("##############\n#............#\n##############")
+	m.hunter = Vector2i(6, 1)
+	m.facing = Vector2i.LEFT
+	var t2 := _thrall_at(m, Vector2i(4, 1))
+	var lunged := false
+	for i in 4:
+		var e: Array = m.step_dir(Vector2i.RIGHT) if i % 2 == 0 else m.step_dir(Vector2i.LEFT)
+		lunged = lunged or "lunge" in e
+	check(lunged, "stepping in and out of reach: within 2 turns of the crouch it lunges")
+	# a crouch that ends some other way (it lost you) doesn't hide a lunge for later
+	var q = Night.start(LONG)
+	q.facing = Vector2i.RIGHT
+	var t3 := _thrall_at(q, Vector2i(3, 1))
+	check("crouch" in q.wait(), "it crouches")
+	q.set_lantern(Fog.Lantern.HOODED)    # it can't see you now
+	t3.target = null                     # and it has lost you
+	var e2: Array = q.wait()
+	check(not "lunge" in e2 and not t3.crouched and t3.pos == Vector2i(3, 1), "it lost you: the crouch is gone, no lunge")
+	q.set_lantern(Fog.Lantern.NORMAL)
+	e2 = q.wait()
+	check("crouch" in e2 and not "lunge" in e2, "seen again: a fresh tell first, never a lunge out of nowhere")
 
 
 func test_corpse_never_rises_through_a_wall() -> void:

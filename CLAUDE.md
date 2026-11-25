@@ -35,6 +35,8 @@ Search it for a system before you change it.
   handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S,
   `scripts/sim/record.gd`). Bot on new walls (after review fix 1, horrors placed by walking distance): 40% win,
   25 oil at the bell, a night with no horror met 7% (was 23%). `docs/HANDOFF_LOG.md` "New walls", "Review fix 1".
+- Nov 25 review fix 2: a crouched thrall always lunges (backing off a tile no longer freezes it); early thrall 12-17 steps in.
+  Bot 39% win, 5% dead by turn 20. `docs/HANDOFF_LOG.md` "Review fix 2".
 - Nov 25: real recorded sound (CC0/public domain, `tools/real_audio.py`): bell, harbour bed, steps, fire, paper,
   thrall moans. Run it after `gen_audio.py`. `docs/HANDOFF_LOG.md` "Real recorded sound".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD

@@ -25,7 +25,7 @@ var hooks: Array[Vector2i] = []
 ## close to the start a horror may stand (walking tiles). The walls never move.
 const SHUFFLE_REACH := 3
 const SAFE_START := 7
-const EARLY := Vector2i(10, 15)    # dealt nights: one thrall waits down a side passage this many steps in (Nov 25: a scare in the first minute)
+const EARLY := Vector2i(12, 17)    # dealt nights: one thrall waits down a side passage this many steps in (Nov 25: a scare in the first minute; 10-15 once a crouch always ends in a lunge: dead by turn 20 in 8%)
 const EARLY_SIGHT := 5   # ...in a straight line from the road, at most this far: look down that passage and it is there
 const EARLY_OFF := 3     # ...and at least this far a walk from the road (2 = bot dead by turn 20 in 13% of nights)
 
