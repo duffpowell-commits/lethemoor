@@ -337,8 +337,8 @@ func test_stalker_gets_you_when_you_look_away() -> void:
 	n.turn_by(1)
 	for i in 4:
 		n.wait()
-	n.turn_by(-1)   # look away (up the wall): one turn with your back to her
-	for i in 2:
+	n.turn_by(-1)   # look away (up the wall): with your back to her she closes a step a turn
+	for i in 6:
 		if not n.dead:
 			n.wait()
 	check(n.dead, "looking away lets her close the gap")
@@ -490,7 +490,9 @@ func test_fire_kills_what_walks_into_it() -> void:
 	n.set_lantern(Fog.Lantern.HOODED)
 	check(n.watched(n.thralls[0]), "the fire lights her and you're looking: she's frozen")
 	n.facing = Vector2i.LEFT     # look away: she comes, straight through the fire
-	n.wait()
+	for i in 2:
+		if not n.thralls[0].gone:
+			n.wait()
 	check(n.thralls[0].gone and not n.dead, "the bride walked through fire to reach you and burned")
 
 
@@ -537,6 +539,9 @@ func test_audio_cues_follow_the_sim() -> void:
 	check(Audio.cues("hook", [], false) == [], "no hook in hand: no swing")
 	check(Audio.cues("spark", ["burned"], true) == ["spark", "burned"], "the slick goes up, it burns")
 	check(Audio.cues("spark", ["burned_self"], true) == ["spark", "death"], "you burn with it")
+	check(Audio.cues("wait", ["toll"], true) == ["toll"], "the bell tolls by itself")
+	check(Audio.cues("forward", ["escaped", "rang", "toll"], true) == ["step", "bell"], "ringing it drowns the toll")
+	check(Audio.cues("wait", ["toll", "taken"], true) == ["death"], "no toll over your own death")
 
 
 func test_audio_every_cue_has_a_clip() -> void:
@@ -716,6 +721,70 @@ func test_dealt_nights_stay_fair() -> void:
 				"seed %d: the night uses the dealt layout" % s)
 		if failures > 0:
 			return
+
+
+# ---------------------------------------------------------------- "all four" (Nov 25: Duff's play-test fixes)
+
+func test_bell_tolls_and_the_map_learns_it() -> void:
+	var g = Night.start("#######\n#H...B#\n#######")
+	g.facing = Vector2i.UP
+	check(not g.bell_heard, "before the first turn nobody knows where it hangs")
+	var ev: Array = g.wait()
+	check("toll" in ev and g.bell_heard, "turn 1: the bell tolls by itself and the map knows it")
+	var tolls := 0
+	for i in Night.BELL_EVERY * 2:
+		if "toll" in g.wait():
+			tolls += 1
+	check(tolls == 2, "then once every BELL_EVERY turns (%d)" % tolls)
+
+
+func test_bride_hunts_blind_after_she_wakes() -> void:
+	var g = Night.start("###################\n#H...............S#\n###################")
+	g.facing = Vector2i.UP
+	g.set_lantern(Fog.Lantern.HOODED)   # she can't see you: before she wakes she stays put
+	var at: Vector2i = g.thralls[0].pos
+	for i in 5:
+		g.wait()
+	check(g.thralls[0].pos == at, "asleep: she doesn't know where you are")
+	g.turn = Night.STALKER_WAKES
+	for i in Night.STALKER_HUNT_EVERY * 3:
+		g.wait()
+	check(g.thralls[0].pos.x < at.x, "awake: she comes for you in the dark")
+	var close := false
+	for i in 60:
+		g.wait()
+	close = g.room.reachable(g.thralls[0].pos, Night.STALKER_SHADOW).has(g.hunter)
+	check(close and not g.dead, "blind she stops at the edge, STALKER_SHADOW tiles off, and waits for your light")
+	check(Audio.stalker_free(g), "hunting and near: the bed goes quiet")
+
+
+func test_held_light_drives_the_bride_off() -> void:
+	var g = Night.start("###########\n#H..S.....#\n###########")
+	g.facing = Vector2i.RIGHT
+	g.set_lantern(Fog.Lantern.BRIGHT)
+	var ev: Array = []
+	for i in Night.STALKER_RECOIL:
+		ev = g.wait()
+	check("recoiled" in ev, "held in the light STALKER_RECOIL turns, she can't bear it")
+	check(g.room.reachable(g.hunter, Night.STALKER_SHADOW).has(g.thralls[0].pos) == false and not g.dead,
+			"she's gone into the dark, past STALKER_SHADOW")
+	check(not g.thralls[0].pos in g.room.bells and g.thralls[0].get("recoiled_on", -1) == g.turn, "never onto the bell; the view knows she vanished this turn")
+
+
+func test_dealt_nights_put_a_thrall_near_the_start() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	var hits := 0
+	for s in range(1, 101):
+		var r = Night.start(text, s).room
+		var from_start: Dictionary = r.reachable(r.hunter, r.size.x * r.size.y)
+		var route: Array = r.path_in(from_start, r.hunter, r.bells[0])
+		for p: Vector2i in r.thralls:
+			var on_road := p in route
+			var d: int = from_start.get(p, 999)
+			if d >= Room.EARLY.x and d <= Room.EARLY.y and not on_road:
+				hits += 1
+				break
+	check(hits >= 95, "nearly every dealt night has a thrall EARLY steps in, off the road (%d/100)" % hits)
 
 
 # ---------------------------------------------------------------- thralls, made worse (Nov 19)

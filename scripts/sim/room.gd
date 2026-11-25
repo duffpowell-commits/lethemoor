@@ -24,6 +24,7 @@ var hooks: Array[Vector2i] = []
 ## close to the start a horror may stand (walking tiles). The walls never move.
 const SHUFFLE_REACH := 3
 const SAFE_START := 7
+const EARLY := Vector2i(9, 12)    # dealt nights: one thrall waits just off the road this many steps in (Nov 25: a scare in the first minute)
 
 
 static func parse(text: String) -> RefCounted:
@@ -110,7 +111,8 @@ func path_in(reach: Dictionary, from: Vector2i, to: Vector2i) -> Array[Vector2i]
 ## Deal a fresh night from `seed`: horrors, oil flasks and letters each move to a floor tile
 ## within SHUFFLE_REACH steps of where the map draws them. Seed 0 keeps the map as drawn.
 ## Fair by rule: no horror within SAFE_START steps of the start or next to another horror, no
-## horror nearer the straight road to the bell or to the start than the map draws it (so the night is as
+## horror nearer the straight road to the bell or to the start than the map draws it (except the one early
+## thrall, `_early_thrall`, on purpose) (so the night is as
 ## dangerous as the handmade one, just in new places), the Stalker never on that road, letters always beside a wall to hang on,
 ## nothing on the start, bell, hook, lamp or exit, nothing sharing a tile.
 func shuffle(seed: int) -> void:
@@ -142,10 +144,45 @@ func shuffle(seed: int) -> void:
 		return far.call(q) and road.call(q) >= road.call(p) and from_start.get(q, 0) >= from_start.get(p, 0)
 	stalkers = _deal(stalkers, rng, used, func(q, p): return fair.call(q, p) and not q in route, horrors)
 	thralls = _deal(thralls, rng, used, fair, horrors)
+	_early_thrall(rng, used, horrors, from_start, road)
 	# bodies lie in dead ends you pass or walk into, never across a corridor you must use
 	corpses = _deal(corpses, rng, used, func(q, p): return fair.call(q, p) and dead_end(q), horrors)
 	letters = _deal(letters, rng, used, func(q, _p): return _against_wall(q))
 	oil_flasks = _deal(oil_flasks, rng, used, func(_q, _p): return true)
+
+
+## The first one: the thrall dealt nearest the start moves to a tile EARLY steps in, one or two
+## tiles off the road to the bell (2-3, beside it, never on it), so the night shows its teeth in the
+## first minute instead of after a long empty walk. Keeps clear of the other horrors.
+func _early_thrall(rng: RandomNumberGenerator, used: Dictionary, horrors: Dictionary, from_start: Dictionary, road: Callable) -> void:
+	if thralls.is_empty():
+		return
+	var k := 0
+	for i in thralls.size():
+		if from_start.get(thralls[i], 999) < from_start.get(thralls[k], 999):
+			k = i
+	var old: Vector2i = thralls[k]
+	horrors.erase(old)
+	var spots: Array[Vector2i] = []
+	for q: Vector2i in from_start:
+		var dq: int = from_start[q]
+		var rq: int = road.call(q)
+		if dq < EARLY.x or dq > EARLY.y or rq < 2 or rq > 3 or used.has(q):
+			continue
+		var crowded := false
+		for d in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+			crowded = crowded or horrors.has(q + d)
+		if not crowded:
+			spots.append(q)
+	if spots.is_empty():
+		horrors[old] = true
+		return
+	spots.sort()
+	var pick := spots[rng.randi_range(0, spots.size() - 1)]
+	used.erase(old)
+	used[pick] = true
+	horrors[pick] = true
+	thralls[k] = pick
 
 
 func _deal(from: Array[Vector2i], rng: RandomNumberGenerator, used: Dictionary, ok: Callable, mark = null) -> Array[Vector2i]:
