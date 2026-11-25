@@ -1,5 +1,6 @@
 extends RefCounted
-## A handmade room, parsed from text. Rooms are handmade, not procedural (scope rule).
+## A room, parsed from text. The handmade map is night 0 and the template every dealt night's
+## walls are carved from (ward.gd, Nov 25: Duff asked for new walls every night).
 ##   # wall   . floor   H hunter start   T thrall   L street lamp (unlit)   E exit
 ##   B bell (ring it: the night is won)   N letter (readable under BRIGHT)   O oil flask (pickup)
 ##   K boathook (pickup: reach 2, bends with every hit)
@@ -24,7 +25,9 @@ var hooks: Array[Vector2i] = []
 ## close to the start a horror may stand (walking tiles). The walls never move.
 const SHUFFLE_REACH := 3
 const SAFE_START := 7
-const EARLY := Vector2i(9, 12)    # dealt nights: one thrall waits just off the road this many steps in (Nov 25: a scare in the first minute)
+const EARLY := Vector2i(10, 15)    # dealt nights: one thrall waits down a side passage this many steps in (Nov 25: a scare in the first minute)
+const EARLY_SIGHT := 5   # ...in a straight line from the road, at most this far: look down that passage and it is there
+const EARLY_OFF := 3     # ...and at least this far a walk from the road (2 = bot dead by turn 20 in 13% of nights)
 
 
 static func parse(text: String) -> RefCounted:
@@ -151,9 +154,11 @@ func shuffle(seed: int) -> void:
 	oil_flasks = _deal(oil_flasks, rng, used, func(_q, _p): return true)
 
 
-## The first one: the thrall dealt nearest the start moves to a tile EARLY steps in, one or two
-## tiles off the road to the bell (2-3, beside it, never on it), so the night shows its teeth in the
-## first minute instead of after a long empty walk. Keeps clear of the other horrors.
+## The first one: the thrall dealt nearest the start moves to a tile EARLY steps in, down a side
+## passage off the road to the bell: a walk of 3-4 from the road (not one lunge from you as you
+## pass) but in a straight line from it, so you see it standing there when you look down that
+## passage. The night shows its teeth in the first minute instead of after a long empty walk.
+## Keeps clear of the other horrors.
 func _early_thrall(rng: RandomNumberGenerator, used: Dictionary, horrors: Dictionary, from_start: Dictionary, road: Callable) -> void:
 	if thralls.is_empty():
 		return
@@ -166,13 +171,16 @@ func _early_thrall(rng: RandomNumberGenerator, used: Dictionary, horrors: Dictio
 	var spots: Array[Vector2i] = []
 	for q: Vector2i in from_start:
 		var dq: int = from_start[q]
-		var rq: int = road.call(q)
-		if dq < EARLY.x or dq > EARLY.y or rq < 2 or rq > 3 or used.has(q):
+		if dq < EARLY.x or dq > EARLY.y or used.has(q) or road.call(q) < 2:
 			continue
 		var crowded := false
 		for d in [Vector2i.ZERO, Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			crowded = crowded or horrors.has(q + d)
-		if not crowded:
+		var near := reachable(q, 4)
+		for n: Vector2i in near:
+			if road.call(n) == 0 and near[n] <= EARLY_OFF - 1:
+				crowded = true          # nearer the road than EARLY_OFF: one step and it has you
+		if not crowded and _road_in_sight(q, road):
 			spots.append(q)
 	if spots.is_empty():
 		horrors[old] = true
@@ -183,6 +191,19 @@ func _early_thrall(rng: RandomNumberGenerator, used: Dictionary, horrors: Dictio
 	used[pick] = true
 	horrors[pick] = true
 	thralls[k] = pick
+
+
+## A road tile in a straight, open line from `q`, within EARLY_SIGHT tiles.
+func _road_in_sight(q: Vector2i, road: Callable) -> bool:
+	for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var p := q
+		for _i in EARLY_SIGHT:
+			p += d
+			if is_wall(p):
+				break
+			if road.call(p) == 0:
+				return true
+	return false
 
 
 func _deal(from: Array[Vector2i], rng: RandomNumberGenerator, used: Dictionary, ok: Callable, mark = null) -> Array[Vector2i]:

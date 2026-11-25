@@ -32,7 +32,7 @@ const CARDS := {
 	"letter": ["LETTERS",
 		"Pages nailed up in the dark. Stand on one with the lantern on BRIGHT to read it. Each letter read is worth 5 oil on your grade."],
 	"flask": ["OIL FLASK",
-		"Walk over it and the lantern drinks it: +12 oil."],
+		"Walk over it and the lantern drinks it: +12 oil (+8 on a Deeper Night)."],
 	"map": ["THE MAP",
 		"Top right is what you remember. A red X marks where you last saw a thrall. It may not be there any more. The amber bell shows where the bell hangs, once you have heard it toll."],
 	"noise": ["NOISE",

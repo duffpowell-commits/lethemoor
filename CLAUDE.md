@@ -31,6 +31,9 @@ Search it for a system before you change it.
 - Nov 25 "all four" (rule changes, Duff picked them after Claude played): the bell tolls every 10 turns and the
   map points to it, a thrall waits just off the road early, the bride hunts from turn 30 and is driven off by 3
   turns of held light, flasks +12. Bot: 50% win, 24 oil at the bell. `docs/HANDOFF_LOG.md` "All four".
+- Nov 25 "2 and 4" (Duff): every dealt night has its own walls (`scripts/sim/ward.gd`, night 0 keeps the
+  handmade map), and a record that unlocks Deeper Night (first bell) and three keepsakes (grade B/A/S,
+  `scripts/sim/record.gd`). Bot on new walls: 54% win, 29 oil at the bell. `docs/HANDOFF_LOG.md` "New walls".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
@@ -70,7 +73,7 @@ Search it for a system before you change it.
 
 ## Layout
 - `scripts/sim/` rules: `night.gd` (turns, thralls, Stalker, oil, dread, noise), `room.gd` (map,
-  paths, shuffle), `fog.gd`. `rooms/*.txt` maps (`one_night.txt` is the slice; legend:
+  paths, shuffle), `ward.gd` (new walls per night), `record.gd` (unlocks), `fog.gd`. `rooms/*.txt` maps (`one_night.txt` is the slice; legend:
   `#` wall `.` floor `H` hunter `T` thrall `L` lamp `E` exit, more in the log). New data folders go in the
   export presets' include filter (`rooms/*.txt` is there).
 - Main scene `scenes/fp_room.tscn` (`scripts/fp_view.gd`). `audio.gd` (autoload `Audio`),

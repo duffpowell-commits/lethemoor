@@ -8,6 +8,7 @@ extends RefCounted
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const Room = preload("res://scripts/sim/room.gd")
+const Ward = preload("res://scripts/sim/ward.gd")
 
 const START_OIL := 60        # One Night: the direct route is ~47 moves with turns; flasks are the margin
 const DREAD_MAX := 100
@@ -30,6 +31,11 @@ const STALKER_RECOIL := 3       # held lit and looked at this many turns running
 const BELL_EVERY := 10          # the bell tolls by itself on turn 1 and every this many turns after: follow it
 const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const FLASK_OIL := 12          # an oil flask found on the floor
+## Deeper Night (unlocked by ringing the bell once, record.gd): the bride wakes sooner and the
+## flasks are thinner and you set out with less oil. Same ward, same horrors.
+const DEEP_WAKES := 18
+const DEEP_FLASK := 8
+const DEEP_OIL := 50            # you set out with less
 const LETTER_POINTS := 5       # grade: each letter read is worth this much oil
 ## Grade at the bell: oil left + LETTER_POINTS per letter read. [min points, grade]
 ## The boathook (`K` on the map): swing it at the first thing 1-2 tiles straight ahead.
@@ -70,6 +76,7 @@ var hunter := Vector2i.ZERO
 var facing := Vector2i.UP       # first-person view looks this way (top-down ignores it)
 var setting: int = Fog.Lantern.NORMAL
 var oil := START_OIL
+var deep := false               # Deeper Night
 var dread := 0
 var turn := 0
 var dead := false
@@ -98,6 +105,26 @@ var seed := 0                   # which night was dealt (0 = the map as drawn); 
 
 
 ## `seed` deals the night (room.shuffle): 0 = the map exactly as drawn (tests, captures).
+## A dealt night as the game plays it: night `seed` gets its own walls (ward.gd), then the dealer
+## places the horrors on them. Seed 0 is the handmade night, walls as drawn.
+static func start_dealt(room_text: String, seed: int, deeper := false) -> RefCounted:
+	var n = start(Ward.carve(room_text, seed) if seed > 0 else room_text, seed)
+	n.deep = deeper
+	if deeper:
+		n.oil = DEEP_OIL
+	return n
+
+
+## The turn the bride starts hunting you blind.
+func wakes() -> int:
+	return DEEP_WAKES if deep else STALKER_WAKES
+
+
+## Oil in a flask found on the floor.
+func flask_oil() -> int:
+	return DEEP_FLASK if deep else FLASK_OIL
+
+
 static func start(room_text: String, seed: int = 0) -> RefCounted:
 	var n = load("res://scripts/sim/night.gd").new()
 	n.room = Room.parse(room_text)
@@ -406,7 +433,7 @@ func _end_turn(events: Array) -> Array:
 		events.append("hook_found")
 	if flasks_left.has(hunter):
 		flasks_left.erase(hunter)
-		oil += FLASK_OIL
+		oil += flask_oil()
 		events.append("oil")
 	if room.letters.has(hunter) and not letters_read.has(hunter):
 		if effective() == Fog.Lantern.BRIGHT:
@@ -478,7 +505,7 @@ func in_view(p: Vector2i) -> bool:
 
 ## Is the bride hunting you now (awake, not burned)? She shadows you just past your light.
 func stalker_hunting(th: Dictionary) -> bool:
-	return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and turn >= STALKER_WAKES
+	return th.get("kind", "thrall") == "stalker" and not th.get("gone", false) and turn >= wakes()
 
 
 ## A Stalker holds still only while it's lit and you're looking right at it.
@@ -493,7 +520,7 @@ func _stalker_act(i: int, events: Array) -> void:
 		return
 	# she hunts: from STALKER_WAKES she always knows where you are and comes, slowly, blind;
 	# when she sees your light she comes fast
-	var blind_hunt: bool = turn >= STALKER_WAKES and not _sees_light(th) and th.target == null \
+	var blind_hunt: bool = turn >= wakes() and not _sees_light(th) and th.target == null \
 			and not room.reachable(th.pos, STALKER_SHADOW).has(hunter)
 	if blind_hunt and turn % STALKER_HUNT_EVERY != 0:
 		return
