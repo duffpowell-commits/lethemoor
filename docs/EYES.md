@@ -49,3 +49,12 @@ may ask for approval once). If it doesn't load, use the script above: same engin
 
 ## Playing a whole night
 `tools/eyes/pilot.gd` picks the balance bot's next move from the live game. Repeat the pair of steps `{"gd": "var v = scene_tree.current_scene; v.act(load('res://tools/eyes/pilot.gd').choose(v.game))"}` and `{"wait": 420}`, with a `shot` every so often. Set `LM_NIGHT` to pick the night.
+
+## Playing like a first-timer
+For reviews, play with `tools/eyes/first_timer.gd` instead of `pilot.gd` (Duff, Nov 25: "We set the bots
+to be more like genuine first-time players for their reviews"). It knows only what is on the screen:
+seen walls, items and horrors in view, and the bell as the chart's direction. It freezes now and then,
+never uses BRIGHT, hooding, oil or letters, and walks into dead ends. `pilot.gd` knows the whole map:
+keep it for balance numbers. Numbers over many nights: `godot --headless --path . --script
+tools/first_timer_bot.gd -- 200`. On build 175 (Nov 25) it won 15% (12% on build 160); one fewer
+thrall a ward made that 24%.
