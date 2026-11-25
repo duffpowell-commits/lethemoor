@@ -3470,8 +3470,11 @@ func _capture_art() -> void:
 			await get_tree().process_frame
 		await _shot("fp_art_bride_face")
 		br.rotation.y += 1.5   # her body faces off down the wall
-		for k in 10:
+		# her head holds up to 1.6 s between snaps: wait (real time) for the next one, not a frame count
+		var waited := 0.0
+		while waited < 3.0 and not (br.look and br.look._want.get_angle() > 1.0 and br.look._cur.get_angle() > 0.9):
 			await get_tree().process_frame
+			waited += get_process_delta_time()
 		head_ok = br.look != null and br.look._want.get_angle() > 1.0 and br.look._cur.get_angle() > 0.9
 		await _shot("fp_art_bride_head")
 		game.thralls[bi].pos = keep_b
