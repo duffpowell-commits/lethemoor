@@ -63,13 +63,14 @@ const RIGS := {"stalker_bride": ["rig_bride", 1.1, 0.0], "thrall_nightmare": ["r
 	"thrall_hooded": ["rig_hooded", 0.92], "thrall_dockwoman": ["rig_dockwoman", 0.88]}
 const BODY_TURN := 1.2               # how fast a standing horror's body follows its head round to you
 const PHANTOM_EVERY := Vector2(7.0, 16.0)   # s between figures that aren't there, once dread hallucinates
-const PHANTOM_LIFE := 0.9
+const PHANTOM_LIFE := 0.9            # s it stands there before it's gone
 const PHANTOM_TINT := Color(0.3, 0.33, 0.42)   # grey-blue, drowned: enough to see, not enough to be sure
 const T_KILL_3D := 1.05              # s: the 3D kill, lunge to lying under it
 const KILL_REACH := 0.34             # tiles in front of your eyes it stops
 const KILL_LOOK_UP := 0.4            # rad you tip back as you go down
 const KILL_ROLL := 0.22
-const KILL_DROP := 0.3               # tiles your eyes fall            # s it stands there before it's gone
+const KILL_DROP := 0.3               # tiles your eyes fall
+const KILL_WHIP := 0.15              # s to wrench you round to it when it comes from the side or behind
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
@@ -85,6 +86,7 @@ var busy := false
 var t := 0.0
 var kill_rig := -1                 # the horror that has you: the kill drives it, not the rules
 var kill_3d_ok := false
+static var kill_3d_seen := false   # capture: the death pass saw a good 3D kill (the art pass gates on it)
 var phantom: Node3D                # a figure at the edge of the light that isn't there (dread >= 50; look only)
 var phantom_t := 0.0               # s left on it, or (negative) s until the next one
 var lunge_hit := 0.0                # 1 the moment something lunges at you, fades: red edge + shake
@@ -514,6 +516,8 @@ func _build_world() -> void:
 		phantom = RigHorror.make("rig_hooded", 1.0)
 		for m in phantom.find_children("*", "MeshInstance3D", true, false):   # unlit and cold: it
 			var mi := m as MeshInstance3D                                     # shows where no light reaches
+			if mi.mesh == null:
+				continue
 			for si in mi.mesh.get_surface_count():
 				var src := mi.get_active_material(si) as StandardMaterial3D
 				var cold := (src.duplicate() if src else StandardMaterial3D.new()) as StandardMaterial3D
@@ -525,9 +529,8 @@ func _build_world() -> void:
 		phantom.player.speed_scale = 0.0   # utterly still
 		if phantom.look:
 			phantom.look.target = cam
-		phantom.visible = false
 		add_child(phantom)
-		phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
+		_hide_phantom()
 
 	# her hand and lantern, low right, riding with the camera
 	hand = Node3D.new()
@@ -2608,10 +2611,16 @@ func _kill_shot_3d(i: int) -> void:
 	gore.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gore.modulate.a = 0.0
 	kill_shot.add_child(gore)
+	# it may come from beside or behind (she never lets you see her move): you're wrenched round to it
 	var cam0 := cam.transform
 	var fwd := -cam0.basis.z
 	fwd.y = 0.0
 	fwd = fwd.normalized()
+	var at := holder.position - Vector3(cam0.origin.x, holder.position.y, cam0.origin.z)
+	if at.length() > 0.05:
+		fwd = at.normalized()
+	var yaw0 := cam.rotation.y
+	var yaw1 := atan2(-fwd.x, -fwd.z)
 	var from := holder.position
 	var to := Vector3(cam0.origin.x, holder.position.y, cam0.origin.z) + fwd * KILL_REACH
 	var e := 0.0
@@ -2625,7 +2634,8 @@ func _kill_shot_3d(i: int) -> void:
 		var fall := clampf((e - 0.22) / 0.5, 0.0, 1.0)
 		fall = fall * fall * (3.0 - 2.0 * fall)
 		var shake := (1.0 - e / T_KILL_3D) * (0.05 if e > 0.2 else 0.015)
-		var b := cam0.basis * Basis(Vector3.RIGHT, KILL_LOOK_UP * fall) * Basis(Vector3.FORWARD, KILL_ROLL * fall)
+		var base := Basis(Vector3.UP, lerp_angle(yaw0, yaw1, clampf(e / KILL_WHIP, 0.0, 1.0)))
+		var b := base * Basis(Vector3.RIGHT, KILL_LOOK_UP * fall) * Basis(Vector3.FORWARD, KILL_ROLL * fall)
 		cam.transform = Transform3D(b, cam0.origin - fwd * 0.08 * fall + Vector3(0, -KILL_DROP * fall, 0)
 			+ Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake)
 		red.color.a = 0.4 * clampf(1.0 - absf(e - 0.3) / 0.4, 0.0, 1.0)
@@ -2636,6 +2646,7 @@ func _kill_shot_3d(i: int) -> void:
 			shot = true
 			kill_3d_ok = Vector2(holder.position.x - cam.position.x, holder.position.z - cam.position.z).length() < 0.8 \
 				and rig.state == "lunge"
+			kill_3d_seen = kill_3d_ok
 			print("KILL3D ", "PASS" if kill_3d_ok else "FAIL", " who=", game.killer)
 			await _shot("fp_killshot")
 		await get_tree().process_frame
@@ -2650,17 +2661,28 @@ func _haunt(delta: float) -> void:
 		return
 	if phantom.visible:
 		phantom_t -= delta
-		if phantom_t <= 0.0 or busy:
-			phantom.visible = false
-			phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
+		if phantom_t <= 0.0 or busy or _sheet_up():
+			_hide_phantom()
 		return
-	if not game.hallucinating() or game.over() or modal != null:
+	if not game.hallucinating() or game.over() or busy or _sheet_up():
 		return
 	phantom_t += delta
 	if phantom_t < 0.0:
 		return
 	phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
 	_show_phantom()
+
+
+func _sheet_up() -> bool:
+	return modal != null or guide_sheet != null or menu_sheet != null or report_sheet != null
+
+
+func _hide_phantom() -> void:
+	phantom.visible = false
+	phantom.player.active = false   # nothing runs while it isn't there
+	if phantom.look:
+		phantom.look.active = false
+	phantom_t = -randf_range(PHANTOM_EVERY.x, PHANTOM_EVERY.y)
 
 
 ## Put the figure in the first dark tile straight ahead (3-6 tiles), if the corridor runs that far.
@@ -2680,6 +2702,9 @@ func _show_phantom() -> bool:
 			phantom.position = _w(p)
 			phantom.rotation.y = atan2(-float(f.x), -float(f.y))   # facing you (glTF bodies face +Z)
 			phantom.visible = true
+			phantom.player.active = true
+			if phantom.look:
+				phantom.look.active = true
 			phantom_t = PHANTOM_LIFE
 			Sound.hook_sfx("whisper", -14.0, randf_range(0.8, 0.95))
 			return true
@@ -3146,6 +3171,7 @@ func _capture() -> void:
 		await get_tree().process_frame
 	if capture_phase == 0 and "--art-only" in OS.get_cmdline_user_args():   # quick look at the art pass
 		capture_phase = 4
+		kill_3d_seen = true   # the kill isn't in this run
 	if capture_phase == 0:
 		await _shot("fp_title")
 		await _press(title_begin)
@@ -3471,8 +3497,8 @@ func _capture_art() -> void:
 			await get_tree().process_frame
 		phantom_ok = phantom.is_visible_in_tree()
 		await _shot("fp_art_phantom")
-		phantom.visible = false
+		_hide_phantom()
 	print("PHANTOM ", "PASS" if phantom_ok else "FAIL", " at=", game.hunter, " facing=", game.facing)
-	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok
+	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)
