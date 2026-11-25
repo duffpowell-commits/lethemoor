@@ -495,9 +495,9 @@ picked: ~260 Meshy credits ("Monsters + hands"). Spent 250 (705 -> 455).
   0.88-1.0 tiles, bride 1.1, against eye 0.82 (were 1.8-2.15, carried over from the painted cards).
 - `scripts/rig_horror.gd`: a horror on Meshy's 24-bone humanoid rig. The view sets a state from the rules
   (idle, walk, crouch, lunge, dead, rise); missing clips fall back. `fp_view.gd` `RIGS` maps a look to
-  `assets/models/rig_<name>.glb` (+ height, + yaw fix: the bride's mesh faces -X). `_drive_rig` picks the
+  `assets/models/rig_<name>.glb` (+ height, + optional yaw fix; the bride needs none, the old quarter turn left her side-on). `_drive_rig` picks the
   state each frame; `_pose` lays corpses in the dead clip's last frame and plays "rise" when they get up.
-  The bride always turns to you and breathes at quarter speed.
+  The bride breathes at quarter speed and squares up to you only when she has moved.
 - Clips per thrall (Meshy action ids): idle 0, walk 113 Mummy Stagger, crouch (the tell) 386 Zombie Scream,
   lunge 4 Attack, dead 8 Dead, rise 3 Arise. Bride: idle 0, lunge 4, walk = the rig's free walk.
 - Clip GLBs are not in git (each carries a mesh copy): project files `lethemoor-3d/meshy_source/`. Copy them to
@@ -517,3 +517,22 @@ picked: ~260 Meshy credits ("Monsters + hands"). Spent 250 (705 -> 455).
   rigs 01a21025-dfdd / -eecc / 01a21026-0339 / -10c9; lantern refine 01a21026-1f8c, glove 01a21026-296e,
   boathook 01a21027-c3cf. Login: `meshy auth login --device` (Duff approves the code on his phone).
 - Not checked yet: 60 fps on Duff's phone with four skinned bodies on screen. Perf LOW could drop rigs to sprites.
+
+## More scary (Nov 25, Duff: "Lets get more scary")
+
+All look only, no rule changes, no Meshy credits.
+- Heads (`scripts/head_look.gd`, a SkeletonModifier3D on each rig's skeleton): the Head bone turns to the camera
+  on top of the clip, in skeleton space from the body's +Z, so it doesn't care how the bone is oriented. It holds,
+  then snaps (0.35-1.1 s) instead of gliding. Thralls 75 degrees either way; the bride 112, slower to let go
+  (her veil isn't weighted to the head, so it barely shows on her). A standing body follows its head round at
+  `BODY_TURN`; crouch and lunge face you at once. The bride's body turns only when her tile changes.
+- 3D kill (`_kill_shot_3d`): if the killer has a rig, its body comes off its tile to `KILL_REACH` in front of your
+  eyes, replays the attack, head locked on you, while the camera tips back (`KILL_LOOK_UP`, `KILL_ROLL`) and drops
+  (`KILL_DROP`): you look up at it in your own lantern light. Red flash + blood screen as before. No rig: the
+  painted 2D kill still runs. `kill_rig` stops the rules driving that body meanwhile.
+- The figure that isn't there (`_haunt`, `_show_phantom`): at dread >= 50 (`hallucinating()`, which already lets
+  the view lie), every 7-16 s a still hooded body, unlit and grey-blue (`PHANTOM_TINT`, fog off), stands on the
+  first unlit tile 3-6 ahead down your corridor for 0.9 s with a low whisper, head turning to you. Not on the map.
+- `Audio.hook_sfx(name, db, pitch)`: one-shot from outside the autoload.
+- Capture: KILL3D, HEAD LOOK, PHANTOM (+ renders `fp_killshot`, `fp_art_bride_face`, `fp_art_bride_head`,
+  `fp_art_phantom`). `--art-only` after `--capture` jumps straight to the art pass for quick looks.

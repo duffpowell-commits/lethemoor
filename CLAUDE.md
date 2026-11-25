@@ -26,6 +26,8 @@ Search it for a system before you change it.
   hooded and dock-woman thralls + the bride. Clips: idle, stagger walk, zombie-scream tell, attack lunge,
   fall dead, arise. Your hands are 3D too (gloved arm + lantern with the light in its globe, boathook).
   Painted cards are out of the thrall rotation. Re-bake/re-shrink steps: `docs/HANDOFF_LOG.md` "Fully 3D horrors".
+- Nov 25 "more scary": heads snap round to watch you, the 3D kill (it comes into your face, you go down),
+  and at dread 50+ a grey figure in the dark ahead that isn't there. `docs/HANDOFF_LOG.md` "More scary".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and

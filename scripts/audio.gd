@@ -69,6 +69,11 @@ static func hook_lantern(setting: int) -> void:
 		_me.on_lantern(setting)
 
 
+static func hook_sfx(name: String, db := 0.0, pitch := 1.0) -> void:
+	if _me:
+		_me.sfx(name, db, pitch)
+
+
 static func hook_track(game) -> void:
 	if _me:
 		_me.track(game)
