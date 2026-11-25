@@ -541,6 +541,7 @@ func test_audio_cues_follow_the_sim() -> void:
 	check(Audio.cues("spark", ["burned_self"], true) == ["spark", "death"], "you burn with it")
 	check(Audio.cues("wait", ["toll"], true) == ["toll"], "the bell tolls by itself")
 	check(Audio.cues("forward", ["escaped", "rang", "toll"], true) == ["step", "bell"], "ringing it drowns the toll")
+	check(Audio.cues("wait", ["toll", "taken"], true) == ["death"], "no toll over your own death")
 
 
 func test_audio_every_cue_has_a_clip() -> void:
@@ -767,6 +768,7 @@ func test_held_light_drives_the_bride_off() -> void:
 	check("recoiled" in ev, "held in the light STALKER_RECOIL turns, she can't bear it")
 	check(g.room.reachable(g.hunter, Night.STALKER_SHADOW).has(g.thralls[0].pos) == false and not g.dead,
 			"she's gone into the dark, past STALKER_SHADOW")
+	check(not g.thralls[0].pos in g.room.bells and g.thralls[0].get("recoiled_on", -1) == g.turn, "never onto the bell; the view knows she vanished this turn")
 
 
 func test_dealt_nights_put_a_thrall_near_the_start() -> void:

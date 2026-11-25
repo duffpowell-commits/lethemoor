@@ -314,7 +314,7 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 			"rang":
 				out.append("bell")
 			"toll":
-				if not "rang" in events:
+				if not ("rang" in events or "taken" in events or "grabbed" in events or "burned_self" in events):
 					out.append("toll")
 			"escaped":
 				if not "rang" in events:

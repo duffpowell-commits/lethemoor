@@ -111,7 +111,8 @@ func path_in(reach: Dictionary, from: Vector2i, to: Vector2i) -> Array[Vector2i]
 ## Deal a fresh night from `seed`: horrors, oil flasks and letters each move to a floor tile
 ## within SHUFFLE_REACH steps of where the map draws them. Seed 0 keeps the map as drawn.
 ## Fair by rule: no horror within SAFE_START steps of the start or next to another horror, no
-## horror nearer the straight road to the bell or to the start than the map draws it (so the night is as
+## horror nearer the straight road to the bell or to the start than the map draws it (except the one early
+## thrall, `_early_thrall`, on purpose) (so the night is as
 ## dangerous as the handmade one, just in new places), the Stalker never on that road, letters always beside a wall to hang on,
 ## nothing on the start, bell, hook, lamp or exit, nothing sharing a tile.
 func shuffle(seed: int) -> void:
@@ -151,7 +152,7 @@ func shuffle(seed: int) -> void:
 
 
 ## The first one: the thrall dealt nearest the start moves to a tile EARLY steps in, one or two
-## tiles off the road to the bell (beside it, never on it), so the night shows its teeth in the
+## tiles off the road to the bell (2-3, beside it, never on it), so the night shows its teeth in the
 ## first minute instead of after a long empty walk. Keeps clear of the other horrors.
 func _early_thrall(rng: RandomNumberGenerator, used: Dictionary, horrors: Dictionary, from_start: Dictionary, road: Callable) -> void:
 	if thralls.is_empty():

@@ -543,7 +543,7 @@ func _recoil(i: int, events: Array) -> void:
 	var best_d := 1 << 30
 	var taken := live_positions(i)
 	for q: Vector2i in from_her:
-		if from_you.get(q, 0) <= STALKER_SHADOW or q in taken or fog.get_state(q) == Fog.LIT:
+		if from_you.get(q, 0) <= STALKER_SHADOW or q in taken or fog.get_state(q) == Fog.LIT or q in room.bells or q in room.exits:
 			continue
 		var dq: int = from_her[q] * 1000 + q.x * 37 + q.y   # nearest to her; ties broken by place, not dictionary order
 		if dq < best_d:
@@ -555,6 +555,7 @@ func _recoil(i: int, events: Array) -> void:
 		return
 	th.pos = best
 	th.seen = false
+	th.recoiled_on = turn   # the view makes her vanish, not glide
 	if not events.has("recoiled"):
 		events.append("recoiled")
 
