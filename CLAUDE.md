@@ -21,8 +21,11 @@ Search it for a system before you change it.
   Tune oil, thrall speed, Stalker spot from it; then a second round.
 - **Kill test by Nov 28:** median fun 6+/10 and testers choose to replay. Don't start full-game
   systems (safe room, satchel, corpse, Choir) before it passes.
-- One Night has the 3D harbor environment (PR #38). The first modeled Thrall uses the nightmare variant slot. See the handoff and `docs/renders/fp_art_thrall_3d.png`.
-- The Stalker has an in-engine 3D preview on `art/stalker-model`, pending owner approval.
+- One Night has the 3D harbor environment (PR #38).
+- Nov 25: every horror is a rigged, animated, faceless 3D body (Meshy, `scripts/rig_horror.gd`): nightmare,
+  hooded and dock-woman thralls + the bride. Clips: idle, stagger walk, zombie-scream tell, attack lunge,
+  fall dead, arise. Your hands are 3D too (gloved arm + lantern with the light in its globe, boathook).
+  Painted cards are out of the thrall rotation. Re-bake/re-shrink steps: `docs/HANDOFF_LOG.md` "Fully 3D horrors".
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
   web https://duffpowell-commits.github.io/lethemoor/ (gh-pages, pushed by CI on main).
 - Art still needed: `docs/art_needs.md` (P0 first). Shared copy: https://claude.ai/artifact/1UXeTCHVCWkMg9qgRMq6bj

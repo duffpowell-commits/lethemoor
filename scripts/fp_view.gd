@@ -49,14 +49,15 @@ const LIGHT := {
 }
 ## the painted hand + lantern for each flame: shuttered, steady, roaring
 const HAND_ART := {Fog.Lantern.HOODED: "hand_lantern_hooded", Fog.Lantern.NORMAL: "hand_lantern", Fog.Lantern.BRIGHT: "hand_lantern_bright"}
-const THRALL_LOOKS := ["thrall_nightmare", "thrall_clawed", "thrall_hooded", "thrall_wired", "thrall_dock", "thrall_netmender", "thrall_dockwoman"]
-const STALKER_MODEL = preload("res://assets/models/stalker.glb")
-const THRALL_MODEL = preload("res://assets/models/thrall.glb")
+## Every look in the rotation has a rigged 3D body (RIGS). The painted cards (clawed, wired, dock,
+## net-mender) left the rotation on Nov 25: a flat card among 3D bodies broke the spell.
+const THRALL_LOOKS := ["thrall_nightmare", "thrall_hooded", "thrall_dockwoman"]
 const THRALL_MODEL_SCALE := Vector3(0.82, 0.94, 0.82)
 const RigHorror = preload("res://scripts/rig_horror.gd")
 ## Looks that have a rigged, animated body (assets/models/<rig>.glb + <rig>_clips.res). A rig wins
 ## over the rigid model and the painted card; a look without one keeps what it had.
-const RIGS := {"stalker_bride": ["rig_bride", 2.15], "thrall_nightmare": ["rig_nightmare", 2.1],
+## [model, height, yaw fix]: Meshy turned the bride to face -X, so she gets a quarter turn.
+const RIGS := {"stalker_bride": ["rig_bride", 2.15, PI / 2], "thrall_nightmare": ["rig_nightmare", 2.1],
 	"thrall_hooded": ["rig_hooded", 1.85], "thrall_dockwoman": ["rig_dockwoman", 1.8], "thrall_dock": ["rig_dock", 1.9]}
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
 const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
@@ -92,6 +93,13 @@ var swipe_fired := false           # this finger already made its move
 var hold_kind := ""                # finger still down after a forward/back swipe: repeat it
 var queued := ""                   # one move made while the last one was still gliding
 var chain_from := ""               # the move this one carries straight on from ("" = from rest)
+var vm_lantern: Node3D             # 3D viewmodel: your gloved right arm and the lantern hanging from it
+var vm_lamp: Node3D                # the lantern itself (swings on the bail)
+var vm_hook: Node3D                # left arm with the boathook, while you carry one
+var vm_glow: MeshInstance3D         # the flame seen through the glass: a soft additive glow
+var vm_lamp_mat: StandardMaterial3D   # its glow follows the flame
+var vm_swing := 0.0                # the lantern's pendulum angle and speed
+var vm_swing_v := 0.0
 var step_k := 0.0                  # 0..1..0 over each step: drives the hand-lantern bob
 var foot := 1.0                    # which foot: the head sways the other way each step
 
@@ -447,15 +455,12 @@ func _build_world() -> void:
 		var rig: Array = RIGS.get(rig_look, [])
 		if not rig.is_empty() and ResourceLoader.exists("res://assets/models/%s.glb" % rig[0]):
 			var body: Node3D = RigHorror.make(rig[0], rig[1])
+			if rig.size() > 2:
+				body.body.rotation.y = rig[2]
 			holder.add_child(body)
+			th.visible = false
 			thrall_models[thrall_nodes.size()] = body
 			thrall_rigs[thrall_nodes.size()] = body
-		elif stalker or th.texture == _tex("thrall_nightmare"):
-			var model := (STALKER_MODEL if stalker else THRALL_MODEL).instantiate() as Node3D
-			if not stalker:
-				model.scale = THRALL_MODEL_SCALE
-			holder.add_child(model)
-			thrall_models[thrall_nodes.size()] = model
 		add_child(holder)
 		if thrall.get("lying", false):   # the dead lie in what ran out of them; the pool stays if they rise
 			var pool := MeshInstance3D.new()
@@ -489,7 +494,7 @@ func _build_world() -> void:
 	hand = Node3D.new()
 	hand.position = Vector3(HAND_X, HAND_Y, -0.55)
 	cam.add_child(hand)
-	hand.visible = false   # the painted hand overlay (HUD) replaces the placeholder box
+	hand.visible = false   # the 3D arm (_build_viewmodel) carries the lantern now
 	var frame := MeshInstance3D.new()
 	var fb := BoxMesh.new()
 	fb.size = Vector3(0.05, 0.075, 0.05)
@@ -516,6 +521,131 @@ func _build_world() -> void:
 	light.omni_attenuation = 1.1
 	light.position = Vector3(HAND_X, HAND_Y + 0.12, -0.5)
 	cam.add_child(light)
+	_build_viewmodel()
+
+
+## Your hands, in 3D (Meshy models, Nov 25): the gloved right arm holds the lantern out by its bail,
+## and the light lives inside the globe, so the shadows come from where the lantern really hangs.
+## The left arm carries the boathook while you have one. The look only: rules never read these.
+const VM_ARM := Vector3(0.11, -0.03, -0.3)      # right fist, camera space (lantern hangs below it)
+const VM_ARM_SCALE := 0.16
+const VM_ARM_DIR := Vector3(0.8, -0.4, 0.45)    # fist -> elbow: off to the right, back toward you
+const VM_POLE_X := 1.0
+const VM_POLE_TILT := 0.14
+const VM_HOOK_DIR := Vector3(-0.6, -0.5, 0.6)
+const VM_LAMP_SCALE := 0.07
+const VM_HOOK_ARM := Vector3(-0.17, -0.2, -0.4)
+func _build_viewmodel() -> void:
+	vm_lantern = Node3D.new()
+	vm_lantern.position = VM_ARM
+	cam.add_child(vm_lantern)
+	var arm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
+	arm.scale = Vector3.ONE * VM_ARM_SCALE
+	# the model stands sleeve-up, fist-down: lay the sleeve back toward you, down and to the right
+	arm.basis = Basis(Quaternion(Vector3.UP, VM_ARM_DIR.normalized())) * Basis.from_scale(Vector3.ONE * VM_ARM_SCALE)
+	arm.position = -(arm.basis * Vector3(0, -0.95, 0))   # fist at the pivot
+	vm_lantern.add_child(arm)
+	vm_lamp = Node3D.new()   # pivot at the fist: the lantern hangs and swings from here
+	vm_lantern.add_child(vm_lamp)
+	var lamp: Node3D = (load("res://assets/models/fp_lantern.glb") as PackedScene).instantiate()
+	lamp.scale = Vector3.ONE * VM_LAMP_SCALE
+	lamp.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.01, 0)   # bail top at the fist
+	vm_lamp.add_child(lamp)
+	for vm: Node3D in [arm, lamp]:
+		for m in vm.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# the light sits inside the globe, so the lantern glows from within rather than catching it
+	for m in lamp.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var src := mi.get_active_material(0) as StandardMaterial3D
+		if src:
+			vm_lamp_mat = src.duplicate() as StandardMaterial3D
+			vm_lamp_mat.emission_enabled = true
+			vm_lamp_mat.emission_texture = src.albedo_texture
+			vm_lamp_mat.emission = Color("#ff9440")
+			mi.material_override = vm_lamp_mat
+	# the flame and the light sit in the globe
+	flame.reparent(vm_lamp, false)
+	flame.position = Vector3(0, -0.95 * VM_LAMP_SCALE - 0.012, 0)
+	flame.scale = Vector3.ONE * 0.45
+	vm_glow = MeshInstance3D.new()
+	var gq := QuadMesh.new()
+	gq.size = Vector2(0.075, 0.09)
+	vm_glow.mesh = gq
+	var gm := StandardMaterial3D.new()
+	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	gm.no_depth_test = true
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(1.0, 0.78, 0.4, 1.0), Color(1.0, 0.45, 0.1, 0.45), Color(0.6, 0.2, 0.0, 0.0)])
+	grad.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(0.5, 0.0)
+	gm.albedo_texture = gt
+	vm_glow.material_override = gm
+	vm_glow.position = flame.position + Vector3(0, 0.002, 0.01)
+	vm_lamp.add_child(vm_glow)
+	light.reparent(vm_lamp, false)
+	light.position = flame.position + Vector3(0, 0, -0.04)
+	vm_hook = Node3D.new()
+	vm_hook.position = VM_HOOK_ARM
+	vm_hook.visible = false
+	cam.add_child(vm_hook)
+	var larm: Node3D = (load("res://assets/models/fp_glove.glb") as PackedScene).instantiate()
+	larm.basis = Basis(Quaternion(Vector3.UP, VM_HOOK_DIR.normalized())) * Basis.from_scale(Vector3(-1, 1, 1) * VM_ARM_SCALE)
+	larm.position = -(larm.basis * Vector3(0, -0.95, 0))
+	vm_hook.add_child(larm)
+	var hook: Node3D = (load("res://assets/models/fp_boathook.glb") as PackedScene).instantiate()
+	hook.scale = Vector3.ONE * 0.12
+	hook.rotation = Vector3(-0.25, PI, -0.35)    # head up and ahead, the hook curling in toward the middle
+	hook.position = Vector3(0.0, 0.12, -0.03)
+	vm_hook.add_child(hook)
+	var pole := MeshInstance3D.new()   # the model's shaft is short: the pole runs on down out of sight
+	var pc := CylinderMesh.new()
+	pc.top_radius = 0.09
+	pc.bottom_radius = 0.1
+	pc.height = 6.0
+	pc.radial_segments = 8
+	pole.mesh = pc
+	var pmat := StandardMaterial3D.new()
+	pmat.albedo_color = Color("#a08a6c")   # matched to the model's shaft
+	pmat.roughness = 0.9
+	pole.material_override = pmat
+	var pole_pivot := Node3D.new()   # at the end of the model's shaft
+	pole_pivot.position = Vector3(VM_POLE_X, -0.9, 0)
+	pole_pivot.rotation.z = VM_POLE_TILT
+	hook.add_child(pole_pivot)
+	pole.position = Vector3(0, -2.9, 0)
+	pole_pivot.add_child(pole)
+	for vm: Node3D in [larm, hook]:
+		for m in vm.find_children("*", "MeshInstance3D", true, false):
+			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Each frame: the arm bobs with your step, the lantern swings on its bail (a real pendulum
+## kicked by steps and turns), the boathook jabs when you swing it.
+func _sway_viewmodel(delta: float) -> void:
+	if vm_lantern == null:
+		return
+	var bob := sin(t * 2.1) * 0.004 + step_k * 0.018
+	vm_lantern.position = VM_ARM + Vector3(sin(t * 1.3) * 0.003, -bob, 0)
+	vm_swing_v += (-vm_swing * 38.0 - vm_swing_v * 2.2) * delta + step_k * delta * 1.6
+	vm_swing += vm_swing_v * delta
+	vm_lamp.rotation = Vector3(vm_swing, 0, vm_swing * 0.6 + sin(t * 0.9) * 0.02)
+	if vm_lamp_mat:
+		vm_lamp_mat.emission_energy_multiplier = 0.06 if game.effective() == Fog.Lantern.HOODED else 0.14 * light.light_energy / LIGHT[Fog.Lantern.NORMAL][1]
+		vm_glow.visible = game.effective() != Fog.Lantern.HOODED
+		vm_glow.scale = Vector3.ONE * (1.35 if game.effective() == Fog.Lantern.BRIGHT else 1.0) * clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.3, 1.4)
+	vm_hook.visible = game.hook_wear > 0 and not game.dead
+	if vm_hook.visible:
+		var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
+		vm_hook.position = VM_HOOK_ARM + Vector3(0.05 * j, -bob + 0.04 * j, -0.16 * j)
+		vm_hook.rotation = Vector3(-0.5 * j, 0, 0)
 
 
 # ---------------------------------------------------------------- rules -> look
@@ -590,6 +720,12 @@ func _refresh_fog() -> void:
 	flame.visible = eff != Fog.Lantern.HOODED
 	if minimap:
 		minimap.queue_redraw()
+
+
+## What clip a rigged horror is playing ("" when it has no rig). Captures check it.
+func _rig_state(i: int) -> String:
+	var rig: Node3D = thrall_rigs.get(i)
+	return rig.state if rig else ""
 
 
 ## Turn a horror to face you (only when it isn't mid-step, so a walk reads as a walk).
@@ -1058,11 +1194,17 @@ func _process(delta: float) -> void:
 			map_rot = want if capture_mode else lerp_angle(map_rot, want, 1.0 - exp(-delta * 9.0))
 			minimap.queue_redraw()
 	_flicker_fires()
+	_sway_viewmodel(delta)
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
 		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
 		if g:
 			var ph := t * 1.3 + float(fp.x * 7 + fp.y * 3)
 			g.modulate.a = 0.15 + 0.75 * pow(maxf(0.0, sin(ph)), 6.0)
+	# the bride: always turned to you, barely breathing (her clip runs at a crawl)
+	for i: int in thrall_rigs:
+		if game.thralls[i].get("kind", "thrall") == "stalker" and thrall_nodes[i].visible:
+			thrall_rigs[i].set_state("idle", 0.25)
+			_face_cam(i, thrall_rigs[i])
 	# standing thralls twitch: a jerk of the head now and then, never smooth. Crouched (the tell
 	# before a lunge) it drops low and wide, shivers and goes dark red; just after a lunge it rears up.
 	for i in thrall_sprites.size():
@@ -1273,6 +1415,7 @@ func _build_hud() -> void:
 	# Back to front: the hand lantern (column), the vignette (whole screen), the HUD (column).
 	var hand_col := _column()
 	layer.add_child(hand_col)
+	hand_col.visible = false   # the painted hands: kept as a fallback, the 3D arms (_build_viewmodel) show instead
 	hud = _column()
 	hud.theme = UI.theme()
 
@@ -3063,7 +3206,7 @@ func _capture_art() -> void:
 	for k in 8:
 		await get_tree().process_frame
 	await _shot("fp_art_crouch")
-	thrall_model_ok = thrall_model_ok and thrall_model.scale.y < THRALL_MODEL_SCALE.y
+	thrall_model_ok = thrall_model_ok and _rig_state(ti) == "crouch"   # the scream, the tell before it comes
 	game.thralls[ti].crouched = false
 	game.thralls[ti].lunge_cd = Night.LUNGE_COOLDOWN
 	game.thralls[ti].pos = Vector2i(7, 18)
@@ -3073,7 +3216,7 @@ func _capture_art() -> void:
 		await get_tree().process_frame
 	lunge_hit = 20.0   # held for the shot (a capture frame can be slow)
 	await _shot("fp_art_lunge")
-	thrall_model_ok = thrall_model_ok and thrall_model.rotation.z < 0.0
+	thrall_model_ok = thrall_model_ok and _rig_state(ti) == "lunge"
 	print("THRALL MODEL ", "PASS" if thrall_model_ok else "FAIL")
 	game.thralls[ti].lunge_cd = 0
 	game.thralls[ti].pos = keep_pos
@@ -3087,8 +3230,18 @@ func _capture_art() -> void:
 	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
 	_refresh()
 	await _shot("fp_art_corpse")
-	var corpse_ok: bool = thrall_nodes[-2].visible and thrall_sprites[-2].billboard == BaseMaterial3D.BILLBOARD_DISABLED and print_nodes.size() == 2
+	var corpse_ok: bool = thrall_nodes[-2].visible and _rig_state(thrall_nodes.size() - 2) == "dead" and print_nodes.size() == 2
 	print("CORPSE ", "PASS" if corpse_ok else "FAIL")
-	var art_ok := harbor_ok and corpse_ok and thrall_model_ok
+	# your hands are 3D: the lantern hangs in your right fist with the light inside its globe,
+	# and the boathook shows in your left exactly while you carry one
+	game.hook_wear = 3
+	await get_tree().process_frame
+	var vm_ok: bool = vm_lantern.is_visible_in_tree() and light.get_parent() == vm_lamp and vm_hook.is_visible_in_tree() \
+		and not hook_art.is_visible_in_tree() and not hand_art.is_visible_in_tree()
+	game.hook_wear = 0
+	await get_tree().process_frame
+	vm_ok = vm_ok and not vm_hook.is_visible_in_tree()
+	print("VIEWMODEL ", "PASS" if vm_ok else "FAIL")
+	var art_ok := harbor_ok and corpse_ok and thrall_model_ok and vm_ok
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)
