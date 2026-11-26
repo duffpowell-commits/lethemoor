@@ -9,11 +9,15 @@ Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
 - **The three-eyed fox is in every game as a rare cameo, not a pal**: a small event
   that matters but never ruins a run. Duff OKs the fox art on a card before it's built. Rule + this game's idea: `docs/MASCOT.md`.
 
-## Right now (2026-11-26, 13:50 UTC)
+## Right now (2026-11-26, 19:50 UTC; checked against main `48a526d`)
 - **Live:** build 199 (main `e17a537`): the gap pass (PR #68). APK:
   https://github.com/duffpowell-commits/lethemoor/releases/download/dev/lethemoor.apk ;
   web: https://duffpowell-commits.github.io/lethemoor/ . Check `releases/download/dev/version.json`.
-- **Working branch:** `claude/project-thread-qrikmp` (the only branch sessions push to). No PR open.
+- **Since build 199:** only docs merged (#69 this log, #70 mascot rule), so the live build is still 199.
+- **Working branch:** each session pushes to the branch its harness names (`claude/...`). No current-work PR open.
+- **Old open PRs, not current work:** #31 (Nov 20 "the bell stays silent": out of date, the bell now
+  tolls every 10 turns; don't merge) and #36 (Nov 22 isolated 3D harbor prototypes, superseded by the
+  3D harbor in #38). Leave both for Duff to close.
 - **Paused** (Duff, Nov 26: "Pause all of them we'll continue on rush"). Then "We'll build all of the
   fixes, cancel the reviews": the gap pass below is built and merged, with no blind review.
   Next: nothing until Duff picks Lethemoor up again (his phone playtest of build 199 comes first).
@@ -75,6 +79,7 @@ Tick each line when it's built, tested and in the branch.
 - Lethemoor keeps its own signing key. Never make or change a key.
 
 ## Log (newest first)
+- 2026-11-26 19:50 UTC: handoff refresh (no code). Main is `48a526d`, live build 199. Noted the two old open PRs; STATUS engine line fixed to 4.7.2.
 - 2026-11-26 13:50 UTC: PR #68 (gap pass) merged as e17a537. Every gap item ticked; no blind review
   (Duff cancelled it). Next for any AI: wait for Duff (game paused, Rush has the focus).
 - 2026-11-26 13:40 UTC: Duff paused, then "build all of the fixes, cancel the reviews". Built: hook on
