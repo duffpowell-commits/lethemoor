@@ -1967,6 +1967,24 @@ func _draw_map() -> void:
 			var red := Color(0.55, 0.03, 0.04, 0.75 * _map_fade(m))
 			minimap.draw_line(m + Vector2(-4, -4), m + Vector2(4, 4), red, 2.0, true)
 			minimap.draw_line(m + Vector2(4, -4), m + Vector2(-4, 4), red, 2.0, true)
+	# the flame gutters: a red mark on the rim the way each unseen thing near you is (the flicker
+	# says something is close; this says which way). When dread lies, the mark lies too.
+	var near: Array = game.flicker_from()
+	var fake_dirs: Array = []
+	if near.is_empty() and fake_flicker:
+		fake_dirs.append(Vector2.UP.rotated(TAU * float((game.turn * 7 + game.seed) % 12) / 12.0))
+	for e: Vector2i in near:
+		fake_dirs.append(Vector2(e - game.hunter))
+	for d: Vector2 in fake_dirs:
+		if d.length() < 0.01:
+			continue
+		var dv := d.normalized().rotated(map_rot)
+		var ang := dv.angle()
+		var blood := Color(0.75, 0.05, 0.05)
+		minimap.draw_arc(mid, MAP_R - 3.0, ang - 0.32, ang + 0.32, 10, blood, 5.0, true)
+		var tip := mid + dv * (MAP_R - 14.0)
+		var sd := Vector2(-dv.y, dv.x)
+		minimap.draw_colored_polygon(PackedVector2Array([tip, mid + dv * (MAP_R - 5.0) + sd * 6.0, mid + dv * (MAP_R - 5.0) - sd * 6.0]), blood)
 	# the bell, once you've heard it toll: on the chart where it hangs, or on the rim pointing at it
 	if game.bell_heard and not room.bells.is_empty():
 		var bp: Vector2i = room.bells[0]
@@ -3499,6 +3517,27 @@ func _capture_art() -> void:
 	await _shot("fp_art_bell_map")
 	var bell_map_ok: bool = "toll" in toll_ev and game.bell_heard
 	print("BELL MAP ", "PASS" if bell_map_ok else "FAIL")
+	# the flame gutters and the chart's rim says which way: a thrall two tiles behind you, hooded
+	var fi := -1
+	for i in game.thralls.size():
+		if game.thralls[i].kind == "thrall" and not game.thralls[i].get("lying", false) and not game.thralls[i].get("gone", false):
+			fi = i
+			break
+	var flicker_ok := false
+	if fi >= 0:
+		var fkeep: Vector2i = game.thralls[fi].pos
+		var fset: int = game.setting
+		game.thralls[fi].pos = entry + Vector2i.DOWN * 2   # through the quay wall: the flicker counts any wall
+		game.set_lantern(Fog.Lantern.HOODED)
+		game.fog.update(game.lights())
+		_refresh()
+		await _shot("fp_flicker_map")
+		flicker_ok = game.flicker_from().has(game.thralls[fi].pos)
+		game.thralls[fi].pos = fkeep
+		game.set_lantern(fset)
+		game.fog.update(game.lights())
+		_refresh()
+	print("FLICKER MAP ", "PASS" if flicker_ok else "FAIL")
 	var views := [["fp_art_bell", Vector2i(3, 1), Vector2i.LEFT],
 		["fp_art_flask", Vector2i(5, 4), Vector2i.LEFT],
 		["fp_art_hook", Vector2i(6, 18), Vector2i.RIGHT],
@@ -3630,6 +3669,6 @@ func _capture_art() -> void:
 		await _shot("fp_art_phantom")
 		_hide_phantom()
 	print("PHANTOM ", "PASS" if phantom_ok else "FAIL", " at=", game.hunter, " facing=", game.facing)
-	var art_ok := harbor_ok and tower_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen and bell_map_ok
+	var art_ok := harbor_ok and tower_ok and flicker_ok and corpse_ok and thrall_model_ok and vm_ok and head_ok and phantom_ok and kill_3d_seen and bell_map_ok
 	print("ART ", "PASS" if art_ok else "FAIL")   # CI requires this final result
 	get_tree().quit(0 if art_ok else 1)

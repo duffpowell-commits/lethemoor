@@ -235,6 +235,11 @@ func flickers() -> bool:
 	return fog.flickers(hunter, awake_positions())
 
 
+## Where the things making the flame gutter are (unseen, within Fog.FLICKER_RANGE).
+func flicker_from() -> Array:
+	return fog.near_unseen(hunter, awake_positions())
+
+
 func hallucinating() -> bool:
 	return dread >= DREAD_HALLUCINATE
 

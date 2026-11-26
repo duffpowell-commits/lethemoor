@@ -104,9 +104,17 @@ static func burn(oil: int, setting: int) -> int:
 	return maxi(0, oil - OIL_COST[setting])
 
 
-## Does the lantern at `pos` flicker? Only unlit enemies count; it says nothing about which.
+## Does the lantern at `pos` flicker? Only unlit enemies count.
 func flickers(pos: Vector2i, enemies: Array) -> bool:
+	return not near_unseen(pos, enemies).is_empty()
+
+
+## The unlit enemies that make the lantern at `pos` flicker (within FLICKER_RANGE, any wall).
+## The chart's rim marks which way they are (review of build 183: "Something is near" scared
+## you but never said from where).
+func near_unseen(pos: Vector2i, enemies: Array) -> Array:
+	var out: Array = []
 	for e: Vector2i in enemies:
 		if get_state(e) != LIT and maxi(absi(e.x - pos.x), absi(e.y - pos.y)) <= FLICKER_RANGE:
-			return true
-	return false
+			out.append(e)
+	return out

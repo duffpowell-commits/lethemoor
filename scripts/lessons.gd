@@ -30,7 +30,7 @@ const CARDS := {
 	"stalker": ["THE BRIDE",
 		"She cannot move while she is lit and you are looking at her. Turn away or let the light fall, and she comes.\n\nHold your light on her and she can't bear it for long: she goes back into the dark. She always finds you again. When the night goes silent, she is close. Never turn your back."],
 	"flicker": ["THE FLAME GUTTERS",
-		"A flicker means something you can't see stands within 3 tiles. It won't tell you where."],
+		"A flicker means something you can't see stands within 3 tiles. A red mark on the rim of the chart shows which way it is. Walls don't stop it: it may be in the next corridor."],
 	"letter": ["LETTERS",
 		"Pages nailed up in the dark. Stand on one with the lantern on BRIGHT to read it. Each letter read is worth 5 oil on your grade."],
 	"flask": ["OIL FLASK",

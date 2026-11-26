@@ -47,6 +47,7 @@ Search it for a system before you change it.
   `docs/HANDOFF_LOG.md` "Hands that hold things".
 - Nov 26 review fix A: the first grab each night tears free (-10 oil, it staggers back); the second kills. `Night.torn_free`.
   `docs/HANDOFF_LOG.md` "Review fix A".
+- Nov 26 review fix B: the flame gutters and a red mark on the chart rim points at the unseen thing (`Night.flicker_from`).
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
