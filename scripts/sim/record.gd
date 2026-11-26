@@ -91,3 +91,15 @@ static func summary(rec: Dictionary) -> String:
 	if rec.get("best_deep", "") != "":
 		s += " · deeper %s" % rec.best_deep
 	return s
+
+
+## The end card's pull to play again: the next thing to earn, in one line ("" once everything is
+## found). Reads the record after this night was counted.
+static func next_goal(rec: Dictionary) -> String:
+	if not has(rec, DEEPER):
+		return "NEXT: ring the bell once, any grade, to open DEEPER NIGHT."
+	for k in KEEPSAKES:
+		if not has(rec, k[0]):
+			return "NEXT: grade %s or better%s for keepsake %s." % [k[1], " on a Deeper Night" if k[4] else "", "I".repeat(KEEPSAKES.find(k) + 1)]
+	return ""
+

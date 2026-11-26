@@ -664,3 +664,16 @@ From the mock review: one map with fixed walls got learned by night three, and n
 - From the eye line the right glove was a near-black blob: the lantern hangs below and in front of it, so its light never reaches the leather you see. `Hands._lift()` gives each glove (both hands) its own material copy: a faint emission from the leather's own texture tinted lantern-warm (`GLOVE_WARM`, `GLOVE_GLOW` 0.1) and a soft rim (`GLOVE_RIM` 0.3, `rim_tint` 0.85 so the rim takes the leather colour, not white).
 - First try was GLOW 0.35 / RIM 0.6 / tint 0.6: the gloves went ghostly pale. Keep it subtle. Render `fp_hands.png`; before/after in project files `lethemoor-3d/review/glove_before_after.png`.
 
+## The 8.5 pass: a first-timer who knows why (Nov 26)
+Duff's new bar (Nov 26): build to an 8.5 from the blind first-time player's review, in one pass. Build 183's first-timer review was 5/10. What the newcomer bot (`tools/eyes/first_timer.gd`) showed, traced night by night: it got lost until the oil ran out, it got cornered by a thrall that came straight back after it tore free, and it swung the hook at thralls that were already down.
+- **First nights (Record.gentle, nights 1-3)**: +`GENTLE_OIL` 15 oil, the bride hunts blind from `GENTLE_WAKES` 45 (not 30), `GENTLE_TEARS` 2 escapes, and chalk arrows (`Night.chalk`, `_chalk_road`): every fork (3+ ways) gets an arrow one step nearer the bell, drawn on the flagstones (`_chalk_arrow`, `chalk_nodes`). Field note "CHALK ON THE STONES".
+- **Tearing free** (all nights): the thrall is down `GRAB_STUN` 4 turns (was HOOK_STUN 2) and loses you (`target = null`).
+- **Shove past** (all nights): a thrall that's down (`Night.down(i)`: stunned, standing, a thrall) can be walked into: you swap places, event `shoved_past`, sound, status line, field note "IT'S DOWN". Before, walking into a hooked thrall killed you. `can_step` allows it even when lit.
+- **HOOK IT!** only lights when the thrall in reach isn't already down; with a downed one ahead the status line says to shove past.
+- **Death card** (`Lessons.death`): where it came from (ahead/behind/left/right, in your light or out of the dark, from `Night.killed_from`/`killed_seen`) and the one thing that would have saved you; `_mark_killer` at each horror death.
+- **End card**: `Record.next_goal` (the next unlock) and the button reads ONE MORE NIGHT.
+- **Subtitles for sound**: `Audio.heard(game, before)` names the nearest horror you heard move out of sight; the status line says "A wet shuffle, off to your left. A thrall." or the bride's silk.
+- **Newcomer bot** now also follows chalk arrows (85%, then keeps going down the passage), turns toward the red rim mark (70%), treats a downed thrall as no threat and shoves past, and only hooks when HOOK IT! would be lit. All of that is on screen, so a real newcomer has it too.
+- Bots (200 / 300 nights): newcomer on first nights 22% -> 41% won; newcomer on later nights 11%; expert (balance bot) 52%.
+- Phone feel: swipes already fire as the finger crosses 50 px (not on lift), steps take 0.2 s. Nothing changed; FPS on a real phone still needs Duff.
+

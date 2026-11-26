@@ -5,6 +5,8 @@ extends RefCounted
 ##   - walls and floor you've seen (fog not DARK), items and horrors only while they're in view
 ##   - where the bell is only as the chart shows it: a direction once it has tolled
 ##   - the field notes' advice (back off from a crouch, hook what's in front, face the bride)
+##   - chalk arrows at forks on a newcomer's first nights: it follows them, most of the time
+##   - the chart's red rim mark when the flame gutters: it turns to look that way, most of the time
 ## and it makes a newcomer's mistakes: it freezes now and then when something is close, it
 ## doesn't know about BRIGHT, hooding, oil slicks or letters, and it walks into dead ends.
 ##   {"gd": "var v = scene_tree.current_scene; v.act(load('res://tools/eyes/first_timer.gd').choose(v.game))"}
@@ -12,11 +14,15 @@ extends RefCounted
 
 const Fog = preload("res://scripts/sim/fog.gd")
 const FREEZE := 0.2        # chance it just stands there when a horror is two tiles off
+const HEED := 0.7          # chance it turns toward the chart's red rim mark (flame guttering, Nov 26)
+const CHALK := 0.85        # chance it follows a chalk arrow at a fork (gentle nights draw them)
 const GRAB := 5            # walks this far out of its way for a flask or hook it can see
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 
 static var visits := {}    # tile -> times stood there (this night)
 static var night_key := ""
+static var last_faced := -99
+static var heading := Vector2i.ZERO   # following the chalk: the way it's going (ZERO = not following)   # the turn it last turned toward the red mark (so it doesn't spin)
 
 
 static func choose(g) -> String:
@@ -26,6 +32,8 @@ static func choose(g) -> String:
 	if key != night_key:
 		night_key = key
 		visits = {}
+		last_faced = -99
+		heading = Vector2i.ZERO
 	visits[g.hunter] = visits.get(g.hunter, 0) + 1
 	var rng := RandomNumberGenerator.new()
 	rng.seed = g.seed * 131 + g.turn * 7 + 3
@@ -37,20 +45,29 @@ static func choose(g) -> String:
 			if not g.in_view(th.pos):
 				return _face(g, th.pos)
 			return "wait"
-	var close: Array = near.filter(func(th): return th.get("kind", "thrall") == "thrall" and _md(th.pos, g.hunter) <= 2)
+	# a thrall that's down (hooked, or reeling after you tore free) is lying there twitching: you can
+	# see it's no threat this turn, and the field note says you can shove past it
+	var close: Array = near.filter(func(th): return th.get("kind", "thrall") == "thrall" and _md(th.pos, g.hunter) <= 2 and th.get("stun", 0) == 0)
 	if not close.is_empty():
 		if rng.randf() < FREEZE:
 			return "wait"           # a newcomer's freeze
 		var ahead: Vector2i = g.hunter + g.facing
-		if g.hook_wear > 0 and close.any(func(th): return th.pos == ahead or th.pos == ahead + g.facing):
+		if g.hook_wear > 0 and g.hook_target() >= 0 and g.thralls[g.hook_target()].get("stun", 0) == 0:   # HOOK IT! is lit
 			return "hook"
 		for d: Vector2i in [-g.facing, g.facing]:   # back off, eyes on it (the field note)
 			var n: Vector2i = g.hunter + d
 			if _known_floor(g, n) and not near.any(func(th): return th.pos == n) and close.all(func(th): return _md(th.pos, n) > _md(th.pos, g.hunter)):
 				return _toward(g, d)
 		return "wait"
+	# the flame gutters and the chart's rim shows a red mark: turn to look that way (it's on screen)
+	var mark: Array = g.flicker_from()
+	if not mark.is_empty() and g.turn - last_faced > 3 and not g.in_view(mark[0]) and rng.randf() < HEED:
+		last_faced = g.turn
+		return _face(g, mark[0])
 	var avoid := {}
 	for th in near:
+		if th.get("stun", 0) > 0 and th.get("kind", "thrall") == "thrall":
+			continue   # down: it can be shoved past
 		for d: Vector2i in [Vector2i.ZERO] + DIRS:
 			avoid[th.pos + d] = true
 	var reach := _known_reach(g, avoid)
@@ -66,6 +83,20 @@ static func choose(g) -> String:
 	if not want.is_empty():
 		want.sort_custom(func(a, b): return reach[a][0] < reach[b][0])
 		return _step_to(g, reach, want[0])
+	# a chalk arrow on the stones at this fork: most newcomers follow it, then keep going that way
+	# down the passage to the next fork (that's what an arrow means to anyone)
+	if g.chalk.has(g.hunter):
+		heading = Vector2i.ZERO
+		if rng.randf() < CHALK and reach.has(g.hunter + g.chalk[g.hunter]):
+			heading = g.chalk[g.hunter]
+	elif heading != Vector2i.ZERO:
+		var on: Array[Vector2i] = []
+		for d: Vector2i in DIRS:
+			if d != -heading and reach.has(g.hunter + d):
+				on.append(d)
+		heading = on[0] if on.size() == 1 else Vector2i.ZERO   # a dead end or an unmarked opening: lost again
+	if heading != Vector2i.ZERO:
+		return _toward(g, heading)
 	# explore: the edge of what you've seen, toward the chart's arrow once the bell has tolled
 	var best = null
 	var best_score := INF
