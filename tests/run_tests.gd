@@ -286,7 +286,22 @@ func test_ringing_the_bell_wins_with_grade() -> void:
 	n.step(Vector2i(2, 1))
 	check(n.escaped and n.rang, "stepping on the bell rings it and ends the night")
 	check(n.points() == n.oil, "no letters: points = oil left")
-	check(n.grade() == "S" if n.oil >= 25 else true, "grade from points")
+	check(n.grade() == Night.UNMET_CAP and n.capped(), "nothing faced tonight: the grade stops at B")
+	n.met = true
+	check(n.grade() == "S" if n.oil >= 35 else true, "grade from points")
+
+
+func test_every_night_gets_a_scare() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	var n = Night.start_dealt(text, 21, false, true)
+	n.set_lantern(Fog.Lantern.HOODED)
+	var ev: Array = []
+	for i in Night.BEAT_TURN:
+		ev += n.wait()
+	check(n.met or ("scent" in ev and n.beat_sent), "by BEAT_TURN, with nothing met, a thrall catches your scent")
+	if "scent" in ev:
+		var th = n.thralls.filter(func(t): return t.target == n.hunter and t.get("kind", "thrall") == "thrall")
+		check(not th.is_empty(), "and it's coming for you")
 
 
 func test_letter_needs_bright() -> void:
@@ -880,6 +895,18 @@ func test_first_nights_tear_free_twice() -> void:
 	th.pos = Vector2i(2, 1)
 	n.wait()
 	check(n.dead, "the third keeps you")
+
+
+func test_nights_four_to_six_are_half_eased() -> void:
+	check(Record.easing({nights = 0}) == 2 and Record.easing({nights = 2}) == 2, "nights 1-3: first nights")
+	check(Record.easing({nights = 3}) == 1 and Record.easing({nights = 5}) == 1, "nights 4-6: half eased")
+	check(Record.easing({nights = 6}) == 0, "night 7 on: the full night")
+	var n = Night.start("#######\n#H....#\n#######")
+	n.half = true
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(2, 1), {target = Vector2i(1, 1)})
+	n.wait()
+	check(not n.dead and n.tears == 1 and not n.torn_free, "half-eased night: the first grab leaves one escape too")
 
 
 func test_shove_past_a_downed_thrall() -> void:

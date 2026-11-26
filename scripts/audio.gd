@@ -270,6 +270,9 @@ func on_turn(kind: String, events: Array, game, spent: bool) -> void:
 				_later(0.12, "heard_turn", -6.0, 0.6)
 			"crouch": sfx("heard_turn", -1.0, 0.7)
 			"rose": sfx("sting_dread", -1.0, 0.85)
+			"scent":   # nothing has come yet, and now something has your scent: a low turn, then dread
+				sfx("heard_turn", -2.0, 0.55)
+				_later(0.35, "sting_dread", -3.0, 0.7)
 			"roused": sfx("heard_turn", -2.0, 0.8)
 			"panic": sfx("panic", 0.0)
 			"out_of_oil": sfx("out_of_oil", 0.0)
@@ -314,7 +317,7 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 		out.append(kind)
 	for e in events:
 		match e:
-			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", "crouch", "lunge", "torn_free", "shoved_past", "rose", "roused", \
+			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", "crouch", "lunge", "torn_free", "shoved_past", "rose", "roused", "scent", \
 					"hook_hit", "hook_broke", "hook_found", "burned":
 				out.append(e)
 			"rang":

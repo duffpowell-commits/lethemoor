@@ -53,6 +53,9 @@ Search it for a system before you change it.
 - Nov 26 review fix D: gloves lifted (faint lantern-warm emission + rim, `Hands._lift`, GLOVE_* consts) so the fist reads.
 - Nov 26 8.5 pass (Duff's bar: an 8.5 first-timer review): chalked first nights, shove past a downed thrall, death card says why,
   next-unlock line, sound subtitles. Newcomer bot 22% -> 41% on first nights. `docs/HANDOFF_LOG.md` "The 8.5 pass".
+- Nov 26 gap pass (Duff: "build all of the fixes, cancel the reviews"): a scare by turn 20 (`Night._beat`), B cap on an empty night,
+  hook on the road on first nights, nights 4-6 half eased (`Record.easing`), spill label, swinging lathe bell, slumping downed thralls.
+  `docs/HANDOFF_LOG.md` "The gap pass".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and

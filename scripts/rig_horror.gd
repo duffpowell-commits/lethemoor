@@ -3,7 +3,7 @@ extends Node3D
 ## Model: assets/models/<who>.glb (rigged mesh). Clips: assets/models/<who>_clips.res
 ## (an AnimationLibrary baked by tools/bake_clips.gd from Meshy's clip GLBs).
 ## The view only tells it what state the rules are in; it never decides a rule.
-## States: idle, walk, crouch (the tell before a lunge), lunge, dead (lying), rise.
+## States: idle, walk, crouch (the tell before a lunge), lunge, dead (lying), down (knocked down), rise.
 ## A state whose clip is missing falls back to the nearest one we have.
 
 const BLEND := 0.18
@@ -14,6 +14,7 @@ const FALLBACK := {
 	"lunge": ["lunge", "idle"],
 	"dead": ["dead", "idle"],
 	"rise": ["rise", "idle"],
+	"down": ["dead", "crouch", "idle"],   # knocked down (hooked, or torn off you): slumps, then rises
 }
 const LOOPS := ["idle", "walk", "walking", "crouch"]
 

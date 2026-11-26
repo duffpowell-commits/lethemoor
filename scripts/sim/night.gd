@@ -33,11 +33,16 @@ const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const GENTLE_SPARE := 1         # thralls left out of a newcomer's first nights (Record.GENTLE_NIGHTS)
 const GENTLE_OIL := 15          # a newcomer's first nights start with this much more oil (8.5 plan, Nov 26)
 const GENTLE_WAKES := 45        # and the bride starts hunting you blind this much later
-const GENTLE_TEARS := 2         # and you tear free of this many grabs before one keeps you
+const GENTLE_TEARS := 2         # first nights and the half-eased nights 4-6: you tear free of this many grabs
 const FLASK_OIL := 12          # an oil flask found on the floor
 const GRAB_OIL := 10           # the first thrall to reach you: you tear free, the lantern spilling this much
                                # (review of build 183: two in three deaths came with oil to spare, so the
                                # oil clock never felt like what killed you; now the first grab costs oil)
+const BEAT_TURN := 20          # no horror in your light by this turn: one catches your scent (gap pass)
+const BEAT_FROM := Vector2i(6, 9)   # walking tiles from you, out of sight, where it turns up
+const UNMET_CAP := "B"          # a night where nothing came into your light can't grade above this
+const HOOK_NEAR := Vector2i(3, 6)  # first nights: a boathook this many walking steps from the start
+const HALF_OIL := 8             # nights 4-6 (Record.easing 1): a little extra oil, still chalked
 const GRAB_STUN := 4           # turns a thrall you tore free of is down, and it loses you: time to get away (8.5 plan)
 ## Deeper Night (unlocked by ringing the bell once, record.gd): the bride wakes sooner and the
 ## flasks are thinner and you set out with less oil. Same ward, same horrors.
@@ -72,6 +77,7 @@ const PRINT_TURNS := 10         # a thrall's wet footprints dry after this many 
 const CORPSE_WAKE := 2          # a corpse gets up when you're this close and it's not in your view cone
 const RISE_TURNS := 1           # getting up costs it this many of its turns
 const NOISE := {"hook_hit": 4, "hook_miss": 3, "pour": 2, "spark": 3, "fire": 3}
+const RANKS := ["S", "A", "B", "C", "D"]
 const GRADES := [[35, "S"], [29, "A"], [23, "B"], [18, "C"], [0, "D"]]   # +15 on Nov 19 when start oil went 45 -> 60
 ## How far a thrall notices your lantern (tiles, needs line of sight).
 const NOTICE := {Fog.Lantern.HOODED: 1, Fog.Lantern.NORMAL: 5, Fog.Lantern.BRIGHT: 8}
@@ -93,6 +99,9 @@ var escaped := false
 var cause := ""                 # why you died, in the game's voice
 var torn_free := false         # you've used up tonight's tear-frees: the next grab keeps you
 var tears := 0                  # grabs you've torn free of tonight
+var half := false               # nights 4-6: chalk and HALF_OIL (Record.easing 1)
+var met := false                # a horror has come into your light tonight
+var beat_sent := false          # the BEAT_TURN scent has been sent
 var chalk := {}                 # gentle nights: fork tile -> the way toward the bell, chalked on the stones
 var killed_from := Vector2i.ZERO  # where what took you stood, from you (grid), for the death card
 var killed_seen := false        # could you see it (lit and in front of you) when it took you
@@ -124,19 +133,67 @@ var seed := 0                   # which night was dealt (0 = the map as drawn); 
 ## `gentle`: one of a newcomer's first nights (Record.gentle): one thrall fewer in the ward. Not
 ## on a Deeper Night, which you chose to make harder. (Duff, Nov 25, "Gentler first 3 nights":
 ## first-timer bot won 15% of nights, 24% with one thrall fewer.)
-static func start_dealt(room_text: String, seed: int, deeper := false, gentle := false) -> RefCounted:
+## `half`: nights 4-6 (Record.easing 1): the chalk stays and a little more oil, but every thrall
+## is dealt and you get one escape (blind first-timer, Nov 26: 41% won on first nights, 11% after).
+static func start_dealt(room_text: String, seed: int, deeper := false, gentle := false, half := false) -> RefCounted:
 	var ward: String = Ward.carve(room_text, seed) if seed > 0 else room_text
 	if gentle and not deeper and seed > 0:
 		ward = Ward.thin(ward, GENTLE_SPARE)   # same walls, a thrall fewer
 	var n = start(ward, seed)
 	n.deep = deeper
 	n.gentle = gentle and not deeper and seed > 0
+	n.half = half and not n.gentle and not deeper and seed > 0
 	if deeper:
 		n.oil = DEEP_OIL
 	elif n.gentle:
 		n.oil += GENTLE_OIL
 		n._chalk_road()
+		n._hook_near_start()
+	elif n.half:
+		n.oil += HALF_OIL
+		n._chalk_road()
 	return n
+
+
+## First nights: the boathook lies 3-6 steps from where you start (blind first-timer, Nov 26: 36 in
+## 200 newcomer first nights never found one, and night 58 died to a thrall with no defence). The
+## nearest hook moves there; the others stay where the dealer put them.
+func _hook_near_start() -> void:
+	var near: Dictionary = room.reachable(hunter, HOOK_NEAR.y)
+	var spots: Array[Vector2i] = []
+	for q: Vector2i in near:
+		if near[q] >= HOOK_NEAR.x and thrall_at(q) < 0 and not room.bells.has(q) and not flasks_left.has(q) \
+				and not room.letters.has(q) and not hooks_left.has(q):
+			spots.append(q)
+	if spots.is_empty():
+		return
+	spots.sort()
+	# lay it on the road to the bell, so walking that way picks it up (a hook off in a side room was
+	# still missed by 37 of 200 newcomer first nights)
+	if not room.bells.is_empty():
+		var road: Array[Vector2i] = room.path_in(room.reachable(hunter, 9999), hunter, room.bells[0])
+		var on_road: Array[Vector2i] = []
+		for q: Vector2i in spots:
+			if road.has(q):
+				on_road.append(q)
+		if not on_road.is_empty():
+			spots = on_road
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed * 17 + 5
+	var to: Vector2i = spots[rng.randi_range(0, spots.size() - 1)]
+	if room.hooks.is_empty():
+		room.hooks.append(to)
+		hooks_left.append(to)
+		return
+	var k := 0
+	for i in room.hooks.size():
+		if near.get(room.hooks[i], 999) < near.get(room.hooks[k], 999):
+			k = i
+	if near.get(room.hooks[k], 999) <= HOOK_NEAR.y:
+		return   # already one this close
+	hooks_left.erase(room.hooks[k])
+	room.hooks[k] = to
+	hooks_left.append(to)
 
 
 ## Someone came this way before you and chalked the forks: at every tile where three or more ways
@@ -526,6 +583,7 @@ func _end_turn(events: Array) -> Array:
 	fog.update(lights())
 	dread += DREAD_LIT if lit else DREAD_DARK
 	_horrors(events)
+	_beat(events)
 	for p: Vector2i in slicks:
 		if slicks[p] > 0:
 			make_noise(p, "fire")   # fire crackles: it draws them in, and they walk into it
@@ -559,12 +617,50 @@ func _horrors(events: Array) -> void:
 			continue
 		var now: bool = fog.get_state(th.pos) == Fog.LIT
 		if now and not th.seen and not th.get("lying", false):
+			met = true
 			dread += DREAD_HORROR
 			if not events.has("horror"):
 				events.append("horror")
 		th.seen = now
 		if now:
 			th.last_seen = th.pos
+
+
+## Every night gets its first scare (blind first-timer, Nov 26: a night with nothing in it
+## felt empty and still earned an S). If no horror has come into your light by BEAT_TURN, the
+## nearest standing thrall catches your scent: it turns up BEAT_FROM walking tiles away, on a
+## tile you can't see, and comes for you. Fog is truth: it only ever appears in the dark.
+func _beat(events: Array) -> void:
+	if met or beat_sent or turn < BEAT_TURN:
+		return
+	beat_sent = true
+	var near: Dictionary = room.reachable(hunter, BEAT_FROM.y)
+	var spots: Array[Vector2i] = []
+	for q: Vector2i in near:
+		if near[q] >= BEAT_FROM.x and fog.get_state(q) != Fog.LIT and thrall_at(q) < 0 and not burning(q) \
+				and not room.bells.has(q):
+			spots.append(q)
+	var k := -1
+	var best := INF
+	for i in thralls.size():
+		var th: Dictionary = thralls[i]
+		if th.get("kind", "thrall") != "thrall" or th.get("gone", false) or th.get("lying", false):
+			continue
+		var d := Vector2(th.pos - hunter).length()
+		if d < best:
+			best = d
+			k = i
+	if k < 0 or spots.is_empty():
+		return
+	spots.sort()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed * 31 + turn
+	var th: Dictionary = thralls[k]
+	th.pos = spots[rng.randi_range(0, spots.size() - 1)]
+	th.target = hunter
+	th.seen = false
+	th.stun = 0
+	events.append("scent")
 
 
 func _sees_light(th: Dictionary) -> bool:
@@ -751,7 +847,7 @@ func _thralls_act(events: Array) -> void:
 ## jumps, and the thing staggers back a tile and is down for HOOK_STUN turns. Only once a night.
 func _tear_free(th: Dictionary, events: Array) -> void:
 	tears += 1
-	torn_free = tears >= (GENTLE_TEARS if gentle else 1)
+	torn_free = tears >= (GENTLE_TEARS if gentle or half else 1)
 	oil = maxi(0, oil - GRAB_OIL)
 	dread = mini(DREAD_MAX, dread + DREAD_HORROR)
 	th.stun = GRAB_STUN
@@ -794,8 +890,15 @@ func points() -> int:
 func grade() -> String:
 	for g in GRADES:
 		if points() >= g[0]:
+			if not met and RANKS.find(g[1]) < RANKS.find(UNMET_CAP):
+				return UNMET_CAP   # nothing faced tonight: a quiet walk isn't a top grade
 			return g[1]
 	return "D"
+
+
+## Did the grade get held down because nothing came into your light? (The end card says so.)
+func capped() -> bool:
+	return not met and RANKS.find(grade()) == RANKS.find(UNMET_CAP) and points() >= GRADES[RANKS.find(UNMET_CAP) - 1][0]
 
 
 ## Remember where the thing that took you stood and whether you could see it (the death card says).

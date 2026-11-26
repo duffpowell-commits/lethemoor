@@ -104,7 +104,8 @@ static func _now(id: String, game, event: String) -> bool:
 		"hook":
 			return game.get("hook_wear") > 0
 		"slick":
-			return event == "poured" or game.thralls.any(func(th): return not th.get("gone", false) and fog.get_state(th.pos) == Fog.LIT)
+			return event == "poured" or game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) \
+					and not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT)
 	return false
 
 
@@ -131,7 +132,8 @@ static func death(game) -> Array:
 		return [where, "Your oil was gone, so it came with nothing to see it by. Pick up every flask you pass, and keep NORMAL unless you need BRIGHT."]
 	var tip := ""
 	if not game.killed_seen and side != "AHEAD":
-		tip = "When the flame gutters, the red mark on the chart's rim shows which side it's on. Turn to face it: then HOOK IT! can light."
+		tip = "When the flame gutters, the red mark on the chart's rim shows which side it's on. Turn to face it" \
+				+ (": then HOOK IT! can light." if game.hook_wear > 0 else ", and back away from it while you look for a boathook.")
 	elif not game.killed_seen:
 		tip = "You walked into it in the dark. NORMAL light shows 2 tiles; BRIGHT shows 4 for 2 oil a turn."
 	elif game.hook_wear > 0:

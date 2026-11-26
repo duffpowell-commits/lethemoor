@@ -74,7 +74,7 @@ const KILL_ROLL := 0.22
 const KILL_DROP := 0.3               # tiles your eyes fall
 const KILL_WHIP := 0.15              # s to wrench you round to it when it comes from the side or behind
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
-const STOP_EVENTS := ["crouch", "lunge", "torn_free", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["scent", "crouch", "lunge", "torn_free", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 12.0               # the corner map follows you: ~15 tiles across the disc
 const MAP_R := 88.0                  # radius of the round chart
@@ -181,6 +181,8 @@ var hints_on := true
 var capture_mode := false
 static var title_done := false    # the title shows once per launch, not on every retry
 var oil_count: Label
+var night_no := 1               # how many nights you've played, this one included
+var spill_label: Label         # a red "-10 SPILLED" under the oil bar when a grab or panic slops oil
 var dread_label: Label
 var lantern_buttons := {}
 var move_buttons := {}
@@ -202,7 +204,8 @@ func _ready() -> void:
 	capture_mode = "--capture" in OS.get_cmdline_user_args()
 	record = Record.blank()
 	_load_hints()
-	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER), Record.gentle(record) or _asked("LM_GENTLE", "gentle") == "1")
+	game = Night.start_dealt(FileAccess.get_file_as_string(ROOM), _pick_night(), deep_on and Record.has(record, Record.DEEPER), Record.gentle(record) or _asked("LM_GENTLE", "gentle") == "1", Record.easing(record) == 1)
+	night_no = int(record.get("nights", 0)) + 1   # this is your night_no-th night (end card label)
 	room = game.room
 	fog = game.fog
 	_build_world()
@@ -880,6 +883,14 @@ func _drive_rig(i: int, rig: Node3D, th: Dictionary, delta := 0.0) -> void:
 	holder.set_meta("last_pos", holder.position)
 	if rig.state == "rise" and rig.player.is_playing():
 		return
+	# knocked down (hooked, or reeling after you tore free): it slumps to the stones while the rule
+	# says it's down, and gets up when it isn't (blind first-timer, Nov 26: it just stood there idle)
+	if game.down(i):
+		rig.set_state("down", 1.6)
+		return
+	if rig.state == "down":
+		rig.set_state("rise", 1.3)
+		return
 	if th.get("crouched", false):
 		rig.set_state("crouch", 0.8)
 	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN and th.get("stun", 0) == 0:
@@ -1129,6 +1140,7 @@ func act(kind: String) -> void:
 	var from_pos := cam.position
 	var from_yaw := cam.rotation.y
 	var from_t: Array = game.positions()
+	var oil0: int = game.oil
 	var events: Array = []
 	var turn0: int = game.turn
 	match kind:
@@ -1200,6 +1212,8 @@ func act(kind: String) -> void:
 		hook_jab = 1.0
 	if ("lunge" in events or "torn_free" in events) and not game.dead:
 		lunge_hit = 1.0
+	if ("torn_free" in events or "panic" in events) and oil0 > game.oil:
+		_show_spill(oil0 - game.oil)
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
 			last_event = ev
@@ -1210,6 +1224,8 @@ func act(kind: String) -> void:
 	if game.dead and ("taken" in events or "grabbed" in events):
 		await _kill_shot()
 	busy = false
+	if game.rang:
+		await _swing_bell()
 	if game.over():
 		_show_end()
 	elif "letter" in events:
@@ -1664,6 +1680,10 @@ func _build_hud() -> void:
 	oil_count = _label("", 17, UI.AMBER, UI.head())
 	oil_count.position = Vector2(262, 38)
 	top.add_child(oil_count)
+	spill_label = _label("", 12, UI.BLOOD, UI.head())
+	spill_label.position = Vector2(190, 55)
+	spill_label.modulate.a = 0.0
+	top.add_child(spill_label)
 	dread_label = _label("DREAD", 14, UI.DIM, UI.head())
 	dread_label.position = Vector2(318, 41)
 	top.add_child(dread_label)
@@ -2135,6 +2155,75 @@ func _down_ahead() -> bool:
 	return i >= 0 and game.down(i) and fog.get_state(game.thralls[i].pos) == Fog.LIT
 
 
+## What the lantern shows at its normal flame, turned over every few turns (blind first-timer, Nov 26:
+## "two paces of light" on every screen read like a warning, even at 75 oil).
+const AMBIENT := [
+	"The lantern burns low: two paces of light.",
+	"Wet stone, and the smell of the harbour. Keep moving.",
+	"Your breath smokes in the lantern light.",
+	"Somewhere water drips. Nothing else moves. Yet.",
+	"The flame holds steady. Tap the lantern to burn brighter, or to hood it.",
+]
+
+
+## You rang it: the bell swings out on its yoke and back, dying away, before the card comes up.
+func _swing_bell() -> void:
+	if room.bells.is_empty() or not harbor_fixtures.has(room.bells[0]):
+		return
+	var body: Node3D = harbor_fixtures[room.bells[0]].get_node_or_null("Body")
+	if body == null:
+		return
+	var tw := create_tween()
+	for a in [0.5, -0.4, 0.3, -0.2, 0.1, 0.0]:
+		tw.tween_property(body, "rotation:x", a, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if capture_mode:
+		return   # the capture reads the card at once; the swing still plays behind it
+	await get_tree().create_timer(1.7).timeout
+
+
+## The end card's last line: which of your nights this was, in words a first-timer reads
+## (blind first-timer, Nov 26: "Night 11" on a first night read like they'd missed ten).
+func _night_tag() -> String:
+	var tag := ""
+	if game.gentle and night_no <= Record.GENTLE_NIGHTS:
+		tag = "FIRST NIGHT %d OF %d" % [night_no, Record.GENTLE_NIGHTS]
+	elif game.gentle:
+		tag = "FIRST NIGHTS"
+	else:
+		tag = "YOUR NIGHT %d" % night_no
+	return tag + ("  ·  DEEPER" if game.deep else "") + "  ·  ward %d" % game.seed
+
+
+## Oil lost all at once (torn free, a panic) shows by the bar, so the drop isn't a mystery
+## (blind first-timer, Nov 26: "my oil crashed and I don't know why").
+func _show_spill(n: int) -> void:
+	spill_label.text = "-%d SPILLED" % n
+	spill_label.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_interval(1.6)
+	tw.tween_property(spill_label, "modulate:a", 0.0, 0.8)
+
+
+## The bell has just tolled: say which way, from where you stand and the way you face.
+func _toll_line() -> String:
+	if game == null or game.room.bells.is_empty():
+		return "The bell tolls, far off."
+	var to: Vector2i = game.room.bells[0] - game.hunter
+	if to == Vector2i.ZERO:
+		return "The bell tolls right above you."
+	var f: Vector2i = game.facing
+	var ahead: int = to.x * f.x + to.y * f.y
+	var right: int = to.x * -f.y + to.y * f.x
+	var way := ""
+	if absi(ahead) >= absi(right) * 2:
+		way = "ahead of you" if ahead > 0 else "behind you"
+	elif absi(right) >= absi(ahead) * 2:
+		way = "to your right" if right > 0 else "to your left"
+	else:
+		way = ("ahead" if ahead > 0 else "behind") + " and to the " + ("right" if right > 0 else "left")
+	return "The bell tolls, %s. The chart marks where." % way
+
+
 func _refresh_hud() -> void:
 	oil_count.text = str(game.oil)
 	letters_label.text = "·   LETTERS %d / %d" % [game.letters_read.size(), room.letters.size()]
@@ -2174,12 +2263,16 @@ func _refresh_hud() -> void:
 				else "Cold hands had you. You tore free, spilling oil. It's lost you for now: get away, or shove past it.",
 		"shoved_past": "You shoulder past the limp thing. It's behind you now. Keep going.",
 		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
+		"scent": "Something out there has caught the smell of your oil. It is coming for you.",
+		"toll": _toll_line(),
 		"roused": "You held it in the high flame too long. It stops shambling.",
 		"blocked_body": "A body lies there, sodden. You'd have to step over it.",
 		"heard": "Somewhere in the dark, something stops, and turns toward the sound.",
 		"cant_spark": "Nothing to light. Look at the oil, lantern lit, 3 tiles or nearer.",
 	}
 	var s: String = lines[game.setting]
+	if game.setting == Fog.Lantern.NORMAL:
+		s = AMBIENT[(game.turn / 4) % AMBIENT.size()]   # a new line every few turns, not one on repeat
 	if game.oil == 0:
 		s = "The oil is spent. The dark is coming in."
 	var extra: String = said.get(last_event, "")
@@ -3006,7 +3099,9 @@ func _show_end() -> void:
 		big.text = "THE DARK TOOK YOU"
 		var why: Array = Lessons.death(game)
 		small.text = "%s\n\n%s\n%s\n\n%d turns  ·  %d oil left" % [game.cause, why[0], why[1], game.turn, game.oil]
-	small.text += ("\n\nNight %d" % game.seed + ("  ·  DEEPER" if game.deep else "") + ("  ·  FIRST NIGHTS" if game.gentle else "")) if game.seed > 0 else ""
+	if game.rang and game.capped():
+		small.text += "\n\nNothing came into your light tonight, so the best it can be is %s." % Night.UNMET_CAP
+	small.text += "\n\n" + _night_tag() if game.seed > 0 else ""
 	if not night_counted and not capture_mode:
 		night_counted = true
 		var news: Array = Record.add_night(record, game.rang, game.grade() if game.rang else "", game.deep)

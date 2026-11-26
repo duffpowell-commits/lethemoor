@@ -5,6 +5,7 @@ extends SceneTree
 ##   godot --headless --path . --script tools/first_timer_bot.gd -- [nights=200]
 ## BOT_FIRST=n starts at night n (default 1). BOT_TRACE=1 prints every move. BOT_GENTLE=1 plays
 ## them as a newcomer's first nights (a thrall fewer, Record.gentle).
+## BOT_HALF=1 plays nights 4-6 (Record.easing 1: chalk, a little more oil).
 
 const Night = preload("res://scripts/sim/night.gd")
 const Pilot = preload("res://tools/eyes/first_timer.gd")
@@ -27,7 +28,7 @@ func _init() -> void:
 	var death_turns: Array = []
 	var dry := 0                        # deaths after the oil ran out
 	for s in range(first, first + count):
-		var g = Night.start_dealt(text, s, false, OS.get_environment("BOT_GENTLE") == "1")
+		var g = Night.start_dealt(text, s, false, OS.get_environment("BOT_GENTLE") == "1", OS.get_environment("BOT_HALF") == "1")
 		for _i in 300:
 			if g.over():
 				break
