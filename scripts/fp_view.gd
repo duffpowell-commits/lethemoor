@@ -2121,13 +2121,17 @@ func _refresh_hud() -> void:
 	status_label.text = s
 	if item_buttons:
 		item_buttons.hook.visible = game.hook_wear > 0
-		hook_ready = _hook_ready()
-		item_buttons.hook.text = ("HOOK IT!" if hook_ready else "HOOK") + "\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
-		if hook_ready:
-			UI.lit(item_buttons.hook)
-		else:
-			UI.unlit(item_buttons.hook)
-			item_buttons.hook.modulate = Color.WHITE
+		var in_reach := _hook_ready()
+		item_buttons.hook.text = ("HOOK IT!" if in_reach else "HOOK") + "\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
+		if in_reach != hook_ready:   # restyle only on a change; unlit goes back to the item plate, not the stock button
+			if in_reach:
+				UI.lit(item_buttons.hook)
+			else:
+				_plate_style(item_buttons.hook)
+				item_buttons.hook.add_theme_color_override("font_color", Color("#c9ad78"))
+				item_buttons.hook.remove_theme_color_override("font_hover_color")
+				item_buttons.hook.modulate = Color.WHITE
+		hook_ready = in_reach
 		item_buttons.spark.visible = game.slicks.values().has(0)
 		# POUR OIL waits till there's a reason for it: a horror seen, or the hook in hand
 		# (the first minute shows only the lantern; a new player was pouring 3 oil on turn 1)
@@ -3510,7 +3514,8 @@ func _capture_trap() -> void:
 	var glow_on: bool = hook_ready and item_buttons.hook.text.begins_with("HOOK IT!")
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
-	print("HOOK GLOW ", "PASS" if glow_on and not hook_ready else "FAIL", " (lit with it 2 ahead, out once it's knocked to 3)")
+	var plate_back: bool = item_buttons.hook.get_theme_color("font_color") == Color("#c9ad78") and item_buttons.hook.has_theme_stylebox_override("normal")
+	print("HOOK GLOW ", "PASS" if glow_on and not hook_ready and plate_back else "FAIL", " (lit with it 2 ahead, back on its brass plate once it's knocked to 3)")
 	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
 	capture_phase = 4
 	get_tree().reload_current_scene()
