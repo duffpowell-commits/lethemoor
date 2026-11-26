@@ -6,7 +6,7 @@ The newest entry is at the top. Rules and commands: `CLAUDE.md` (it applies to e
 Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
 
 ## Studio mascot (Duff, Nov 26)
-- **the three-eyed fox is in every game as a rare cameo, not a pal**: a small event
+- **The three-eyed fox is in every game as a rare cameo, not a pal**: a small event
   that matters but never ruins a run. Duff OKs the fox art on a card before it's built. Rule + this game's idea: `docs/MASCOT.md`.
 
 ## Right now (2026-11-26, 13:50 UTC)
