@@ -13,6 +13,7 @@ Search it for a system before you change it.
 - Publisher branding uses the approved 3 Eyed Fox Studios artwork at startup and credits in the Field Guide.
 
 ## Where things stand (Nov 21)
+- **Pick up the build here: `docs/BUILD_LOG.md`** (any AI; current state, the 8.5 gap list, how to test, log).
 - Design that wins over every older doc: `docs/design/first_person_design.md` (Nov 19, first person,
   Duff: "Switch fully now"). Pillars: light is life, every slot matters, the dead don't stay gone.
 - The One Night slice is built: bell + grade, Stalker, boathook + oil-slick trap, noise, letters,
