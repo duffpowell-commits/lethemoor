@@ -254,6 +254,7 @@ static func start(room_text: String, seed: int = 0) -> RefCounted:
 		th.seen = n.fog.get_state(th.pos) == Fog.LIT
 		if th.seen:
 			th.last_seen = th.pos
+			n.met = true   # in your light from the first turn: it counts as met
 	return n
 
 
@@ -660,6 +661,8 @@ func _beat(events: Array) -> void:
 	th.target = hunter
 	th.seen = false
 	th.stun = 0
+	th.crouched = false   # it comes walking, not coiled to spring
+	th.lunge_cd = 0
 	events.append("scent")
 
 

@@ -1213,7 +1213,7 @@ func act(kind: String) -> void:
 	if ("lunge" in events or "torn_free" in events) and not game.dead:
 		lunge_hit = 1.0
 	if ("torn_free" in events or "panic" in events) and oil0 > game.oil:
-		_show_spill(oil0 - game.oil)
+		_show_spill((Night.GRAB_OIL if "torn_free" in events else 0) + (Night.PANIC_OIL if "panic" in events else 0))
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
 			last_event = ev
@@ -1226,6 +1226,8 @@ func act(kind: String) -> void:
 	busy = false
 	if game.rang:
 		await _swing_bell()
+		if not is_inside_tree():
+			return   # left for the title while it swung
 	if game.over():
 		_show_end()
 	elif "letter" in events:

@@ -679,7 +679,7 @@ Duff's new bar (Nov 26): build to an 8.5 from the blind first-time player's revi
 
 ## The gap pass: every fix from the 6.4 review (Nov 26)
 The blind first-timer scored the 8.5 pass (build 196) 6.4. Duff: build all the gap fixes, cancel the reviews (no blind review this round). Found in that review and the newcomer bot: some nights nothing ever came (and still got an S), 36 of 200 first nights never found a hook, a cliff after night 3 (41% -> 11%), oil dropping with no reason given, a cone for a bell, downed thralls standing idle, one status line on repeat, and "Night 11" on a first night.
-- **A scare every night** (`Night._beat`, after the first `_horrors` in `_end_turn`): no horror in your light by `BEAT_TURN` 20 -> the nearest standing thrall turns up `BEAT_FROM` 6-9 walking tiles off, on a dark tile, hunting you (event `scent`: status line, low turn + dread sound). 4-7 cost first nights 6 points of win rate; 6-9 costs none.
+- **A scare every night** (`Night._beat`, after the first `_horrors` in `_end_turn`): no horror in your light by `BEAT_TURN` 20 -> the nearest standing thrall turns up `BEAT_FROM` 6-9 walking tiles off, on a tile out of your light, hunting you (event `scent`: status line, low turn + dread sound). 4-7 cost first nights 6 points of win rate; 6-9 costs none.
 - **No S for an empty night**: `Night.met` (set on a first sighting); `grade()` caps at `UNMET_CAP` "B"; `capped()`; the end card says why.
 - **Hook near the start on first nights** (`_hook_near_start`): the nearest hook moves 3-6 steps out, on the shortest road to the bell when it can.
 - **Nights 4-6 half eased** (`Record.easing` 1, `Night.half`): +`HALF_OIL` 8, chalk, two escapes (`GENTLE_TEARS`), the normal bride.
