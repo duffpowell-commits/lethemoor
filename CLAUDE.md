@@ -49,6 +49,7 @@ Search it for a system before you change it.
   `docs/HANDOFF_LOG.md` "Review fix A".
 - Nov 26 review fix B: the flame gutters and a red mark on the chart rim points at the unseen thing (`Night.flicker_from`).
 - Nov 26 review fix C: HOOK glows and reads HOOK IT! while a seen thrall is in the hook's reach (`Night.hook_target`).
+- Nov 26 review fix D: gloves lifted (faint lantern-warm emission + rim, `Hands._lift`, GLOVE_* consts) so the fist reads.
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and
