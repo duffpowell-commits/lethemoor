@@ -2,11 +2,11 @@
 
 Public repo: follow the Public repo rules at the top of `CLAUDE.md`.
 
-Read this first. Update it last. Long record: `docs/HANDOFF_LOG.md`. Design that wins: `docs/design/first_person_design.md` (Nov 19).
+Read this first. Update it last. Long record: `docs/HANDOFF_LOG.md`. **Any AI picking up the build: `docs/BUILD_LOG.md`.** Design that wins: `docs/design/first_person_design.md` (Nov 19).
 
 ## The game
 
-Lethemoor: The Last Lantern. Gothic turn-based survival horror, first-person grid crawler, for Android phones (portrait) and a web build for iPhone testers. Godot 4.5, GDScript only. Owner: Duff.
+Lethemoor: The Last Lantern. Gothic turn-based survival horror, first-person grid crawler, for Android phones (portrait) and a web build for iPhone testers. Godot 4.7.2 (4.7.x only), GDScript only, Compatibility renderer. Owner: Duff.
 
 Pillars: light is life (oil is the clock), every slot matters, the dead don't stay gone.
 
