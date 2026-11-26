@@ -3526,14 +3526,15 @@ func _capture_art() -> void:
 	var flicker_ok := false
 	if fi >= 0:
 		var fkeep: Vector2i = game.thralls[fi].pos
-		game.thralls[fi].pos = entry + Vector2i.DOWN * 2
+		var fset: int = game.setting
+		game.thralls[fi].pos = entry + Vector2i.DOWN * 2   # through the quay wall: the flicker counts any wall
 		game.set_lantern(Fog.Lantern.HOODED)
 		game.fog.update(game.lights())
 		_refresh()
 		await _shot("fp_flicker_map")
 		flicker_ok = game.flicker_from().has(game.thralls[fi].pos)
 		game.thralls[fi].pos = fkeep
-		game.set_lantern(Fog.Lantern.NORMAL)
+		game.set_lantern(fset)
 		game.fog.update(game.lights())
 		_refresh()
 	print("FLICKER MAP ", "PASS" if flicker_ok else "FAIL")
