@@ -1072,3 +1072,15 @@ func test_the_record_unlocks_things() -> void:
 	check(Record.news([]) == "", "nothing new, nothing said")
 	check(Record.news(["deeper", "keep1"]).contains("DEEPER") and Record.news(["deeper", "keep1"]).contains("BLACK WAX"), "one line names them")
 	check(Record.news(["deeper", "keep1", "keep2", "keep3"]).contains("3 KEEPSAKES"), "many keepsakes, counted")
+
+
+# Why (review of build 183): "Something is near" scared you but never said from where. The chart's
+# rim now marks the way of each unseen thing making the flame gutter.
+func test_flicker_says_which_way() -> void:
+	var n = Night.start("#########\n#H......#\n#.#######\n#.#######\n#########")
+	n.set_lantern(Fog.Lantern.HOODED)
+	var th := _thrall_at(n, Vector2i(3, 1))
+	n.fog.update(n.lights())
+	check(n.flickers() and n.flicker_from() == [Vector2i(3, 1)], "unseen and near: the flame gutters, and we know which one")
+	th.pos = Vector2i(7, 1)
+	check(not n.flickers() and n.flicker_from().is_empty(), "too far: no flicker, no mark")
