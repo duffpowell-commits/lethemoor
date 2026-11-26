@@ -831,8 +831,8 @@ func _drive_rig(i: int, rig: Node3D, th: Dictionary, delta := 0.0) -> void:
 		return
 	if th.get("crouched", false):
 		rig.set_state("crouch", 0.8)
-	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
-		rig.set_state("lunge", 1.4)
+	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN and th.get("stun", 0) == 0:
+		rig.set_state("lunge", 1.4)   # (a stunned one, torn off you, staggers rather than lunges)
 	elif moving:
 		rig.set_state("walk", 0.75)   # slow, dragging
 	else:

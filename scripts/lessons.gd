@@ -24,7 +24,7 @@ const CARDS := {
 	"lunge": ["IT LUNGED",
 		"Two tiles off and seeing your light, a thrall crouches for a turn, then jerks a tile at you. Backing off doesn't stop it coming; it only buys room. Then it must rest a few turns.\n\nMove now: back off, hook it, or step round a corner. Standing still is death."],
 	"torn": ["IT HAD YOU",
-		"A thrall got its hands on you. You tore free, but the lantern slopped 10 oil and it will be up again in two turns.\n\nThat was your one escape tonight. The next one that reaches you keeps you."],
+		"A thrall got its hands on you. You tore free, but the lantern slopped 10 oil, and it is only down for a moment.\n\nThat was your one escape tonight. The next one that reaches you keeps you."],
 	"rose": ["THE DEAD GET UP",
 		"Not every body is dead. Some lie still till you've walked past and look away, then rise behind you.\n\nGetting up costs it a turn. Keep bodies in front of you, or give them a wide berth."],
 	"stalker": ["THE BRIDE",
