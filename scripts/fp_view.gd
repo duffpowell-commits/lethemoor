@@ -74,7 +74,7 @@ const KILL_ROLL := 0.22
 const KILL_DROP := 0.3               # tiles your eyes fall
 const KILL_WHIP := 0.15              # s to wrench you round to it when it comes from the side or behind
 const THRALL_LUNGE := "thrall_lunge_nightmare"   # reaching for you, sack-mouth open: the lunge and the kill shot
-const STOP_EVENTS := ["crouch", "lunge", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
+const STOP_EVENTS := ["crouch", "lunge", "torn_free", "rose", "roused", "heard", "hook_hit", "hook_broke", "hook_found", "burned", "ignite", "burned_self", "rang", "horror", "panic", "out_of_oil", "taken", "grabbed", "escaped", "letter", "oil", "letter_dim", "stalker_moved"]
 const ROOM := "res://rooms/one_night.txt"   # the slice: reach the bell, ring it, get graded
 const MAP_CELL := 12.0               # the corner map follows you: ~15 tiles across the disc
 const MAP_R := 88.0                  # radius of the round chart
@@ -831,8 +831,8 @@ func _drive_rig(i: int, rig: Node3D, th: Dictionary, delta := 0.0) -> void:
 		return
 	if th.get("crouched", false):
 		rig.set_state("crouch", 0.8)
-	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN:
-		rig.set_state("lunge", 1.4)
+	elif th.get("lunge_cd", 0) == Night.LUNGE_COOLDOWN and th.get("stun", 0) == 0:
+		rig.set_state("lunge", 1.4)   # (a stunned one, torn off you, staggers rather than lunges)
 	elif moving:
 		rig.set_state("walk", 0.75)   # slow, dragging
 	else:
@@ -1146,7 +1146,7 @@ func act(kind: String) -> void:
 	turn_events = events
 	if "hook_hit" in events or "hook_miss" in events or "hook_broke" in events:
 		hook_jab = 1.0
-	if "lunge" in events and not game.dead:
+	if ("lunge" in events or "torn_free" in events) and not game.dead:
 		lunge_hit = 1.0
 	for ev in events:
 		if ev in STOP_EVENTS or last_event not in STOP_EVENTS:
@@ -2065,6 +2065,7 @@ func _refresh_hud() -> void:
 		"burned": "Something burns in the oil. It doesn't scream.",
 		"crouch": "It crouches, low and still, watching the flame. Move.",
 		"lunge": "It lunges, a pace gone in a heartbeat. Backing off won't stop it coming.",
+		"torn_free": "Cold hands had you. You tore free and the lantern slopped oil. Next time it won't let go.",
 		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
 		"roused": "You held it in the high flame too long. It stops shambling.",
 		"blocked_body": "A body lies there, sodden. You'd have to step over it.",

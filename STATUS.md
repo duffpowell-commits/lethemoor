@@ -59,6 +59,8 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 26: the first thrall to grab you each night doesn't kill: you tear free, spilling 10 oil, and it staggers back. The second grab kills. Expert bot 41% -> 50% won; more deaths now come from running out of oil.
+
 - Nov 25: hands hold things. The right fist holds the lantern by an iron link through its fingers (it was a left glove floating beside it); the left fist closes round the boathook's handle with the hook standing up. `scripts/hands.gd`, render `docs/renders/fp_hands.png`.
 
 - Nov 25: your first three nights deal one thrall fewer (Duff's pick after the first-timer review: a newcomer won 15% of nights, 22% with one fewer).

@@ -45,6 +45,8 @@ Search it for a system before you change it.
   thrall moans. Run it after `gen_audio.py`. `docs/HANDOFF_LOG.md` "Real recorded sound".
 - Nov 25: hands hold things: right fist holds the lantern by an iron link, left fist grips the boathook's handle (`scripts/hands.gd`).
   `docs/HANDOFF_LOG.md` "Hands that hold things".
+- Nov 26 review fix A: the first grab each night tears free (-10 oil, it staggers back); the second kills. `Night.torn_free`.
+  `docs/HANDOFF_LOG.md` "Review fix A".
 - Nov 24: Eyes (`docs/EYES.md`): a cloud session can run the night, tap buttons, step, read the HUD
   and screenshot it. Copied from godot-game-starter (Duff: "Add eyes to lethemoor").
 - Builds: `dev` release APK (https://github.com/duffpowell-commits/lethemoor/releases/tag/dev) and

@@ -32,6 +32,9 @@ const BELL_EVERY := 10          # the bell tolls by itself on turn 1 and every t
 const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const GENTLE_SPARE := 1         # thralls left out of a newcomer's first nights (Record.GENTLE_NIGHTS)
 const FLASK_OIL := 12          # an oil flask found on the floor
+const GRAB_OIL := 10           # the first thrall to reach you: you tear free, the lantern spilling this much
+                               # (review of build 183: two in three deaths came with oil to spare, so the
+                               # oil clock never felt like what killed you; now the first grab costs oil)
 ## Deeper Night (unlocked by ringing the bell once, record.gd): the bride wakes sooner and the
 ## flasks are thinner and you set out with less oil. Same ward, same horrors.
 const DEEP_WAKES := 18
@@ -84,6 +87,7 @@ var turn := 0
 var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
+var torn_free := false         # a thrall had you once tonight and you tore free; the next one keeps you
 var killer := ""                # what took you: "thrall" or "stalker" ("" = not a horror)
 var bell_heard := false        # it has tolled once: the map knows where it hangs
 var rang := false               # rang the bell (One Night's goal): escaped with a grade
@@ -253,6 +257,9 @@ func step(p: Vector2i) -> Array:
 	var at := thrall_at(p)
 	if at >= 0 and thralls[at].get("lying", false):
 		_rise(at, events)   # you trip over a body in the dark, and it isn't dead
+		return _end_turn(events)
+	if at >= 0 and not torn_free and thralls[at].get("kind", "thrall") == "thrall":
+		_tear_free(thralls[at], events)   # you walked into it: its hands are on you, and you wrench free
 		return _end_turn(events)
 	if at >= 0:
 		killer = thralls[at].get("kind", "thrall")
@@ -620,6 +627,9 @@ func _thralls_act(events: Array) -> void:
 			th.stun -= 1       # knocked down by the hook (or still getting up): no move, no grab
 			                   # (and out of its crouch: the next lunge needs a new tell)
 			continue
+		if _dist(th.pos) == 1 and not torn_free:
+			_tear_free(th, events)
+			continue
 		if _dist(th.pos) == 1:
 			killer = "thrall"
 			_die("Cold hands, out of the dark. The lantern rolls away.")
@@ -670,6 +680,21 @@ func _thralls_act(events: Array) -> void:
 				events.append("lunge")
 		if not events.has("thrall_moved"):
 			events.append("thrall_moved")
+
+
+## The first grab of the night: you wrench free. Oil slops out of the lantern (GRAB_OIL), dread
+## jumps, and the thing staggers back a tile and is down for HOOK_STUN turns. Only once a night.
+func _tear_free(th: Dictionary, events: Array) -> void:
+	torn_free = true
+	oil = maxi(0, oil - GRAB_OIL)
+	dread = mini(DREAD_MAX, dread + DREAD_HORROR)
+	th.stun = HOOK_STUN
+	th.crouched = false
+	th.lunge_cd = LUNGE_COOLDOWN
+	var back: Vector2i = th.pos + (th.pos - hunter)
+	if not room.is_wall(back) and thrall_at(back) < 0 and back != hunter:
+		th.pos = back
+	events.append("torn_free")
 
 
 ## A corpse gets up: it's hunting you now, but rising costs it its next turn.

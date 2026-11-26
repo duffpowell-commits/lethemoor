@@ -192,6 +192,7 @@ func test_hooding_loses_it() -> void:
 
 func test_adjacent_thrall_takes_you() -> void:
 	var n = Night.start("######\n#H.T.#\n######")
+	n.torn_free = true   # already torn free once tonight: this one keeps you
 	n.set_lantern(Fog.Lantern.HOODED)
 	var ev: Array = n.wait()
 	check(not n.dead, "two tiles off and hooded: still alive (it noticed nothing)")
@@ -206,7 +207,13 @@ func test_adjacent_thrall_takes_you() -> void:
 
 
 func test_walking_into_unseen_thrall() -> void:
+	var f = Night.start("#####\n#HT.#\n#####")
+	f.set_lantern(Fog.Lantern.HOODED)
+	var fe: Array = f.step(Vector2i(2, 1))
+	check(not f.dead and "torn_free" in fe and f.hunter == Vector2i(1, 1) and f.thralls[0].pos == Vector2i(3, 1),
+			"the first time tonight: its hands are on you, you wrench free and it staggers back")
 	var n = Night.start("#####\n#HT.#\n#####")
+	n.torn_free = true
 	n.set_lantern(Fog.Lantern.HOODED)
 	check(n.can_step(Vector2i(2, 1)), "you can't see it, so you can step there")
 	var ev: Array = n.step(Vector2i(2, 1))
@@ -810,8 +817,32 @@ func test_thrall_lunges_from_two_tiles() -> void:
 	check("lunge" in ev and th.pos == Vector2i(2, 1), "still there: it lunges a tile")
 	check(not n.dead, "a lunge closes the gap; the grab comes on its next turn")
 	n.step_dir(Vector2i.LEFT)   # back into the wall: no turn spent
-	n.wait()
-	check(n.dead, "stand there after a lunge and it has you")
+	var before: int = n.oil
+	ev = n.wait()
+	check(not n.dead and "torn_free" in ev, "stand there after a lunge and it grabs: the first time tonight, you tear free")
+	check(before - n.oil >= Night.GRAB_OIL and th.stun > 0 and th.pos == Vector2i(3, 1), \
+			"it costs GRAB_OIL, and the thing staggers back a tile and is down")
+	for i in 12:
+		n.wait()
+		if n.dead:
+			break
+	check(n.dead, "stand there and it comes again: the second grab keeps you")
+
+
+func test_first_grab_tears_free_once() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(2, 1), {target = Vector2i(1, 1)})
+	var oil0: int = n.oil
+	var ev: Array = n.wait()
+	check(not n.dead and "torn_free" in ev and n.torn_free, "next to you on its turn, the first time: you tear free")
+	check(oil0 - n.oil >= Night.GRAB_OIL, "the lantern slops GRAB_OIL")
+	check(th.pos == Vector2i(3, 1) and th.stun == Night.HOOK_STUN, "it staggers back a tile and is down")
+	th.stun = 0
+	th.lunge_cd = 0
+	th.pos = Vector2i(2, 1)
+	ev = n.wait()
+	check(n.dead and "taken" in ev, "the second time it has you")
 
 
 func test_lunge_rests_and_backing_off_works() -> void:
@@ -940,6 +971,7 @@ func test_hook_breaks_a_crouch() -> void:
 
 func test_killer_is_recorded() -> void:
 	var n = Night.start("#####\n#HT.#\n#####")
+	n.torn_free = true
 	n.set_lantern(Fog.Lantern.HOODED)
 	n.step(Vector2i(2, 1))
 	check(n.dead and n.killer == "thrall", "walked into a thrall in the dark: the thrall took you")
