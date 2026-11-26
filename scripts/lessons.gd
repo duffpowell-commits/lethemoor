@@ -40,7 +40,7 @@ const CARDS := {
 	"noise": ["NOISE",
 		"They hear as well as they see. Walking, turning and waiting are quiet. A hook blow carries 4 tiles, a swing at nothing 3, a spark 3, pouring 2, and fire crackles 3 tiles every turn it burns.\n\nWhat hears it comes to look, round corners too. Fire draws them in, and they walk into it."],
 	"hook": ["THE BOATHOOK",
-		"Tap HOOK to swing at the first thing up to 2 tiles ahead. It's knocked back a tile and can't move for 2 turns.\n\nEvery hit bends the hook. After 3 it's useless. A swing at nothing costs the turn."],
+		"Tap HOOK to swing at the first thing up to 2 tiles ahead. When it glows and reads HOOK IT!, something is in reach. It's knocked back a tile and can't move for 2 turns.\n\nEvery hit bends the hook. After 3 it's useless. A swing at nothing costs the turn."],
 	"slick": ["OIL SLICK",
 		"POUR soaks the tile in front of you (3 oil). Pour again to make it longer. Back off, keep looking at it, and tap SPARK (1 oil).\n\nThe fire burns 3 turns. Whatever stands in it burns, and you can't walk through it. Don't stand in your own oil."],
 	"panic": ["PANIC",

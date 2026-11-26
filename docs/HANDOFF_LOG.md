@@ -653,3 +653,9 @@ From the mock review: one map with fixed walls got learned by night three, and n
 ## Review fix B: the chart says which way (Nov 26)
 - "The flame gutters. Something is near." used to say nothing about where. Now each unseen awake thrall or bride within `Fog.FLICKER_RANGE` (3, any wall) puts a red arc and arrowhead on the chart's rim pointing its way: `Fog.near_unseen()`, `Night.flicker_from()`, drawn in `_draw_map`. When dread makes the flame lie (`fake_flicker`), a mark appears from a direction picked by turn and seed: the chart lies too.
 - No sound from that side: close-up thralls are silent by design (`Night.silent`, QUIET_NEAR), so the chart carries it. Capture: `FLICKER MAP PASS`, render `fp_flicker_map.png`. Test `test_flicker_says_which_way`.
+
+## Review fix C: teach the hook (Nov 26)
+- The first-timer review died with all 3 hook hits unused: nothing said "swing now". `Night.hook_target()` returns the thrall a swing would hit (first one within `HOOK_REACH` ahead, short of a wall); `hook()` uses it, so the glow and the swing always agree.
+- The view lights HOOK (amber, `UI.lit`), relabels it HOOK IT!, pulses it, and the status line says it's in reach, but only when that thrall stands in LIT fog and isn't a lying corpse: a hidden one never lights the button, or the button would give it away. The field note says what the glow means.
+- Capture: `HOOK GLOW PASS` (lit with a thrall 2 ahead, out once the hit knocks it to 3), render `fp_thrall.png`. Test `test_hook_target_matches_the_swing`.
+- Gotcha: `tools/test.sh` doesn't load `fp_view.gd`, so a type-inference parse error there only shows in the capture (or `--check-only`). Run one of those after view edits.
