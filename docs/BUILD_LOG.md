@@ -5,19 +5,18 @@ logs for another ai to build where you stop." Updated as the work goes, not only
 The newest entry is at the top. Rules and commands: `CLAUDE.md` (it applies to every agent).
 Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
 
-## Right now (2026-11-26, 13:10 UTC)
-- **Live:** build 196 (main `cda4877`): the 8.5 pass (PR #66). APK:
+## Right now (2026-11-26, 13:50 UTC)
+- **Live:** build 199 (main `e17a537`): the gap pass (PR #68). APK:
   https://github.com/duffpowell-commits/lethemoor/releases/download/dev/lethemoor.apk ;
   web: https://duffpowell-commits.github.io/lethemoor/ . Check `releases/download/dev/version.json`.
-- **Working branch:** `claude/project-thread-qrikmp` (the only branch sessions push to). No PR open
-  for the gap pass yet.
-- **Goal (changed Nov 26, 13:12 UTC):** Duff paused the game, then said "We'll build all of the
-  fixes, cancel the reviews". So: build every gap item below in one PR, merge when CI is green.
-  **No blind first-timer review this round** (the 8.5 gate is off until he asks for a review again).
+- **Working branch:** `claude/project-thread-qrikmp` (the only branch sessions push to). No PR open.
+- **Paused** (Duff, Nov 26: "Pause all of them we'll continue on rush"). Then "We'll build all of the
+  fixes, cancel the reviews": the gap pass below is built and merged, with no blind review.
+  Next: nothing until Duff picks Lethemoor up again (his phone playtest of build 199 comes first).
 - **Scores so far (blind first-timer):** build 183: 5/10. Build 196 (8.5 pass): 6.4/10.
-  Duff chose: merge 6.4, then build the gap below in one pass, gated on 8.5 again.
+  Build 199 (gap pass): not reviewed (Duff cancelled it).
 
-## The gap pass (in progress): what a first-timer still hit at 6.4
+## The gap pass (done, PR #68, build 199): what a first-timer still hit at 6.4
 Tick each line when it's built, tested and in the branch.
 - [x] **A scare every night.** Rule in `scripts/sim/night.gd`: `_beat()`; if no horror has come into
       your light by `BEAT_TURN` (20), the nearest standing thrall turns up 6-9 walking tiles away on a
@@ -30,9 +29,9 @@ Tick each line when it's built, tested and in the branch.
       the shortest road to the bell when it can (a side room was still missed).
 - [x] **Death tip only suggests the hook if you hold one** (`scripts/lessons.gd` `death()`).
 - [x] **THRALLS card before OIL SLICK** (`lessons.gd`: make "slick" trigger on kind "thrall" only).
-- [ ] **No cliff after night 3.** Newcomer bot: 41% won on first nights, 11% after. Plan:
-      `Record.easing(rec)` 2 for nights 1-3, 1 for nights 4-6 (`HALF_OIL` 8 more oil, chalk kept,
-      one escape, normal bride), 0 after.
+- [x] **No cliff after night 3.** `Record.easing(rec)` 2 for nights 1-3, 1 for nights 4-6
+      (`Night.half`: `HALF_OIL` 8 more oil, chalk, two escapes, normal bride), 0 after.
+      Newcomer bot nights 4-6: 11% -> 29% won.
 - [x] **Show oil spills**: red "-10 SPILLED" under the oil bar on torn_free / panic (`_show_spill`).
 - [x] **A real bell**: `Harbor.bell()` is now the iron yoke plus a child "Body" (lathe-turned
       bronze, `BELL_PROFILE`, hanger + clapper). `fp_view._swing_bell()` swings it 1.7 s before the card.
@@ -40,8 +39,8 @@ Tick each line when it's built, tested and in the branch.
 - [x] **Status line stops repeating**: `AMBIENT` lines turn over every 4 turns at normal flame;
       on a toll, `_toll_line()` says which way (ahead / behind / left / right of where you face).
 - [x] **End card on first nights** says "FIRST NIGHT 1 OF 3" (`_night_tag()`, `night_no`).
-- [ ] Docs: `CLAUDE.md` Where things stand, `docs/HANDOFF_LOG.md`, `STATUS.md`, this file.
-- [ ] Gate: tests, capture ART PASS, CI green, fresh-eyes review PASS on the head, merge.
+- [x] Docs: `CLAUDE.md` Where things stand, `docs/HANDOFF_LOG.md`, `STATUS.md`, this file.
+- [x] Gate: tests, capture ART PASS, CI green, fresh-eyes review PASS on the head, merge (#68).
       (Blind first-timer review cancelled by Duff for this round.)
 
 ## How to build, test and review (cloud sandbox)
@@ -72,6 +71,8 @@ Tick each line when it's built, tested and in the branch.
 - Lethemoor keeps its own signing key. Never make or change a key.
 
 ## Log (newest first)
+- 2026-11-26 13:50 UTC: PR #68 (gap pass) merged as e17a537. Every gap item ticked; no blind review
+  (Duff cancelled it). Next for any AI: wait for Duff (game paused, Rush has the focus).
 - 2026-11-26 13:40 UTC: Duff paused, then "build all of the fixes, cancel the reviews". Built: hook on
   the bell road, slump, spill label, lathe bell + swing, rotating status, toll direction, scent line +
   sound, first-night label, grade-cap note. Tests 83 pass. Next: tune the first-night win rate back
