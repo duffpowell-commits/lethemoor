@@ -854,12 +854,90 @@ func test_first_grab_tears_free_once() -> void:
 	var ev: Array = n.wait()
 	check(not n.dead and "torn_free" in ev and n.torn_free, "next to you on its turn, the first time: you tear free")
 	check(oil0 - n.oil >= Night.GRAB_OIL, "the lantern slops GRAB_OIL")
-	check(th.pos == Vector2i(3, 1) and th.stun == Night.HOOK_STUN, "it staggers back a tile and is down")
+	check(th.pos == Vector2i(3, 1) and th.stun == Night.GRAB_STUN and th.target == null, "it staggers back a tile, is down and has lost you")
 	th.stun = 0
 	th.lunge_cd = 0
 	th.pos = Vector2i(2, 1)
 	ev = n.wait()
 	check(n.dead and "taken" in ev, "the second time it has you")
+
+
+func test_first_nights_tear_free_twice() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.gentle = true
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(2, 1), {target = Vector2i(1, 1)})
+	n.wait()
+	check(not n.dead and n.tears == 1 and not n.torn_free, "first night: the first grab leaves one escape")
+	th.stun = 0
+	th.lunge_cd = 0
+	th.pos = Vector2i(2, 1)
+	th.target = Vector2i(1, 1)
+	n.wait()
+	check(not n.dead and n.tears == 2 and n.torn_free, "the second grab: torn free again, none left")
+	th.stun = 0
+	th.lunge_cd = 0
+	th.pos = Vector2i(2, 1)
+	n.wait()
+	check(n.dead, "the third keeps you")
+
+
+func test_shove_past_a_downed_thrall() -> void:
+	var n = Night.start("#######\n#H....#\n#######")
+	n.facing = Vector2i.RIGHT
+	n.torn_free = true
+	var th := _thrall_at(n, Vector2i(2, 1))
+	th.stun = 2
+	var ev: Array = n.step_dir(Vector2i.RIGHT)
+	check("shoved_past" in ev and n.hunter == Vector2i(2, 1) and th.pos == Vector2i(1, 1) and not n.dead, "a downed thrall: you shove past and it's behind you")
+	var m = Night.start("#######\n#H....#\n#######")
+	m.facing = Vector2i.RIGHT
+	var up := _thrall_at(m, Vector2i(2, 1))
+	m.fog.update(m.lights())
+	check(not m.can_step(Vector2i(2, 1)) and up.stun == 0, "one that's standing, in your light: you can't walk into it")
+
+
+func test_first_nights_chalk_the_way_and_give_oil() -> void:
+	var text := FileAccess.get_file_as_string("res://rooms/one_night.txt")
+	var g = Night.start_dealt(text, 11, false, true)
+	var h = Night.start_dealt(text, 11, false, false)
+	check(g.oil == h.oil + Night.GENTLE_OIL and g.wakes() == Night.GENTLE_WAKES, "first nights: more oil, the bride wakes later")
+	check(not g.chalk.is_empty() and h.chalk.is_empty(), "first nights are chalked, later ones aren't")
+	var bell: Vector2i = g.room.bells[0]
+	var dist: Dictionary = g.room.reachable(bell, 9999)
+	var ok := true
+	for p: Vector2i in g.chalk:
+		ok = ok and dist.has(p + g.chalk[p]) and dist[p + g.chalk[p]] == dist[p] - 1
+	check(ok, "every chalk arrow points one step nearer the bell")
+	var d = Night.start_dealt(text, 11, true, true)
+	check(d.chalk.is_empty() and not d.gentle, "a Deeper Night is never gentle")
+
+
+func test_death_card_says_why() -> void:
+	var n = Night.start("#######\n#.H...#\n#######")
+	n.facing = Vector2i.RIGHT
+	n.torn_free = true
+	var th := _thrall_at(n, Vector2i(1, 1), {target = Vector2i(2, 1)})
+	n.set_lantern(Fog.Lantern.NORMAL)
+	n.wait()
+	check(n.dead and n.killed_from == Vector2i.LEFT, "it took you from behind")
+	var why: Array = Lessons.death(n)
+	check(why[0] == "BEHIND YOU, OUT OF THE DARK" and why[1].contains("red mark"), "the card names the side and points at the red mark")
+	var rec := Record.blank()
+	check(Record.next_goal(rec).contains("DEEPER NIGHT"), "first goal: ring the bell once")
+	Record.add_night(rec, true, "C", false)
+	check(Record.next_goal(rec).contains("grade B"), "then a keepsake")
+
+
+func test_heard_names_what_moved() -> void:
+	var n = Night.start("#############\n#......H....#\n#############")
+	n.facing = Vector2i.RIGHT
+	var th := _thrall_at(n, Vector2i(1, 1))
+	var before: Array = n.positions()
+	th.pos = Vector2i(2, 1)   # 5 tiles behind: past QUIET_NEAR, within earshot
+	check(Audio.heard(n, before) == ["thrall", Vector2i(2, 1)], "a thrall shuffled behind you, out of sight: the subtitle says so")
+	before = n.positions()
+	check(Audio.heard(n, before).is_empty(), "nothing moved: nothing to say")
 
 
 func test_lunge_rests_and_backing_off_works() -> void:
@@ -1007,6 +1085,7 @@ func test_updater_later_holds() -> void:
 
 const Ward = preload("res://scripts/sim/ward.gd")
 const Record = preload("res://scripts/sim/record.gd")
+const Lessons = preload("res://scripts/lessons.gd")
 
 
 func test_every_dealt_night_has_its_own_walls() -> void:

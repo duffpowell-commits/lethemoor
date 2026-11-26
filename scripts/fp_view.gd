@@ -147,8 +147,10 @@ var blood_screen: TextureRect      # blood thrown across your sight when one lun
 var print_tex: Texture2D
 var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
+var chalk_nodes := {}          # gentle nights: chalk arrows on the stones at forks, toward the bell
 var hook_nodes := {}              # tile -> boathook lying on the floor
 var slick_nodes := {}             # tile -> oil slick / fire on the floor (made as they appear)
+var heard_now: Array = []        # [kind, pos] a horror you heard move this turn (Audio.heard): the subtitle
 var hook_ready := false            # a thrall you can see is in the hook's reach: HOOK glows and pulses
 var item_buttons := {}            # HOOK / POUR / SPARK, left edge above the bottom panel
 var letter_mats := {}             # tile -> material, goes pale once read
@@ -257,6 +259,28 @@ func _prop_sprite(name: String, h: float) -> Sprite3D:
 	sp.shaded = true
 	sp.offset = Vector2(0, sp.texture.get_height() / 2.0)
 	return sp
+
+
+## A chalk arrow, pointing up the image (rough strokes, gaps where the chalk skipped).
+func _chalk_arrow() -> Image:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var stroke := func(a: Vector2, b: Vector2) -> void:
+		for i in 60:
+			var p: Vector2 = a.lerp(b, i / 59.0)
+			if rng.randf() < 0.12:
+				continue   # the chalk skipped
+			for dx in range(-2, 3):
+				for dy in range(-2, 3):
+					var q := Vector2i(p) + Vector2i(dx, dy)
+					if q.x >= 0 and q.y >= 0 and q.x < 64 and q.y < 64 and rng.randf() < 0.8:
+						img.set_pixelv(q, Color(1, 1, 1, rng.randf_range(0.55, 0.95)))
+	stroke.call(Vector2(32, 56), Vector2(32, 10))
+	stroke.call(Vector2(32, 9), Vector2(17, 26))
+	stroke.call(Vector2(32, 9), Vector2(47, 26))
+	return img
 
 
 func _w(p: Vector2i) -> Vector3:
@@ -455,6 +479,30 @@ func _build_world() -> void:
 		flask.add_child(glint)
 		add_child(flask)
 		flask_nodes[op] = flask
+
+	# chalk arrows at the forks (a newcomer's first nights: Night.chalk), scratched on the flagstones
+	if not game.chalk.is_empty():
+		var ct := ImageTexture.create_from_image(_chalk_arrow())
+		for cp: Vector2i in game.chalk:
+			var d: Vector2i = game.chalk[cp]
+			var mark := MeshInstance3D.new()
+			var q := QuadMesh.new()
+			q.size = Vector2(0.55, 0.55)
+			mark.mesh = q
+			var cm := StandardMaterial3D.new()
+			cm.albedo_texture = ct
+			cm.albedo_color = Color(0.92, 0.9, 0.84)
+			cm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			cm.roughness = 1.0
+			cm.emission_enabled = true          # chalk holds what little light there is
+			cm.emission = Color(0.16, 0.15, 0.13)
+			mark.material_override = cm
+			mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mark.position = _w(cp) + Vector3(0, 0.012, 0)
+			mark.rotation = Vector3(-PI / 2, atan2(-float(d.x), -float(d.y)), 0)
+			mark.rotation_order = EULER_ORDER_YXZ
+			add_child(mark)
+			chalk_nodes[cp] = mark
 
 	# boathooks on the floor: a long dark pole with an iron hook (placeholder, art comes via Foxboard)
 	for kp: Vector2i in room.hooks:
@@ -797,6 +845,8 @@ func _refresh_fog() -> void:
 	_sync_slicks()
 	for fp: Vector2i in flask_nodes:
 		flask_nodes[fp].visible = game.flasks_left.has(fp) and fog.get_state(fp) != Fog.DARK
+	for cp: Vector2i in chalk_nodes:
+		chalk_nodes[cp].visible = fog.get_state(cp) != Fog.DARK
 	for lp: Vector2i in letter_mats:
 		if game.letters_read.has(lp):
 			tile_base[Vector2i(-200 - lp.x, -200 - lp.y)] = Color(0.3, 0.27, 0.23)   # read: it's spent
@@ -1098,6 +1148,7 @@ func act(kind: String) -> void:
 		"pour": events = game.pour()
 		"spark": events = game.spark()
 	Sound.hook_turn(kind, events, game, game.turn != turn0)
+	heard_now = Sound.heard(game, from_t) if game.turn != turn0 else []
 	# a quiet step returns no events too: only an unspent turn means you hit stone
 	if game.turn == turn0 and not game.over() and kind in ["forward", "back"]:
 		busy = false          # bumped a wall (or a thrall you can see): no turn spent
@@ -2052,8 +2103,8 @@ func _map_sign(p: Vector2i, r: Rect2) -> void:
 		minimap.draw_line(ctr + Vector2(-c, c) * 0.35, ctr + Vector2(c, -c) * 0.35, Color(0.75, 0.7, 0.55), 1.4)
 
 
-## A thrall you can see stands where a swing would land (the rule picks it, the fog says you
-## see it; a hidden one never lights the button, or the button would give it away).
+## A thrall you can see stands where a swing would land and isn't already down (the rule picks it,
+## the fog says you see it; a hidden one never lights the button, or the button would give it away).
 func _hook_ready() -> bool:
 	if game == null or game.over() or game.hook_wear <= 0:
 		return false
@@ -2061,7 +2112,27 @@ func _hook_ready() -> bool:
 	if i < 0:
 		return false
 	var th: Dictionary = game.thralls[i]
-	return not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT
+	return not th.get("lying", false) and th.get("stun", 0) == 0 and fog.get_state(th.pos) == Fog.LIT
+
+
+## "A wet shuffle, off to your left." Which side is from where you face (the sound plays from there too).
+func _heard_line(h: Array) -> String:
+	var d: Vector2i = h[1] - game.hunter
+	var f: Vector2i = game.facing
+	var ahead := d.x * f.x + d.y * f.y
+	var right := d.x * -f.y + d.y * f.x
+	var side := "ahead" if ahead > absi(right) else ("behind you" if -ahead > absi(right) else ("off to your right" if right > 0 else "off to your left"))
+	if h[0] == "stalker":
+		return "Silk dragging on stone, %s. The bride is moving." % side
+	return "A wet shuffle, %s. A thrall." % side
+
+
+## A thrall you can see lies down on the tile right ahead: one step shoves you past it.
+func _down_ahead() -> bool:
+	if game == null or game.over():
+		return false
+	var i: int = game.thrall_at(game.hunter + game.facing)
+	return i >= 0 and game.down(i) and fog.get_state(game.thralls[i].pos) == Fog.LIT
 
 
 func _refresh_hud() -> void:
@@ -2099,7 +2170,9 @@ func _refresh_hud() -> void:
 		"burned": "Something burns in the oil. It doesn't scream.",
 		"crouch": "It crouches, low and still, watching the flame. Move.",
 		"lunge": "It lunges, a pace gone in a heartbeat. Backing off won't stop it coming.",
-		"torn_free": "Cold hands had you. You tore free and the lantern slopped oil. Next time it won't let go.",
+		"torn_free": "Cold hands had you. You tore free and the lantern slopped oil. Next time it won't let go." if game.torn_free \
+				else "Cold hands had you. You tore free, spilling oil. It's lost you for now: get away, or shove past it.",
+		"shoved_past": "You shoulder past the limp thing. It's behind you now. Keep going.",
 		"rose": "Behind you, wet cloth tears off the stones. The dead one is getting up.",
 		"roused": "You held it in the high flame too long. It stops shambling.",
 		"blocked_body": "A body lies there, sodden. You'd have to step over it.",
@@ -2114,8 +2187,12 @@ func _refresh_hud() -> void:
 		s = extra
 	elif _hook_ready():
 		s = "It's in reach of the hook. Tap HOOK IT! to knock it back."
+	elif _down_ahead():
+		s = "It's down. Walk into it to shove past, before it gets up."
 	elif flicker or fake_flicker:
 		s = "The flame gutters. Something is near."
+	elif not heard_now.is_empty():
+		s = _heard_line(heard_now)
 	if game.turn < 3 and extra == "":
 		s = "Swipe up to walk (hold to keep going), down to back away, sideways to turn. Find the bell."
 	status_label.text = s
@@ -2896,7 +2973,7 @@ func _show_end() -> void:
 		small.autowrap_mode = TextServer.AUTOWRAP_WORD
 		box.add_child(small)
 		var again := Button.new()
-		again.text = "WALK THE NIGHT AGAIN"
+		again.text = "ONE MORE NIGHT"
 		again.focus_mode = Control.FOCUS_NONE
 		again.custom_minimum_size = Vector2(0, 66)
 		again.add_theme_font_size_override("font_size", 19)
@@ -2927,7 +3004,8 @@ func _show_end() -> void:
 		small.text = "You reach the water's edge as the sky goes grey.\n\n%d turns  ·  %d oil left" % [game.turn, game.oil]
 	else:
 		big.text = "THE DARK TOOK YOU"
-		small.text = "%s\n\n%d turns  ·  %d oil left" % [game.cause, game.turn, game.oil]
+		var why: Array = Lessons.death(game)
+		small.text = "%s\n\n%s\n%s\n\n%d turns  ·  %d oil left" % [game.cause, why[0], why[1], game.turn, game.oil]
 	small.text += ("\n\nNight %d" % game.seed + ("  ·  DEEPER" if game.deep else "") + ("  ·  FIRST NIGHTS" if game.gentle else "")) if game.seed > 0 else ""
 	if not night_counted and not capture_mode:
 		night_counted = true
@@ -2936,6 +3014,9 @@ func _show_end() -> void:
 		unlocked_now = news
 	if not unlocked_now.is_empty():
 		small.text += "\n" + Record.news(unlocked_now)
+	var goal: String = Record.next_goal(record)
+	if goal != "" and not capture_mode:
+		small.text += "\n" + goal
 	end_screen.visible = true
 	_fit_end_card.call_deferred()
 

@@ -265,6 +265,9 @@ func on_turn(kind: String, events: Array, game, spent: bool) -> void:
 			"torn_free":   # wrenched free: the sting, and the lantern's oil slopping
 				sfx("sting_horror", 1.0, 0.9)
 				_later(0.2, "oil", -2.0, 0.8)
+			"shoved_past":   # shouldering past something wet and limp
+				sfx("bump", -1.0, 0.7)
+				_later(0.12, "heard_turn", -6.0, 0.6)
 			"crouch": sfx("heard_turn", -1.0, 0.7)
 			"rose": sfx("sting_dread", -1.0, 0.85)
 			"roused": sfx("heard_turn", -2.0, 0.8)
@@ -311,7 +314,7 @@ static func cues(kind: String, events: Array, spent: bool) -> Array:
 		out.append(kind)
 	for e in events:
 		match e:
-			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", "crouch", "lunge", "torn_free", "rose", "roused", \
+			"oil", "letter", "letter_dim", "horror", "panic", "out_of_oil", "crouch", "lunge", "torn_free", "shoved_past", "rose", "roused", \
 					"hook_hit", "hook_broke", "hook_found", "burned":
 				out.append(e)
 			"rang":
@@ -364,6 +367,27 @@ func _world_sounds(game) -> void:
 		var linger: int = mini(now[i] - 1, 3)
 		at("breath_behind", game.thralls[i].pos, 1.0 - bd * 2.0 + linger * 1.5, randf_range(0.9, 1.05) - linger * 0.04)
 	was_behind = now
+
+
+## The subtitle for what you heard move this turn (8.5 plan: a first-timer should know a thrall's
+## shuffle from the bride's silk): the nearest horror out of sight that moved within earshot and
+## isn't so close it has gone quiet. [kind, pos], or [] if nothing. Pure, tested headless.
+static func heard(game, before: Array) -> Array:
+	var best: Array = []
+	var best_d := INF
+	for i in game.thralls.size():
+		var th: Dictionary = game.thralls[i]
+		if th.get("gone", false) or th.get("lying", false) or i >= before.size() or before[i] == th.pos:
+			continue
+		if game.in_view(th.pos) and game.fog.get_state(th.pos) == Fog.LIT:
+			continue   # you can see it: no need to say what you heard
+		var d: float = Vector2(th.pos - game.hunter).length()
+		if d > HEAR or (game.has_method("silent") and game.silent(th)):
+			continue
+		if d < best_d:
+			best_d = d
+			best = [th.get("kind", "thrall"), th.pos]
+	return best
 
 
 ## Horrors breathing at your neck: within BEHIND_NEAR walking tiles, out of your view cone,

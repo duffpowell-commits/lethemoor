@@ -31,10 +31,14 @@ const STALKER_RECOIL := 3       # held lit and looked at this many turns running
 const BELL_EVERY := 10          # the bell tolls by itself on turn 1 and every this many turns after: follow it
 const VIEW_COS := 0.64          # ~50 degrees either side of where you face
 const GENTLE_SPARE := 1         # thralls left out of a newcomer's first nights (Record.GENTLE_NIGHTS)
+const GENTLE_OIL := 15          # a newcomer's first nights start with this much more oil (8.5 plan, Nov 26)
+const GENTLE_WAKES := 45        # and the bride starts hunting you blind this much later
+const GENTLE_TEARS := 2         # and you tear free of this many grabs before one keeps you
 const FLASK_OIL := 12          # an oil flask found on the floor
 const GRAB_OIL := 10           # the first thrall to reach you: you tear free, the lantern spilling this much
                                # (review of build 183: two in three deaths came with oil to spare, so the
                                # oil clock never felt like what killed you; now the first grab costs oil)
+const GRAB_STUN := 4           # turns a thrall you tore free of is down, and it loses you: time to get away (8.5 plan)
 ## Deeper Night (unlocked by ringing the bell once, record.gd): the bride wakes sooner and the
 ## flasks are thinner and you set out with less oil. Same ward, same horrors.
 const DEEP_WAKES := 18
@@ -87,7 +91,11 @@ var turn := 0
 var dead := false
 var escaped := false
 var cause := ""                 # why you died, in the game's voice
-var torn_free := false         # a thrall had you once tonight and you tore free; the next one keeps you
+var torn_free := false         # you've used up tonight's tear-frees: the next grab keeps you
+var tears := 0                  # grabs you've torn free of tonight
+var chalk := {}                 # gentle nights: fork tile -> the way toward the bell, chalked on the stones
+var killed_from := Vector2i.ZERO  # where what took you stood, from you (grid), for the death card
+var killed_seen := false        # could you see it (lit and in front of you) when it took you
 var killer := ""                # what took you: "thrall" or "stalker" ("" = not a horror)
 var bell_heard := false        # it has tolled once: the map knows where it hangs
 var rang := false               # rang the bell (One Night's goal): escaped with a grade
@@ -125,12 +133,40 @@ static func start_dealt(room_text: String, seed: int, deeper := false, gentle :=
 	n.gentle = gentle and not deeper and seed > 0
 	if deeper:
 		n.oil = DEEP_OIL
+	elif n.gentle:
+		n.oil += GENTLE_OIL
+		n._chalk_road()
 	return n
+
+
+## Someone came this way before you and chalked the forks: at every tile where three or more ways
+## meet, an arrow toward the bell (the shortest way). Only on a newcomer's first nights, where
+## getting lost was what ran the oil out (first-timer bot, Nov 26).
+func _chalk_road() -> void:
+	chalk = {}
+	if room.bells.is_empty():
+		return
+	var bell: Vector2i = room.bells[0]
+	var dist: Dictionary = room.reachable(bell, 9999)
+	for p: Vector2i in dist:
+		if p == bell:
+			continue
+		var ways: Array[Vector2i] = []
+		for d: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			if dist.has(p + d):
+				ways.append(d)
+		if ways.size() < 3:
+			continue
+		var best: Vector2i = ways[0]
+		for d in ways:
+			if dist[p + d] < dist[p + best]:
+				best = d
+		chalk[p] = best
 
 
 ## The turn the bride starts hunting you blind.
 func wakes() -> int:
-	return DEEP_WAKES if deep else STALKER_WAKES
+	return DEEP_WAKES if deep else (GENTLE_WAKES if gentle else STALKER_WAKES)
 
 
 ## Oil in a flask found on the floor.
@@ -250,7 +286,13 @@ func can_step(p: Vector2i) -> bool:
 	if over() or room.is_wall(p) or burning(p) or (p - hunter).abs().x + (p - hunter).abs().y != 1:
 		return false
 	var i := thrall_at(p)
-	return i < 0 or fog.get_state(p) != Fog.LIT
+	return i < 0 or fog.get_state(p) != Fog.LIT or down(i)
+
+
+## A thrall that's down this turn (hooked, or reeling after you tore free): you can shove past it.
+func down(i: int) -> bool:
+	var th: Dictionary = thralls[i]
+	return th.get("stun", 0) > 0 and th.get("kind", "thrall") == "thrall" and not th.get("lying", false) and not th.get("gone", false)
 
 
 ## Take one turn moving onto `p`. Returns the events that happened (strings), [] if illegal.
@@ -263,11 +305,21 @@ func step(p: Vector2i) -> Array:
 	if at >= 0 and thralls[at].get("lying", false):
 		_rise(at, events)   # you trip over a body in the dark, and it isn't dead
 		return _end_turn(events)
+	if at >= 0 and down(at):
+		# it's down (hooked, or reeling from your tearing free): you shove past it, and it's behind you
+		var th: Dictionary = thralls[at]
+		th.pos = hunter
+		if p - hunter != -facing:
+			facing = p - hunter
+		hunter = p
+		events.append("shoved_past")
+		return _end_turn(events)
 	if at >= 0 and not torn_free and thralls[at].get("kind", "thrall") == "thrall":
 		_tear_free(thralls[at], events)   # you walked into it: its hands are on you, and you wrench free
 		return _end_turn(events)
 	if at >= 0:
 		killer = thralls[at].get("kind", "thrall")
+		_mark_killer(thralls[at])
 		_die("Something was standing in the dark. It was waiting.")
 		events.append("grabbed")
 		return events
@@ -562,6 +614,7 @@ func _stalker_act(i: int, events: Array) -> void:
 			return
 		if (th.pos - hunter).abs().x + (th.pos - hunter).abs().y == 1:
 			killer = "stalker"
+			_mark_killer(th)
 			_die("Lace, and a cold breath at your neck. You never saw her move.")
 			events.append("taken")
 			return
@@ -643,6 +696,7 @@ func _thralls_act(events: Array) -> void:
 			continue
 		if _dist(th.pos) == 1:
 			killer = "thrall"
+			_mark_killer(th)
 			_die("Cold hands, out of the dark. The lantern rolls away.")
 			events.append("taken")
 			return
@@ -696,10 +750,12 @@ func _thralls_act(events: Array) -> void:
 ## The first grab of the night: you wrench free. Oil slops out of the lantern (GRAB_OIL), dread
 ## jumps, and the thing staggers back a tile and is down for HOOK_STUN turns. Only once a night.
 func _tear_free(th: Dictionary, events: Array) -> void:
-	torn_free = true
+	tears += 1
+	torn_free = tears >= (GENTLE_TEARS if gentle else 1)
 	oil = maxi(0, oil - GRAB_OIL)
 	dread = mini(DREAD_MAX, dread + DREAD_HORROR)
-	th.stun = HOOK_STUN
+	th.stun = GRAB_STUN
+	th.target = null      # it reels off and loses you for now
 	th.crouched = false
 	th.lunge_cd = LUNGE_COOLDOWN
 	var back: Vector2i = th.pos + (th.pos - hunter)
@@ -740,6 +796,12 @@ func grade() -> String:
 		if points() >= g[0]:
 			return g[1]
 	return "D"
+
+
+## Remember where the thing that took you stood and whether you could see it (the death card says).
+func _mark_killer(th: Dictionary) -> void:
+	killed_from = th.pos - hunter
+	killed_seen = fog.get_state(th.pos) == Fog.LIT and in_view(th.pos)
 
 
 func _die(why: String) -> void:

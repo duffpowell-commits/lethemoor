@@ -25,10 +25,10 @@ const HOOK_UP := Vector3(0.12, 0.97, -0.2)         # the hook stands up, head a 
 const HOOK_ELBOW := Vector3(-0.6, -0.15, 0.8)      # left forearm: level, back and to the left
 const HOOK_FACE := Vector3(0.6, 0.0, 0.8)          # the side the hook's curl opens toward (model +Z)
 const HOOK_SCALE := 0.12
-const GLOVE_TINT := 1.0                            # albedo multiplier (the texture is the leather)
 const GLOVE_WARM := Color("#ffb070")               # lantern-warm light the leather gives back
 const GLOVE_GLOW := 0.1                            # how much: enough to read the fist, not to glow
 const GLOVE_RIM := 0.3                             # rim light on the edges, so the fist has an outline
+const GLOVE_RIM_TINT := 0.85                       # the rim takes the leather colour, not white
 
 
 ## The right hand with the lantern hanging from its fist on an iron link. `root` sits at the grip
@@ -104,20 +104,19 @@ static func glove(mirror: bool) -> Node3D:
 
 ## The glove's leather is near black and the lantern hangs below and in front of the fist, so from
 ## the eye line the fist read as a dark blob (review, Nov 26). Lift it: the leather catches a little
-## of the lantern's warmth (a faint emission from its own texture) and a brass rim picks out its edge.
+## of the lantern's warmth (a faint emission from its own texture) and a soft leather-toned rim picks out its edge.
 static func _lift(mi: MeshInstance3D) -> void:
 	var src := mi.get_active_material(0) as StandardMaterial3D
 	if src == null:
 		return
 	var m := src.duplicate() as StandardMaterial3D
-	m.albedo_color = Color(GLOVE_TINT, GLOVE_TINT, GLOVE_TINT)
 	m.emission_enabled = true
 	m.emission_texture = src.albedo_texture
 	m.emission = GLOVE_WARM
 	m.emission_energy_multiplier = GLOVE_GLOW
 	m.rim_enabled = true
 	m.rim = GLOVE_RIM
-	m.rim_tint = 0.85                       # rim takes the leather colour, not white
+	m.rim_tint = GLOVE_RIM_TINT
 	mi.material_override = m
 
 
