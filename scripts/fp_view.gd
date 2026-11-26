@@ -149,6 +149,7 @@ var kill_shot: Control             # the close-up when a thrall takes you
 var flask_nodes := {}             # tile -> node, hidden once picked up
 var hook_nodes := {}              # tile -> boathook lying on the floor
 var slick_nodes := {}             # tile -> oil slick / fire on the floor (made as they appear)
+var hook_ready := false            # a thrall you can see is in the hook's reach: HOOK glows and pulses
 var item_buttons := {}            # HOOK / POUR / SPARK, left edge above the bottom panel
 var letter_mats := {}             # tile -> material, goes pale once read
 var letters_label: Label
@@ -1285,6 +1286,9 @@ func _process(delta: float) -> void:
 			map_rot = want if capture_mode else lerp_angle(map_rot, want, 1.0 - exp(-delta * 9.0))
 			minimap.queue_redraw()
 	_flicker_fires()
+	if hook_ready and item_buttons:   # HOOK IT breathes while something is in reach
+		var k := 0.75 + 0.25 * sin(t * 9.0)
+		item_buttons.hook.modulate = Color(1.0, k, k * 0.8)
 	_sway_viewmodel(delta)
 	_haunt(delta)
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
@@ -2048,6 +2052,18 @@ func _map_sign(p: Vector2i, r: Rect2) -> void:
 		minimap.draw_line(ctr + Vector2(-c, c) * 0.35, ctr + Vector2(c, -c) * 0.35, Color(0.75, 0.7, 0.55), 1.4)
 
 
+## A thrall you can see stands where a swing would land (the rule picks it, the fog says you
+## see it; a hidden one never lights the button, or the button would give it away).
+func _hook_ready() -> bool:
+	if game == null or game.over() or game.hook_wear <= 0:
+		return false
+	var i: int = game.hook_target()
+	if i < 0:
+		return false
+	var th: Dictionary = game.thralls[i]
+	return not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT
+
+
 func _refresh_hud() -> void:
 	oil_count.text = str(game.oil)
 	letters_label.text = "·   LETTERS %d / %d" % [game.letters_read.size(), room.letters.size()]
@@ -2096,6 +2112,8 @@ func _refresh_hud() -> void:
 	var extra: String = said.get(last_event, "")
 	if extra != "":
 		s = extra
+	elif _hook_ready():
+		s = "It's in reach of the hook. Tap HOOK IT! to knock it back."
 	elif flicker or fake_flicker:
 		s = "The flame gutters. Something is near."
 	if game.turn < 3 and extra == "":
@@ -2103,7 +2121,17 @@ func _refresh_hud() -> void:
 	status_label.text = s
 	if item_buttons:
 		item_buttons.hook.visible = game.hook_wear > 0
-		item_buttons.hook.text = "HOOK\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
+		var in_reach := _hook_ready()
+		item_buttons.hook.text = ("HOOK IT!" if in_reach else "HOOK") + "\n%d hit%s left" % [game.hook_wear, "" if game.hook_wear == 1 else "s"]
+		if in_reach != hook_ready:   # restyle only on a change; unlit goes back to the item plate, not the stock button
+			if in_reach:
+				UI.lit(item_buttons.hook)
+			else:
+				_plate_style(item_buttons.hook)
+				item_buttons.hook.add_theme_color_override("font_color", Color("#c9ad78"))
+				item_buttons.hook.remove_theme_color_override("font_hover_color")
+				item_buttons.hook.modulate = Color.WHITE
+		hook_ready = in_reach
 		item_buttons.spark.visible = game.slicks.values().has(0)
 		# POUR OIL waits till there's a reason for it: a horror seen, or the hook in hand
 		# (the first minute shows only the lantern; a new player was pouring 3 oil on turn 1)
@@ -3483,8 +3511,11 @@ func _capture_trap() -> void:
 	b.target = null
 	_refresh()
 	await _shot("fp_thrall")   # art check: a thrall two tiles ahead, in the lantern's reach
+	var glow_on: bool = hook_ready and item_buttons.hook.text.begins_with("HOOK IT!")
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
+	var plate_back: bool = item_buttons.hook.get_theme_color("font_color") == Color("#c9ad78") and item_buttons.hook.has_theme_stylebox_override("normal")
+	print("HOOK GLOW ", "PASS" if glow_on and not hook_ready and plate_back else "FAIL", " (lit with it 2 ahead, back on its brass plate once it's knocked to 3)")
 	print("HOOK ", "PASS" if b.pos == west + Vector2i(-3, 0) and b.stun > 0 and game.hook_wear == Night.HOOK_WEAR - 1 else "FAIL", " at=", b.pos)
 	capture_phase = 4
 	get_tree().reload_current_scene()

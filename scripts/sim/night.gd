@@ -301,20 +301,26 @@ func wait() -> Array:
 	return _end_turn([])
 
 
+## The thrall a swing would hit now: the first one up to HOOK_REACH tiles ahead, short of a
+## wall, or -1. Shared by hook() and the view's "it's in reach" glow, so the two always agree.
+func hook_target() -> int:
+	for r in range(1, HOOK_REACH + 1):
+		var t: Vector2i = hunter + facing * r
+		if room.is_wall(t):
+			return -1
+		var i := thrall_at(t)
+		if i >= 0:
+			return i
+	return -1
+
+
 ## Swing the boathook down the way you face. Costs a turn. [] if you have no hook.
 func hook() -> Array:
 	if over() or hook_wear <= 0:
 		return []
 	_quiet()
 	var events: Array = []
-	var hit := -1
-	for r in range(1, HOOK_REACH + 1):
-		var t: Vector2i = hunter + facing * r
-		if room.is_wall(t):
-			break
-		hit = thrall_at(t)
-		if hit >= 0:
-			break
+	var hit := hook_target()
 	if hit < 0:
 		events.append("hook_miss")
 		make_noise(hunter, "hook_miss")

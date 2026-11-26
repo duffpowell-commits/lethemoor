@@ -413,6 +413,23 @@ func test_boathook_pickup_and_reach() -> void:
 	check("hook_miss" in ev and n.hook_wear == Night.HOOK_WEAR - 1, "3 tiles is out of reach: a miss doesn't bend it")
 
 
+func test_hook_target_matches_the_swing() -> void:
+	var n = Night.start(HOOK_HALL)
+	n.facing = Vector2i.RIGHT
+	n.step(Vector2i(2, 1))
+	n.step(Vector2i(3, 1))
+	var th: Dictionary = n.thralls[0]
+	th.pos = Vector2i(5, 1)
+	check(n.hook_target() == 0, "2 ahead: HOOK IT glows")
+	th.pos = Vector2i(6, 1)
+	check(n.hook_target() == -1, "3 ahead: out of reach, no glow")
+	n.facing = Vector2i.LEFT
+	th.pos = Vector2i(2, 1)
+	check(n.hook_target() == 0, "the glow follows the way you face")
+	n.facing = Vector2i.RIGHT
+	check(n.hook_target() == -1, "behind you doesn't count")
+
+
 func test_boathook_saves_you_when_adjacent() -> void:
 	var n = Night.start("########\n#H.....#\n########")
 	n.thralls.append({pos = Vector2i(2, 1), target = null, seen = true, last_seen = null, kind = "thrall", stun = 0, gone = false})

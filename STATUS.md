@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 26: with the boathook in hand, the HOOK button glows and reads HOOK IT! whenever a thrall you can see is within its 2-tile reach.
 - Nov 26: when the flame gutters, a red mark on the chart's rim points to whatever unseen thing is near (it lies too when dread is high).
 
 - Nov 26: the first thrall to grab you each night doesn't kill: you tear free, spilling 10 oil, and it staggers back. The second grab kills. Expert bot 41% -> 50% won; more deaths now come from running out of oil.
