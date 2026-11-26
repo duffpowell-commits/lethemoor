@@ -16,7 +16,7 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 - Web (Safari): https://duffpowell-commits.github.io/lethemoor/
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
-- Both are build 123, commit `de5bf2a`, with the 3D nightmare Thrall.
+- Both are build 199, commit `e17a537` (Nov 26 gap pass).
 
 ## Tools
 
