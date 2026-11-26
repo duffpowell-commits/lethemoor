@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 26: your gloves catch a little of the lantern's warmth and have a soft rim, so the right fist reads as a fist from the eye line instead of a dark blob.
 - Nov 26: with the boathook in hand, the HOOK button glows and reads HOOK IT! whenever a thrall you can see is within its 2-tile reach.
 - Nov 26: when the flame gutters, a red mark on the chart's rim points to whatever unseen thing is near (it lies too when dread is high).
 

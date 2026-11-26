@@ -659,3 +659,8 @@ From the mock review: one map with fixed walls got learned by night three, and n
 - The view lights HOOK (amber, `UI.lit`), relabels it HOOK IT!, pulses it, and the status line says it's in reach, but only when that thrall stands in LIT fog and isn't a lying corpse: a hidden one never lights the button, or the button would give it away. The field note says what the glow means.
 - Capture: `HOOK GLOW PASS` (lit with a thrall 2 ahead, out once the hit knocks it to 3), render `fp_thrall.png`. Test `test_hook_target_matches_the_swing`.
 - Gotcha: `tools/test.sh` doesn't load `fp_view.gd`, so a type-inference parse error there only shows in the capture (or `--check-only`). Run one of those after view edits.
+
+## Review fix D: a fist you can read (Nov 26)
+- From the eye line the right glove was a near-black blob: the lantern hangs below and in front of it, so its light never reaches the leather you see. `Hands._lift()` gives each glove (both hands) its own material copy: a faint emission from the leather's own texture tinted lantern-warm (`GLOVE_WARM`, `GLOVE_GLOW` 0.1) and a soft rim (`GLOVE_RIM` 0.3, `rim_tint` 0.85 so the rim takes the leather colour, not white).
+- First try was GLOW 0.35 / RIM 0.6 / tint 0.6: the gloves went ghostly pale. Keep it subtle. Render `fp_hands.png`; before/after in project files `lethemoor-3d/review/glove_before_after.png`.
+
