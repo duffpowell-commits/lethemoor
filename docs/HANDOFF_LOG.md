@@ -677,3 +677,13 @@ Duff's new bar (Nov 26): build to an 8.5 from the blind first-time player's revi
 - Bots (200 / 300 nights): newcomer on first nights 22% -> 41% won; newcomer on later nights 11%; expert (balance bot) 52%.
 - Phone feel: swipes already fire as the finger crosses 50 px (not on lift), steps take 0.2 s. Nothing changed; FPS on a real phone still needs Duff.
 
+## The gap pass: every fix from the 6.4 review (Nov 26)
+The blind first-timer scored the 8.5 pass (build 196) 6.4. Duff: build all the gap fixes, cancel the reviews (no blind review this round). Found in that review and the newcomer bot: some nights nothing ever came (and still got an S), 36 of 200 first nights never found a hook, a cliff after night 3 (41% -> 11%), oil dropping with no reason given, a cone for a bell, downed thralls standing idle, one status line on repeat, and "Night 11" on a first night.
+- **A scare every night** (`Night._beat`, after the first `_horrors` in `_end_turn`): no horror in your light by `BEAT_TURN` 20 -> the nearest standing thrall turns up `BEAT_FROM` 6-9 walking tiles off, on a tile out of your light, hunting you (event `scent`: status line, low turn + dread sound). 4-7 cost first nights 6 points of win rate; 6-9 costs none.
+- **No S for an empty night**: `Night.met` (set on a first sighting); `grade()` caps at `UNMET_CAP` "B"; `capped()`; the end card says why.
+- **Hook near the start on first nights** (`_hook_near_start`): the nearest hook moves 3-6 steps out, on the shortest road to the bell when it can.
+- **Nights 4-6 half eased** (`Record.easing` 1, `Night.half`): +`HALF_OIL` 8, chalk, two escapes (`GENTLE_TEARS`), the normal bride.
+- **View**: red "-N SPILLED" under the oil bar on torn_free/panic (`_show_spill`); downed thralls play rig state "down" (the fall clip) then "rise"; a lathe-turned bronze bell (`Harbor.bell_body`, `BELL_PROFILE`, child "Body" under the yoke) that swings for 1.7 s before the card (`_swing_bell`); `AMBIENT` status lines turn every 4 turns; a toll says which way (`_toll_line`); end card "FIRST NIGHT n OF 3" / "YOUR NIGHT n" (`_night_tag`, `night_no`).
+- **Lessons**: the death tip only says HOOK IT! if you hold a hook; the OIL SLICK card waits for a standing thrall.
+- Newcomer bot (200): first nights 40% won (was 41%), nights 4-6 29% (they were 11%), later nights 8%.
+

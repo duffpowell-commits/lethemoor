@@ -59,6 +59,7 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 
 ## Changelog
 
+- Nov 26 (gap pass, no review this round per Duff): something always comes for you by turn 20, and a night where nothing came can't earn better than B. First nights put a boathook on your road. Nights 4-6 are half eased (more oil, chalk, two escapes). Spilled oil shows as a red number. The bell is a real bronze bell that swings when you ring it. Knocked-down thralls slump. Status lines vary and the toll says which way. The end card says FIRST NIGHT 1 OF 3. Newcomer bot: first nights 40%, nights 4-6 29% (was 11%).
 - Nov 26 (8.5 pass): your first three nights are chalked toward the bell, with more oil, two escapes and a later bride. A thrall that's down can be shoved past. The death card says what got you, from where, and what would have saved you; the end card names the next unlock (ONE MORE NIGHT). Sounds get subtitles. Newcomer bot on first nights: 22% -> 41% won.
 - Nov 26: your gloves catch a little of the lantern's warmth and have a soft rim, so the right fist reads as a fist from the eye line instead of a dark blob.
 - Nov 26: with the boathook in hand, the HOOK button glows and reads HOOK IT! whenever a thrall you can see is within its 2-tile reach.

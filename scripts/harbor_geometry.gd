@@ -103,20 +103,84 @@ static func lamp_mesh() -> ArrayMesh:
 
 
 static func bell() -> MeshInstance3D:
-	var bronze := _surface()
-	_cylinder(bronze, 0.17, 0.32, 0.48, 1.44)
-	_cylinder(bronze, 0.32, 0.42, 0.12, 1.14)
-	_cylinder(bronze, 0.42, 0.43, 0.054, 1.054)
-	_cylinder(bronze, 0.115, 0.17, 0.12, 1.73)
-	var mesh := bronze.commit()
-	mesh.surface_set_material(0, _metal(Color("#8d643b")))
+	# the iron yoke stays on the wall; the bell hangs from it on its own node ("Body", pivot at the
+	# yoke) so it can swing when you ring it (gap pass, Nov 26: the old one was a stack of cones)
 	var iron := _surface()
 	_box(iron, Vector3(0.60, 0.15, 0.16), Vector3(-0.23, 2.26, 0))
-	_cylinder(iron, 0.037, 0.05, 0.5, 1.99)
-	_cylinder(iron, 0.025, 0.085, 0.14, 0.99)
+	var yoke := iron.commit()
+	yoke.surface_set_material(0, _metal(Color("#353b40")))
+	var frame := _fixture("HarborBell", yoke)
+	var body := MeshInstance3D.new()
+	body.name = "Body"
+	body.position = Vector3(0, BELL_PIVOT, 0)
+	body.mesh = bell_body()
+	frame.add_child(body)
+	return frame
+
+
+const BELL_PIVOT := 2.2
+## A bell's real section, turned on a lathe: crown, shoulder, waist, the thick sound-bow and the
+## flared lip, outside then back up the inside. (radius, height above the floor)
+const BELL_PROFILE := [
+	Vector2(0.0, 1.84), Vector2(0.15, 1.84), Vector2(0.2, 1.80), Vector2(0.225, 1.72),
+	Vector2(0.235, 1.6), Vector2(0.245, 1.46), Vector2(0.265, 1.32), Vector2(0.3, 1.2),
+	Vector2(0.36, 1.1), Vector2(0.42, 1.035), Vector2(0.455, 1.0), Vector2(0.45, 0.975),
+	Vector2(0.4, 0.98), Vector2(0.34, 1.04), Vector2(0.27, 1.17), Vector2(0.22, 1.36),
+	Vector2(0.2, 1.56), Vector2(0.17, 1.72), Vector2(0.0, 1.76),
+]
+const BELL_SIDES := 28
+
+
+## The bronze bell (lathe), with its iron hanger and clapper, origin at the pivot.
+static func bell_body() -> ArrayMesh:
+	var bronze := _surface()
+	var lift := Vector3(0, -BELL_PIVOT, 0)
+	for k in BELL_PROFILE.size() - 1:
+		var a: Vector2 = BELL_PROFILE[k]
+		var b: Vector2 = BELL_PROFILE[k + 1]
+		for j in BELL_SIDES:
+			var t0 := TAU * j / BELL_SIDES
+			var t1 := TAU * (j + 1) / BELL_SIDES
+			var p00 := Vector3(cos(t0) * a.x, a.y, sin(t0) * a.x) + lift
+			var p01 := Vector3(cos(t1) * a.x, a.y, sin(t1) * a.x) + lift
+			var p10 := Vector3(cos(t0) * b.x, b.y, sin(t0) * b.x) + lift
+			var p11 := Vector3(cos(t1) * b.x, b.y, sin(t1) * b.x) + lift
+			for v in [p00, p01, p11, p00, p11, p10]:
+				bronze.add_vertex(v)
+	bronze.generate_normals()
+	var mesh := bronze.commit()
+	var mat := _metal(Color("#9a6d3c"))
+	mat.metallic = 0.55
+	mat.roughness = 0.42
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED   # open mouth: you see in under the lip
+	mat.rim_enabled = true
+	mat.rim = 0.35
+	mat.rim_tint = 0.6
+	mesh.surface_set_material(0, mat)
+	var iron := _surface()
+	var hang := CylinderMesh.new()
+	hang.top_radius = 0.04
+	hang.bottom_radius = 0.05
+	hang.height = BELL_PIVOT - 1.82
+	hang.radial_segments = 10
+	hang.rings = 0
+	iron.append_from(hang, 0, Transform3D(Basis.IDENTITY, Vector3(0, (1.82 - BELL_PIVOT) * 0.5, 0)))
+	var rod := CylinderMesh.new()
+	rod.top_radius = 0.018
+	rod.bottom_radius = 0.018
+	rod.height = 0.62
+	rod.radial_segments = 8
+	rod.rings = 0
+	iron.append_from(rod, 0, Transform3D(Basis.IDENTITY, Vector3(0, 1.42 - BELL_PIVOT, 0)))
+	var ball := SphereMesh.new()
+	ball.radius = 0.075
+	ball.height = 0.15
+	ball.radial_segments = 12
+	ball.rings = 6
+	iron.append_from(ball, 0, Transform3D(Basis.IDENTITY, Vector3(0, 1.09 - BELL_PIVOT, 0)))
 	iron.commit(mesh)
 	mesh.surface_set_material(1, _metal(Color("#353b40")))
-	return _fixture("HarborBell", mesh)
+	return mesh
 
 
 ## The bell tower: a stone shaft rising from the wall behind the bell, rising far over the ward walls

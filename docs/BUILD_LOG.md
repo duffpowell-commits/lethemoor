@@ -11,36 +11,38 @@ Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
   web: https://duffpowell-commits.github.io/lethemoor/ . Check `releases/download/dev/version.json`.
 - **Working branch:** `claude/project-thread-qrikmp` (the only branch sessions push to). No PR open
   for the gap pass yet.
-- **Goal:** Duff's bar is an **8.5/10 from a blind first-time player's review** before more rounds.
-  Build to a plan, OK'd once, in one pass; then review; then merge.
+- **Goal (changed Nov 26, 13:12 UTC):** Duff paused the game, then said "We'll build all of the
+  fixes, cancel the reviews". So: build every gap item below in one PR, merge when CI is green.
+  **No blind first-timer review this round** (the 8.5 gate is off until he asks for a review again).
 - **Scores so far (blind first-timer):** build 183: 5/10. Build 196 (8.5 pass): 6.4/10.
   Duff chose: merge 6.4, then build the gap below in one pass, gated on 8.5 again.
 
 ## The gap pass (in progress): what a first-timer still hit at 6.4
 Tick each line when it's built, tested and in the branch.
-- [ ] **A scare every night.** Rule in `scripts/sim/night.gd`: `_beat()`; if no horror has come into
-      your light by `BEAT_TURN` (20), the nearest standing thrall turns up 4-7 walking tiles away on a
-      dark tile and comes for you (event `scent`). Built, test `test_every_night_gets_a_scare`. Still
-      to do: a status line and sound for `scent`, and bot numbers (first sighting by turn 25).
-- [ ] **No S for an empty night.** `Night.met`, `grade()` caps at `UNMET_CAP` ("B") if nothing came
-      into your light; `capped()`. Built and tested. Still to do: the end card should say why.
-- [ ] **A hook early on first nights.** 36 of 200 newcomer first nights never got the boathook. Plan:
-      in `start_dealt`, when gentle, move the nearest hook to a tile 3-6 steps from the start.
-- [ ] **Death tip only suggests the hook if you hold one** (`scripts/lessons.gd` `death()`).
-- [ ] **THRALLS card before OIL SLICK** (`lessons.gd`: make "slick" trigger on kind "thrall" only).
+- [x] **A scare every night.** Rule in `scripts/sim/night.gd`: `_beat()`; if no horror has come into
+      your light by `BEAT_TURN` (20), the nearest standing thrall turns up 6-9 walking tiles away on a
+      dark tile and comes for you (event `scent`). Built, test `test_every_night_gets_a_scare`. Status line
+      and sound for `scent` done. Bot cost: newcomer first nights 41% -> 34% won; being tuned.
+- [x] **No S for an empty night.** `Night.met`, `grade()` caps at `UNMET_CAP` ("B") if nothing came
+      into your light; `capped()`. Built and tested. End card says why ("Nothing came into your light tonight...").
+- [x] **A hook early on first nights.** 36 of 200 newcomer first nights never got the boathook.
+      `Night._hook_near_start()`: when gentle, the nearest hook moves 3-6 steps from the start, on
+      the shortest road to the bell when it can (a side room was still missed).
+- [x] **Death tip only suggests the hook if you hold one** (`scripts/lessons.gd` `death()`).
+- [x] **THRALLS card before OIL SLICK** (`lessons.gd`: make "slick" trigger on kind "thrall" only).
 - [ ] **No cliff after night 3.** Newcomer bot: 41% won on first nights, 11% after. Plan:
       `Record.easing(rec)` 2 for nights 1-3, 1 for nights 4-6 (`HALF_OIL` 8 more oil, chalk kept,
       one escape, normal bride), 0 after.
-- [ ] **Show oil spills** (tear-free -10, panic -5): a red "-10" by the oil bar when it happens.
-- [ ] **A real bell** to ring at the end: build a bronze bell from primitives in Godot (no paid
-      art), swing it on the win, play the bell clip.
-- [ ] **Downed thralls slump** (`fp_view.gd` `_drive_rig`): while `stun > 0` it still plays idle.
-- [ ] **Status line stops repeating** "The lantern burns low: two paces of light" (it shows even at
-      75 oil). Rotate ambient lines; say which way the bell tolled.
-- [ ] **End card on first nights** says "FIRST NIGHT 1 OF 3", not "Night 11".
+- [x] **Show oil spills**: red "-10 SPILLED" under the oil bar on torn_free / panic (`_show_spill`).
+- [x] **A real bell**: `Harbor.bell()` is now the iron yoke plus a child "Body" (lathe-turned
+      bronze, `BELL_PROFILE`, hanger + clapper). `fp_view._swing_bell()` swings it 1.7 s before the card.
+- [x] **Downed thralls slump** (`fp_view.gd` `_drive_rig`): while `stun > 0` it still plays idle.
+- [x] **Status line stops repeating**: `AMBIENT` lines turn over every 4 turns at normal flame;
+      on a toll, `_toll_line()` says which way (ahead / behind / left / right of where you face).
+- [x] **End card on first nights** says "FIRST NIGHT 1 OF 3" (`_night_tag()`, `night_no`).
 - [ ] Docs: `CLAUDE.md` Where things stand, `docs/HANDOFF_LOG.md`, `STATUS.md`, this file.
-- [ ] Gate: tests, capture ART PASS, CI green, fresh-eyes review PASS on the head, then a **blind
-      first-timer review** (below). Merge only at 8.5, or bring Duff the gap.
+- [ ] Gate: tests, capture ART PASS, CI green, fresh-eyes review PASS on the head, merge.
+      (Blind first-timer review cancelled by Duff for this round.)
 
 ## How to build, test and review (cloud sandbox)
 1. Godot 4.7.2-stable Linux at `/usr/local/bin/godot`; fresh clone: `godot --headless --path . --import`.
@@ -70,6 +72,10 @@ Tick each line when it's built, tested and in the branch.
 - Lethemoor keeps its own signing key. Never make or change a key.
 
 ## Log (newest first)
+- 2026-11-26 13:40 UTC: Duff paused, then "build all of the fixes, cancel the reviews". Built: hook on
+  the bell road, slump, spill label, lathe bell + swing, rotating status, toll direction, scent line +
+  sound, first-night label, grade-cap note. Tests 83 pass. Next: tune the first-night win rate back
+  (beat dropped it 41% -> 34%), easing nights 4-6 (22%), then capture, PR, merge.
 - 2026-11-26 13:10 UTC: gap pass started. Built the scare-every-night rule and the grade cap (tests
   pass, 83). Next: early hook on first nights, then easing over nights 4-6.
 - 2026-11-26 12:57 UTC: PR #66 (8.5 pass) merged, build 196 live. First-timer review 6.4.
