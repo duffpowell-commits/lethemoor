@@ -6,7 +6,7 @@ extends RefCounted
 const Fog = preload("res://scripts/sim/fog.gd")
 
 ## Danger first: if a thrall and a letter turn up together, the thrall gets the card.
-const ORDER := ["goal", "stalker", "rose", "lunge", "behind", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
+const ORDER := ["goal", "stalker", "rose", "torn", "lunge", "behind", "horror", "panic", "noise", "hook", "slick", "flicker", "letter", "flask", "hood", "oil", "dread", "map"]
 
 const CARDS := {
 	"goal": ["RING THE BELL",
@@ -20,9 +20,11 @@ const CARDS := {
 	"dread": ["DREAD",
 		"The red bar. It climbs in the dark and when something finds you. Light brings it down.\n\nPast the halfway mark the flame starts lying to you. When it fills, your hands shake and you spill 5 oil."],
 	"horror": ["THRALLS",
-		"They come to light. BRIGHT is seen from 8 tiles, NORMAL from 5, HOODED only up close. One beside you on its turn is death.\n\nThey shamble, a step every other turn. But two tiles off they crouch, then lunge, and one held under BRIGHT light two turns stops shambling. Close up they make no sound at all. Wet prints on the stones mean one passed here."],
+		"They come to light. BRIGHT is seen from 8 tiles, NORMAL from 5, HOODED only up close. One beside you on its turn grabs you. The first time each night you tear free, spilling 10 oil. The second time is death.\n\nThey shamble, a step every other turn. But two tiles off they crouch, then lunge, and one held under BRIGHT light two turns stops shambling. Close up they make no sound at all. Wet prints on the stones mean one passed here."],
 	"lunge": ["IT LUNGED",
 		"Two tiles off and seeing your light, a thrall crouches for a turn, then jerks a tile at you. Backing off doesn't stop it coming; it only buys room. Then it must rest a few turns.\n\nMove now: back off, hook it, or step round a corner. Standing still is death."],
+	"torn": ["IT HAD YOU",
+		"A thrall got its hands on you. You tore free, but the lantern slopped 10 oil and it will be up again in two turns.\n\nThat was your one escape tonight. The next one that reaches you keeps you."],
 	"rose": ["THE DEAD GET UP",
 		"Not every body is dead. Some lie still till you've walked past and look away, then rise behind you.\n\nGetting up costs it a turn. Keep bodies in front of you, or give them a wide berth."],
 	"stalker": ["THE BRIDE",
@@ -71,6 +73,8 @@ static func _now(id: String, game, event: String) -> bool:
 			return game.thralls.any(func(th): return th.get("kind", "thrall") == "thrall" and not th.get("gone", false) and not th.get("lying", false) and fog.get_state(th.pos) == Fog.LIT)
 		"lunge", "rose":
 			return event == id
+		"torn":
+			return event == "torn_free"
 		"behind":   # what the breath-at-your-neck sound means (audio.gd behind())
 			return game.thralls.any(func(th): return not th.get("gone", false) and not th.get("lying", false) \
 					and not game.in_view(th.pos) and game.room.reachable(th.pos, 2).has(game.hunter))
