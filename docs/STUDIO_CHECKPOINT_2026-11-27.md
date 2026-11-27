@@ -1,0 +1,5 @@
+# Studio checkpoint — 2026-11-27
+
+Published build 216, code ab65ef5, verification handoff #81. 92 rule tests and actual engine ART PASS; 500-night benchmark unchanged (81/200 newcomer wins, 148/300 expert wins, zero expert stalls), actual browser-emulated touch passed. Human enjoyment, physical device FPS, Safari and audible mix remain unverified. No new score is a player score.
+
+Approved next pass: distinct recognizable harbor landmarks, lantern/viewmodel light and mobile HUD readability; no new game systems. Local preview/harbor-readability from 3378fe8 changes only presentation: iron details and textured boat/door, softened glove rim and depth-aware lantern halo, larger oil/label text and 12 proportional oil bands. 92/92 rule tests, fp_view parse, headless startup and landmark smoke passed. Existing dummy-material/OGG teardown diagnostics persist. Portable lethemoor-readability-handoff.zip available from owner; no remote branch yet. Actual renders, phone-size touch/readability, high/low graphics and 500-night parity still needed, then standard exact-head review and CI. Nov 28 viability gate remains independent; do not start parked full-game systems.
