@@ -9,14 +9,14 @@ extends RefCounted
 const PAGES := [
 	{
 		"head": "A PAGE, WATER-STAINED",
-		"body": "My Tobias came home at the third hour, wet to the collar, though no rain had fallen. He would not speak. He stood at the foot of our bed until the grey of morning, and the boards beneath him never dried.\n\nTonight I have barred the door. He does not knock. He only waits, as patient as the tide.\n\nIf you pass the quay, do not let him see your light.",
+		"body": "Tobias came home at the third hour, wet to the collar, though no rain fell. He would not speak. He stood at the foot of our bed until the grey of morning, and the boards never dried.\n\nHis lobster pots still stand by the Rope Walk. I have barred the door; he does not knock. He waits, as patient as the tide.\n\nIf you pass the quay, do not let him see your light.",
 		"sign": "Martha Hale, of the Rope Walk",
 		# the look: a damp, yellowed scrap in faded brown ink, torn off along the bottom
 		"paper": "page_1", "ink": Color("#3b2a17"), "head_ink": Color("#5b3a1c"), "tilt": -1.6, "width": 480,
 	},
 	{
 		"head": "A PAGE, PERFUMED",
-		"body": "Beloved, they say the bell will ring for us at dawn, and all the harbour will hear it.\n\nI have sewn the veil myself. If the fog comes before you do, I shall wait in the chapel lane. Look upon me as you used to, and I will be as still as a portrait. Only do not turn from me again.\n\nI have never liked the dark. I have been in it so long.",
+		"body": "Beloved, they say the bell will ring for us at dawn, and the harbour will hear it.\n\nI have sewn the veil myself. Our oar lies beneath the upturned boat. If fog comes first, I shall wait in Chapel Lane. Look upon me as you used to, and I will be still as a portrait. Only do not turn from me again.\n\nI have never liked the dark. I have been in it so long.",
 		"sign": "Your Ada",
 		# pale folded notepaper, violet-black ink, a rose blot: smaller, like a note slipped under a door
 		"paper": "page_2", "ink": Color("#2b1f33"), "head_ink": Color("#6a2f4a"), "tilt": 1.2, "width": 440,

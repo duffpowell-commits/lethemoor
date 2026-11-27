@@ -46,6 +46,7 @@ build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~
 | burn_shriek.ogg | a cracked, falling shriek in fire | something burns in the slick |
 | heard_turn.ogg | the drag stops, a pivot, a click in the throat | a horror turns toward a noise (hook, pour, spark, fire), in 3D at its tile |
 | fire_loop.ogg | 5 s loop: oil burning on stone | on every burning tile, in 3D, while it burns |
+| harbor_undertone.ogg | original synthesized bowed-metal and wind swell, baked reverb | rare seeded quiet moment, spatial and captioned |
 
 ## Real recordings (Nov 25, `tools/real_audio.py`)
 

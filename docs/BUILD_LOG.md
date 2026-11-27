@@ -9,20 +9,13 @@ Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
 - **The three-eyed fox is in every game as a rare cameo, not a pal**: a small event
   that matters but never ruins a run. Duff OKs the fox art on a card before it's built. Rule + this game's idea: `docs/MASCOT.md`.
 
-## Right now (2026-11-26, 19:50 UTC; checked against main `48a526d`)
-- **Live:** build 199 (main `e17a537`): the gap pass (PR #68). APK:
-  https://github.com/duffpowell-commits/lethemoor/releases/download/dev/lethemoor.apk ;
-  web: https://duffpowell-commits.github.io/lethemoor/ . Check `releases/download/dev/version.json`.
-- **Since build 199:** only docs merged (#69 this log, #70 mascot rule), so the live build is still 199.
-- **Working branch:** each session pushes to the branch its harness names (`claude/...`). No current-work PR open.
-- **Old open PRs, not current work:** #31 (Nov 20 "the bell stays silent": out of date, the bell now
-  tolls every 10 turns; don't merge) and #36 (Nov 22 isolated 3D harbor prototypes, superseded by the
-  3D harbor in #38). Leave both for Duff to close.
-- **Paused** (Duff, Nov 26: "Pause all of them we'll continue on rush"). Then "We'll build all of the
-  fixes, cancel the reviews": the gap pass below is built and merged, with no blind review.
-  Next: nothing until Duff picks Lethemoor up again (his phone playtest of build 199 comes first).
-- **Scores so far (blind first-timer):** build 183: 5/10. Build 196 (8.5 pass): 6.4/10.
-  Build 199 (gap pass): not reviewed (Duff cancelled it).
+## Right now (2026-11-27; main `e31f818` after stack integration)
+- **Live at last verified manifest:** build 211, main `ff0bd05` (#78). #79 merged afterward; main publication runs asynchronously. APK: https://github.com/duffpowell-commits/lethemoor/releases/download/dev/lethemoor.apk ; web: https://duffpowell-commits.github.io/lethemoor/ . Check `releases/download/dev/version.json` for the actual live commit before claiming release.
+- **Stack integrated in order:** #76 `64e27fd214f4bf6c8f3855bd238bb70f82484dc5`, #77 `a5befeb48348bc6087b1bf5d8652c633b6d8b7b3`, #78 `ff0bd05d880834f238d40837d16a3f0b310ae9ce`, #79 `e31f818f66dc49b683ef3358c86807ffca176899`. Each passed build, rule-lock, gitleaks and exact-head fresh-eyes; #79 also required independently inspected actual crate renders.
+- **Working branch:** `feat/complete-atmosphere`, implementing approved #74 on integrated main. Candidate code commits `0959a232b180712bed1dcb237c7543b1244197a3` and `0c43bd9db582ae4092fd27d0c581216075ccf360`, plus the active-priority correction on #80; 92 passing tests, 500-night benchmark unchanged, full real input `ART PASS`, staged HIGH and LOW atmosphere captures pass. Final combined-branch CI and exact-head fresh-eyes gate before merge.
+- **Evidence:** `docs/ATMOSPHERE_VERIFICATION.md` (actual PNGs, before/after, warning reproduction and mitigation, automated versus human evidence). No changes to the fixed signing key, approved 3D assets, simulation rules or paid content. Audio cue yields to the Bride's silence and essential audio; reflection is hidden immediately when hooded/unlit.
+- **Old open PRs:** #31 (out of date) and #36 (superseded) remain untouched. #74 is the approved design reference; not a code dependency.
+- **Human enjoyment:** build 183 historical blind first-timer 5/10; build 196 6.4/10; build 199 review cancelled. No new human enjoyment score or replay intent has been measured; Duff does not need to personally playtest. Nov 28 viability gate (median 6+/10 + voluntary replay) is separate; no parked full-game systems until that evidence exists.
 
 ## The gap pass (done, PR #68, build 199): what a first-timer still hit at 6.4
 Tick each line when it's built, tested and in the branch.
@@ -79,6 +72,7 @@ Tick each line when it's built, tested and in the branch.
 - Lethemoor keeps its own signing key. Never make or change a key.
 
 ## Log (newest first)
+- 2026-11-27: stack #76–79 merged in dependency order; final #74 atmosphere completion built on `e31f818`. Real captures and low graphics, 92 tests, benchmark and OGG/dummy material investigations are in `docs/ATMOSPHERE_VERIFICATION.md`. Independent reviews found and prompted fixes for reflection fog visibility, the Bride silence, stationary hunting shuffles and active priority audio tails. PR #80 exact candidate CI/review pending after the audio-priority follow-up.
 - 2026-11-27: `feat/harbor-remembers` adds one rare, seeded top-crate shift per night after the player has seen a pot landmark, then moved >=7 tiles away and >=8 turns elapsed, outside the view cone and light. Same fixture and map; no simulation changes. Capture seed zero unchanged. 88/88 tests, parse pass on prototype; headless scene startup exited 0 with existing dummy material warning. Real rendered return visit remains unverified.
 - 2026-11-27: atmosphere prototype `feat/seeded-atmosphere-dawn`: seed-select wet-floor material distribution and a short unsettling success verdict line. Seed 0 retains capture baseline; cosmetic only, no simulation change, no new assets. 87/87 tests, fp_view parse pass. Actual rendered validation pending. An explicit audio stop/clear experiment did not resolve dummy-driver OGG cleanup warnings; reverted it. Wall coping still awaits suitable painted texture. PRs #76/77 merged after green CI and independent reviews.
 - 2026-11-27: pacing follow-up `fix/scent-retry-pacing`: `_beat` now records delivery only after a valid safe spawn exists and retries later if none exists. Regression test blocks every candidate then clears them. 86/86 tests; 200 newcomer and 300 expert outcomes identical to QA branch (81 and 148 wins, zero early deaths, zero expert stuck). The alternative occupied-path restriction reduced wins to 79/140 and left no-encounter rate at 7%, so discarded. Retry fix is correctness, not proven pacing improvement. Verbose headless exit identified three playing OGG streams (amb_moor, flame_loop, night_start); investigate ordinary rendered shutdown before changing audio. Real capture still pending.

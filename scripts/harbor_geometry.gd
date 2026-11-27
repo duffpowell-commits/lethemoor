@@ -79,7 +79,25 @@ func wall_for(room, cell: Vector2i) -> ArrayMesh:
 	if ruined:
 		_box(surface, Vector3(0.2, 0.075, 0.23), Vector3(0.27, height + 0.047, 0.28))
 		_box(surface, Vector3(0.13, 0.05, 0.18), Vector3(0.01, height + 0.035, -0.29))
-	var mesh := surface.commit()
+	var plain := surface.commit()
+	var arrays := plain.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var colors := PackedColorArray()
+	colors.resize(vertices.size())
+	for i in vertices.size():
+		var v := vertices[i]
+		# Keep the geometry and UVs intact. Olive patina catches in the coping joints;
+		# sparse, muted damp patches tint the upper courses, not every stone.
+		if v.y >= height - 0.13:
+			var blend := 0.5 + 0.5 * sin(v.x * 17.0 + v.z * 13.0)
+			colors[i] = Color(0.65, 0.78, 0.54).lerp(Color(0.87, 0.89, 0.72), blend)
+		elif v.y > 1.0 and v.y < 1.7 and v.x > 0.1:
+			colors[i] = Color(0.83, 0.87, 0.80)
+		else:
+			colors[i] = Color.WHITE
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	walls[key] = mesh
 	return mesh
 
@@ -248,7 +266,10 @@ static func landmark(kind: String, shifted := false) -> MeshInstance3D:
 			_box(wood, Vector3(0.44, 0.38, 0.44), Vector3(-0.09 if shifted else 0.02, 0.61, -0.24), Transform3D(Basis(Vector3.UP, -0.28 if shifted else 0.3), Vector3.ZERO))
 	mesh = wood.commit()
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color("#2e241b") if kind != "pots" else Color("#33291e")
+	mat.albedo_color = Color("#2e241b") if kind != "pots" else Color("#51402c")
+	if kind == "pots":
+		mat.albedo_texture = load("res://assets/art/harbor_crate_wood.png")
+		mat.uv1_scale = Vector3(3, 2, 1)
 	mat.roughness = 0.95
 	mat.metallic_specular = 0.1
 	mesh.surface_set_material(0, mat)

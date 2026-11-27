@@ -552,6 +552,18 @@ def fire_loop():
     write("fire_loop", loopify(roar * 0.8 + cr, 1.0), peak=0.7)
 
 
+def harbor_undertone():
+    # A quiet, bowed-metal-like cluster, swelling and then dissolving into harbor wind.
+    tt = t(3.2)
+    envelope = np.sin(np.pi * tt / 3.2) ** 2
+    vibrato = 0.28 * np.sin(2 * np.pi * 0.7 * tt)
+    x = (np.sin(2 * np.pi * 146.8 * tt + vibrato) +
+         0.48 * np.sin(2 * np.pi * 151.2 * tt - vibrato) +
+         0.13 * np.sin(2 * np.pi * 295.1 * tt))
+    x += 0.20 * fft_filter(noise(3.2), lo=180, hi=620)
+    write("harbor_undertone", fade(reverb(x * envelope, 1.0, 0.25)), peak=0.36)
+
+
 def main():
     if "--only" in sys.argv:
         names = sys.argv[sys.argv.index("--only") + 1:]
@@ -568,7 +580,7 @@ def main():
         "stalker_silk": stalker_silk, "whisper": whisper, "panic": panic, "night_start": night_start,
         "hook_swing": hook_swing, "hook_hit": hook_hit, "hook_broke": hook_broke, "hook_found": hook_found,
         "pour": pour, "ignite": ignite, "burn_shriek": burn_shriek,
-        "heard_turn": heard_turn, "fire_loop": fire_loop, "breath_behind": breath_behind,
+        "harbor_undertone": harbor_undertone, "heard_turn": heard_turn, "fire_loop": fire_loop, "breath_behind": breath_behind,
     }
     for i in range(4):
         jobs[f"step_{i}"] = lambda i=i: footstep(i)

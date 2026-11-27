@@ -16,7 +16,7 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 - Web (Safari): https://duffpowell-commits.github.io/lethemoor/
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
-- Both are build 199, commit `e17a537` (Nov 26 gap pass).
+- Public manifest last verified build 211, commit `ff0bd05` (#78); #79 merged afterward and main publication is asynchronous. Check `version.json` rather than assuming the latest main is already live.
 
 ## Tools
 
@@ -24,40 +24,22 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 
 ## In progress
 
-Harbor remembers prototype: rare cosmetic crate shift on return visits, 88 tests pass; rendered evidence pending.
+- **Integrated:** PRs #76, #77, #78, #79 merged after CI and independent fresh-eyes passes. Main `e31f818`; exact merge commits in `docs/BUILD_LOG.md`.
+- **Atmosphere candidate:** `feat/complete-atmosphere` completes approved #74: seeded rare puddle silhouettes, unseen crate shift, original quiet spatial cue (stops for essential feedback), coping patina, prop-linked letters, wrong dawn. No simulation, signing key or approved 3D asset changes. 92 tests pass, 500-night benchmark unchanged, actual Compatibility `ART PASS` and staged HIGH/LOW atmosphere checks. See [verification and real screenshots](docs/ATMOSPHERE_VERIFICATION.md). Final CI and exact-head fresh-eyes still required before merge.
+- One Night remains the slice. The 7% expert no-encounter rate is unchanged. Parked until the separate viability decision: safe room, satchel, revenant corpse and Choir.
+- Old PRs #31 and #36 remain untouched. #74 is the approved design reference.
 
-Atmosphere prototype: seeded wet-floor distribution and dawn text, 87 tests pass; visual proof pending. Audio cleanup candidate discarded (no improvement).
+## Remaining evidence / constraints
 
-Pacing follow-up: scent beat retries if no safe spawn exists; 86 tests pass and 500-night benchmark unchanged versus QA branch. No-encounter rate remains 7%; broader pacing tuning not demonstrated.
-
-QA reliability branch (Nov 27): expert bot no longer stalls out of oil; HUD anchor warning fixed. 85 tests passed; 500 simulated nights, zero expert stuck runs. Real render and cleanup validation pending. Owner personal playtest waived; volunteer enjoyment data remains pending.
-
-Nov 27: hook presentation polish, with stronger 3D swing, spectral arc, timed contact feedback and original synthesized audio. Rules unchanged; 85 headless tests pass. Phone FPS and audible mix still pending. Release status awaits CI.
-
-Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
-
-The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
-
-The 3D harbor shipped in build 119 (PR #38). Since Nov 25 (PR #45) every horror is a rigged, animated 3D body and your hands and lantern are 3D. Needs a phone FPS check.
-
-Parked until the kill test: safe room, satchel, revenant corpse, Choir. Kill test is Nov 28: median fun 6+/10 and testers choose to replay.
-
-Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell stays silent, so later sessions leave the bell without a hum).
-
-## Blockers
-
-- CI is running. This repo is public, and the build workflow kept succeeding after Nov 18, through the Nov 21 publish above. A newer web page or APK lands when a non-docs change merges to main. Markdown-only edits are ignored by the build workflow, so they do not start a build. A Nov 18 "Actions minutes ran out" note does not match these runs.
-- `LM_KEYSTORE_PASS` is the repo Actions secret that unlocks `signing/lethemoor.keystore.enc`. Duff has the passphrase. Sessions cannot write Actions secrets. Never change this key and never use it for another game. If the secret is missing, CI signs with a throwaway key and that APK cannot update an installed one. The key must stay backed up outside the sandbox.
-- Real-phone reads are still missing: FPS, lunge timing, corpse readability, kill shot, swipe-only controls, sound mix. Tuning waits on the playtest.
-- P0 art still open: wall tops. List: `docs/art_needs.md`.
+- Android and web exports must pass CI with fixed signing key as before; do not alter `signing/lethemoor.keystore.enc`.
+- Actual physical-phone FPS, Safari runtime, audible mix and genuine volunteer enjoyment remain unmeasured. Owner personal playtest is waived; automated quality evidence does not measure enjoyment.
+- Existing active-OGG teardown issue and dummy-material warning are isolated/documented, not treated as fixed on all platforms. See verification doc for reproduction.
 
 ## Next
 
-1. Play the Nov 21 web build and dev APK. Send verdicts, FPS, and sound notes.
-2. Tune oil, thrall speed, and where the Stalker stands, from those notes.
-3. Run a second playtest round.
-4. Score the Nov 28 kill test. Full-game systems start only after it passes.
-5. Wire wall-top art when Foxboard sends it. `git fetch` before every push.
+1. Complete final candidate CI, exact-head fresh-eyes review and merge only when all gates pass; verify published APK and web manifest.
+2. If volunteers give genuine feedback, record the Nov 28 viability decision (median fun 6+/10 and voluntary replay). Do not equate bot/engine correctness or synthetic verdict taps with that result; no personal playtest required from Duff.
+3. Do not expand the slice or start parked full-game systems without the viability decision.
 
 ## Key paths
 
@@ -105,4 +87,4 @@ Open: PR #33 (art generation guide, docs). Draft PR #31 (Duff, Nov 20: the bell 
 - 2026-11-20. Fluid moves: a swipe fires mid-drag, the next move queues, hold to keep walking, steps chain.
 - 2026-11-19. Slice finished through painted art, nightmare thrall, verdict card, and in-app APK updates.
 
-Updated 2026-11-25.
+Updated 2026-11-27.
