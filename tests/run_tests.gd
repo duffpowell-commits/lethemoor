@@ -1207,3 +1207,14 @@ func test_flicker_says_which_way() -> void:
 	check(n.flickers() and n.flicker_from() == [Vector2i(3, 1)], "unseen and near: the flame gutters, and we know which one")
 	th.pos = Vector2i(7, 1)
 	check(not n.flickers() and n.flicker_from().is_empty(), "too far: no flicker, no mark")
+
+
+func test_hook_presentation_keyframes() -> void:
+	var View = preload("res://scripts/fp_view.gd")
+	var rest: Array = View.hook_pose(0.0)
+	var windup: Array = View.hook_pose(0.045)
+	var contact: Array = View.hook_pose(0.10)
+	check(rest == View.hook_pose(View.HOOK_ANIM_TIME), "hook settles exactly to rest")
+	check(windup[1].z > 0.0 and contact[1].z < 0.0, "clearly opposed windup and sweep poses")
+	check(contact[0].is_equal_approx(View.hook_pose(0.135)[0]) and contact[1].is_equal_approx(View.hook_pose(0.135)[1]), "brief presentation-only contact hold")
+	check(contact[0].z < windup[0].z, "hook moves across the foreground")

@@ -451,8 +451,15 @@ def hook_swing():
     dur = 0.5
     tt = t(dur)
     x = onepole(noise(dur), 300 + 2200 * np.sin(np.pi * np.clip(tt / 0.32, 0, 1)) ** 2)
-    x *= np.sin(np.pi * np.clip(tt / 0.36, 0, 1)) ** 2
-    write("hook_swing", fade(reverb(x, 0.7, 0.2)), peak=0.6)
+    x *= np.sin(np.pi * np.clip(tt / 0.22, 0, 1)) ** 2
+    # Three short, irregular iron rattles under a descending spectral breath.
+    rattle = np.zeros_like(tt)
+    for at in (0.008, 0.032, 0.063):
+        d = np.maximum(tt - at, 0)
+        rattle += (tt >= at) * np.exp(-d * 95) * (
+            np.sin(2 * np.pi * 1430 * d) + 0.6 * np.sin(2 * np.pi * 2273 * d))
+    breath = np.sin(2 * np.pi * (320 * tt - 260 * tt ** 2)) * np.sin(np.pi * np.clip(tt / 0.3, 0, 1)) ** 2
+    write("hook_swing", fade(reverb(x + 0.16 * rattle + 0.12 * breath, 0.7, 0.2)), peak=0.7)
 
 
 def hook_hit():
@@ -461,7 +468,7 @@ def hook_hit():
     thud = np.sin(2 * np.pi * 70 * d * (1 - 0.3 * d)) * env(len(d), 0.002, 0.08)
     meat = fft_filter(noise(1.0), lo=120, hi=900) * env(len(d), 0.002, 0.06)
     ring = partials(1, [740, 1931, 3310], [0.5, 0.3, 0.15], [0.35, 0.2, 0.1], 1.0, 0.01) * 0.35
-    write("hook_hit", fade(reverb(thud + meat + ring, 1.0, 0.3)), peak=0.9)
+    write("hook_hit", fade(reverb(1.35 * thud + meat + ring, 1.0, 0.3)), peak=0.9)
 
 
 def hook_broke():

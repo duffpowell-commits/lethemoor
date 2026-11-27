@@ -687,3 +687,11 @@ The blind first-timer scored the 8.5 pass (build 196) 6.4. Duff: build all the g
 - **Lessons**: the death tip only says HOOK IT! if you hold a hook; the OIL SLICK card waits for a standing thrall.
 - Newcomer bot (200): first nights 40% won (was 41%), nights 4-6 29% (they were 11%), later nights 8%.
 
+
+## Hook presentation polish (Nov 27)
+
+- The existing first-person boathook now has a 0.36-second windup, sweeping contact pose, 35 ms visual hold and recovery. The grip stays closed; a pale spectral crescent and small contact-only camera kick are drawn without a new light or asset.
+- Timing is visual only: the original one-turn action, reach, wear, stun, noise and seed logic remain unchanged. The old 0.2-second action glide is unchanged.
+- Existing synthesized swing/hit clips were regenerated with an iron rattle, spectral breath and heavier low impact. The hit and break cues align with contact; status text retains the hook result over incidental audible events.
+- Reproduce portrait screenshots with Godot Compatibility: `godot --path . res://scenes/fp_room.tscn -- --capture --hook-only`. This captures fixed poses and runs a real hit to check turn and wear.
+- 85 headless tests pass; full desktop capture reached ART PASS before final visual alignment refinements, and the dedicated hook capture checks the final presentation. Physical-phone FPS and audible mix remain pending.

@@ -37,8 +37,8 @@ build plays audio in Godot's "sample" mode, where bus effects don't run. Total ~
 | stalker_silk.ogg | lace dragging on stone with a breath in it | the Stalker moves (in 3D) |
 | night_start.ogg | low swell and a far-off toll | each night starts (also dawn) |
 | ui_click.ogg | soft wooden tick | any button |
-| hook_swing.ogg | a heavy falling whoosh | swinging the boathook |
-| hook_hit.ogg | iron into something wet: thud, ring | the hook hits |
+| hook_swing.ogg | iron rattle and a falling spectral whoosh | swinging the boathook |
+| hook_hit.ogg | heavy low thud and iron ring | the hook hits |
 | hook_broke.ogg | shaft creaks, head snaps, clank | the hook wears out |
 | hook_found.ogg | iron dragged off stone, taken up | picking up the boathook |
 | pour.ogg | oil glugged onto stone | POUR (oil slick) |

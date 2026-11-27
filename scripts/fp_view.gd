@@ -114,6 +114,8 @@ var queued := ""                   # one move made while the last one was still 
 var chain_from := ""               # the move this one carries straight on from ("" = from rest)
 var vm_lantern: Node3D             # 3D viewmodel: your gloved right arm and the lantern hanging from it
 var vm_lamp: Node3D                # the lantern itself (swings on the bail)
+var vm_hook_arm: Node3D
+var vm_hook_tip := Vector3.ZERO
 var vm_hook: Node3D                # left arm with the boathook, while you carry one
 var vm_glow: MeshInstance3D         # the flame seen through the glass: a soft additive glow
 var vm_lamp_mat: StandardMaterial3D   # its glow follows the flame
@@ -160,7 +162,13 @@ static var capture_phase := 0     # capture runs twice: win at the bell, then a 
 var hud: Control
 var hand_art: TextureRect
 var hook_art: TextureRect          # the boathook in your left hand, while you carry one
-var hook_jab := 0.0                # 1 the moment you swing it, easing back
+var hook_clock := 1.0              # elapsed presentation time; simulation never reads it
+var hook_contact := false
+var hook_victim := -1
+var hook_capture_hold := false
+var hook_vfx: Control
+const HOOK_CONTACT_TIME := 0.10
+const HOOK_ANIM_TIME := 0.36
 const HOOK_W := 340.0
 const HAND_W := 236.0
 var status_label: Label
@@ -703,6 +711,8 @@ func _build_viewmodel() -> void:
 	var hrig: Array = Hands.hook_rig(vm_hook)
 	var hook: Node3D = hrig[0]
 	var larm: Node3D = hrig[1]
+	vm_hook_arm = larm
+	vm_hook_tip = (hook.transform * Vector3(-0.65, 0.65, 0.0)) * 0.60 # inner curl, keeps the arc within the view
 	for vm: Node3D in [larm, hook, hrig[2]]:
 		for m in vm.find_children("*", "MeshInstance3D", true, false):
 			(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -722,11 +732,53 @@ func _sway_viewmodel(delta: float) -> void:
 		vm_lamp_mat.emission_energy_multiplier = 0.06 if game.effective() == Fog.Lantern.HOODED else 0.14 * light.light_energy / LIGHT[Fog.Lantern.NORMAL][1]
 		vm_glow.visible = game.effective() != Fog.Lantern.HOODED
 		vm_glow.scale = Vector3.ONE * (1.35 if game.effective() == Fog.Lantern.BRIGHT else 1.0) * clampf(light.light_energy / LIGHT[Fog.Lantern.NORMAL][1], 0.3, 1.4)
-	vm_hook.visible = game.hook_wear > 0 and not game.dead
+	vm_hook.visible = (game.hook_wear > 0 or hook_clock < HOOK_ANIM_TIME) and not game.dead
 	if vm_hook.visible:
-		var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
-		vm_hook.position = Hands.HOOK_AT + Vector3(0.05 * j, -bob + 0.04 * j, -0.16 * j)
-		vm_hook.rotation = Vector3(-0.5 * j, 0, 0)
+		var pose := hook_pose(hook_clock)
+		vm_hook.position = Hands.HOOK_AT + pose[0] - Vector3.UP * bob
+		vm_hook.rotation = pose[1]
+		# Keep the grip closed but the elbow behind the camera, not twisting up into view.
+		var elbow := Hands.HOOK_ELBOW.lerp(Vector3(-0.25, -0.8, 0.95), smoothstep(0.045, HOOK_CONTACT_TIME, hook_clock) * (1.0 - smoothstep(0.135, HOOK_ANIM_TIME, hook_clock)))
+		Hands.grip(vm_hook_arm, -Hands.HOOK_UP, vm_hook.basis.inverse() * elbow, Hands.ARM_SCALE)
+	if hook_vfx:
+		hook_vfx.queue_redraw()
+
+
+## Camera-space theatrical swing: the whole grip rig moves together. No rule changes.
+static func hook_pose(elapsed: float) -> Array[Vector3]:
+	var times := [0.0, 0.045, HOOK_CONTACT_TIME, 0.135, 0.21, HOOK_ANIM_TIME]
+	var positions := [Vector3.ZERO, Vector3(-0.045, 0.015, 0.035), Vector3(0.11, 0.045, -0.16),
+		Vector3(0.11, 0.045, -0.16), Vector3(0.14, -0.065, -0.06), Vector3.ZERO]
+	var rotations := [Vector3.ZERO, Vector3(0.22, -0.22, 0.58), Vector3(-0.56, -0.28, -0.85),
+		Vector3(-0.56, -0.28, -0.85), Vector3(-0.30, -0.12, -1.02), Vector3.ZERO]
+	for i in range(1, times.size()):
+		if elapsed <= times[i]:
+			var u := smoothstep(0.0, 1.0, (elapsed - times[i - 1]) / (times[i] - times[i - 1]))
+			return [positions[i - 1].lerp(positions[i], u), rotations[i - 1].lerp(rotations[i], u)]
+	return [Vector3.ZERO, Vector3.ZERO]
+
+
+## A restrained, fading crescent projected from the actual moving hook rig.
+func _draw_hook_vfx() -> void:
+	if game.dead or hook_clock < 0.065 or hook_clock > 0.29:
+		return
+	var fade_out := 1.0 - smoothstep(0.135, 0.29, hook_clock)
+	var finish := minf(hook_clock, 0.21)
+	var start := maxf(0.045, finish - 0.13)
+	var prev := Vector2.ZERO
+	for i in range(15):
+		var u := float(i) / 14.0
+		var pose := hook_pose(lerpf(start, finish, u))
+		var point := Hands.HOOK_AT + pose[0] + Basis.from_euler(pose[1]) * vm_hook_tip
+		var screen := hook_vfx.get_global_transform().affine_inverse() * cam.unproject_position(cam.to_global(point))
+		if i > 0:
+			var alpha := fade_out * sin(u * PI * 0.85)
+			hook_vfx.draw_line(prev, screen, Color(0.34, 0.72, 0.62, alpha * 0.18), 18.0 * u, true)
+			hook_vfx.draw_line(prev, screen, Color(0.76, 0.95, 0.83, alpha * 0.60), 4.5 * u, true)
+		prev = screen
+	if hook_contact and hook_clock >= HOOK_CONTACT_TIME:
+		var pulse := 1.0 - smoothstep(HOOK_CONTACT_TIME, 0.20, hook_clock)
+		hook_vfx.draw_circle(prev, 13.0 * pulse, Color(0.78, 0.92, 0.80, pulse * 0.22), true)
 
 
 # ---------------------------------------------------------------- rules -> look
@@ -886,6 +938,8 @@ func _drive_rig(i: int, rig: Node3D, th: Dictionary, delta := 0.0) -> void:
 	# knocked down (hooked, or reeling after you tore free): it slumps to the stones while the rule
 	# says it's down, and gets up when it isn't (blind first-timer, Nov 26: it just stood there idle)
 	if game.down(i):
+		if i == hook_victim and hook_clock < HOOK_CONTACT_TIME and rig.state != "down":
+			return
 		rig.set_state("down", 1.6)
 		return
 	if rig.state == "down":
@@ -1143,6 +1197,7 @@ func act(kind: String) -> void:
 	var oil0: int = game.oil
 	var events: Array = []
 	var turn0: int = game.turn
+	var target: int = game.hook_target() if kind == "hook" else -1
 	match kind:
 		"forward": events = game.step_dir(game.facing)
 		"back": events = game.step_dir(-game.facing)
@@ -1176,8 +1231,18 @@ func act(kind: String) -> void:
 		last_event = "cant_" + kind
 		_refresh_hud()
 		return
+	var swinging: bool = kind == "hook" and game.turn != turn0
+	var victim_was_visible: bool = target >= 0 and thrall_nodes[target].visible
+	if swinging:
+		hook_clock = 0.0
+		hook_contact = "hook_hit" in events
+		hook_victim = target if hook_contact else -1
 	var was_flicker := flicker
 	_refresh_fog()
+	if swinging and hook_victim >= 0 and victim_was_visible:
+		thrall_nodes[hook_victim].visible = true
+		if thrall_rigs.has(hook_victim):
+			thrall_rigs[hook_victim].player.active = true
 	var to_pos := _cam_pos(game.hunter, game.facing)
 	var to_yaw := _yaw(game.facing)
 	var walking := kind in ["forward", "back"]
@@ -1204,12 +1269,11 @@ func act(kind: String) -> void:
 		_place_cam(from_pos.lerp(to_pos, k) + head, yaw, -turn_dir * arc * (0.04 if kind == "about" else 0.025))
 		for j in thrall_nodes.size():   # a step glides; a bride driven off by the light is simply gone
 			var far: bool = game.thralls[j].get("recoiled_on", -1) > turn0 or (from_t[j] - game.thralls[j].pos).length() > 2.5
-			thrall_nodes[j].position = _w(game.thralls[j].pos) if far else _w(from_t[j]).lerp(_w(game.thralls[j].pos), u)
+			var recoil := smoothstep(0.135, dur, e) if swinging and j == hook_victim else u
+			thrall_nodes[j].position = _w(game.thralls[j].pos) if far else _w(from_t[j]).lerp(_w(game.thralls[j].pos), recoil)
 		await get_tree().process_frame
 	step_k = 0.0
 	turn_events = events
-	if "hook_hit" in events or "hook_miss" in events or "hook_broke" in events:
-		hook_jab = 1.0
 	if ("lunge" in events or "torn_free" in events) and not game.dead:
 		lunge_hit = 1.0
 	if ("torn_free" in events or "panic" in events) and oil0 > game.oil:
@@ -1349,6 +1413,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	t += delta
+	if not hook_capture_hold:
+		hook_clock = minf(HOOK_ANIM_TIME, hook_clock + delta)
 	if minimap and game:   # the chart swings round to keep what's ahead at the top
 		var want := 0.0 if map_north_up else Vector2(game.facing).angle_to(Vector2.UP)
 		if absf(angle_difference(map_rot, want)) > 0.002:
@@ -1429,19 +1495,19 @@ func _process(delta: float) -> void:
 		if blood_screen:   # the spatter hangs on longer than the flash, then runs off
 			blood_screen.modulate.a = minf(lunge_hit * 1.4, 0.95)
 	else:
-		if cam and cam.h_offset != 0.0:
-			cam.h_offset = 0.0
-			cam.v_offset = 0.0
+		if cam:
+			var kick := (1.0 - smoothstep(HOOK_CONTACT_TIME, 0.22, hook_clock)) if hook_contact and hook_clock >= HOOK_CONTACT_TIME else 0.0
+			cam.h_offset = sin(hook_clock * 105.0) * 0.017 * kick
+			cam.v_offset = -0.012 * kick
 		if lunge_flash and lunge_flash.modulate.a > 0.0:
 			lunge_flash.modulate.a = 0.0
 		if blood_screen and blood_screen.modulate.a > 0.0 and not kill_shot:
 			blood_screen.modulate.a = 0.0
 	var eff: int = game.effective()
 	if hook_art:   # left hand: the boathook, lit by the lantern in the right; it jabs when you swing
-		hook_art.visible = game.hook_wear > 0 and not game.dead
+		hook_art.visible = (game.hook_wear > 0 or hook_clock < HOOK_ANIM_TIME) and not game.dead
 		if hook_art.visible:
-			hook_jab = maxf(0.0, hook_jab - delta * 3.0)
-			var j := sin(hook_jab * PI) if hook_jab > 0.0 else 0.0
+			var j := sin(clampf(hook_clock / HOOK_ANIM_TIME, 0.0, 1.0) * PI)
 			var lk := 0.45 if eff == Fog.Lantern.HOODED else (1.05 if eff == Fog.Lantern.NORMAL else 1.25)
 			hook_art.modulate = Color(lk, lk * 0.96, lk * 0.92)
 			hook_art.position = Vector2(-44 + 30.0 * j, _ui_h() - _bh() - HOOK_W - 50 - 80.0 * j + sin(t * 1.7 + 1.0) * 2.0)
@@ -1584,6 +1650,11 @@ func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	# Back to front: the hand lantern (column), the vignette (whole screen), the HUD (column).
+	hook_vfx = Control.new()
+	hook_vfx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hook_vfx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(hook_vfx)
+	hook_vfx.draw.connect(_draw_hook_vfx)
 	var hand_col := _column()
 	layer.add_child(hand_col)
 	hand_col.visible = false   # the painted hands: kept as a fallback, the 3D arms (_build_viewmodel) show instead
@@ -2278,6 +2349,11 @@ func _refresh_hud() -> void:
 	if game.oil == 0:
 		s = "The oil is spent. The dark is coming in."
 	var extra: String = said.get(last_event, "")
+	if last_event in ["heard", "toll", "hook_hit", "hook_miss", "hook_broke"]:
+		for cue in ["hook_broke", "hook_hit", "hook_miss"]:
+			if cue in turn_events:
+				extra = said[cue]
+				break
 	if extra != "":
 		s = extra
 	elif _hook_ready():
@@ -3505,6 +3581,9 @@ func _capture() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
 	for i in 20:
 		await get_tree().process_frame
+	if "--hook-only" in OS.get_cmdline_user_args():
+		await _capture_hook_only()
+		return
 	if capture_phase == 0 and "--art-only" in OS.get_cmdline_user_args():   # quick look at the art pass
 		capture_phase = 4
 		kill_3d_seen = true   # the kill isn't in this run
@@ -3660,6 +3739,52 @@ func _capture_stalker() -> void:
 	get_tree().reload_current_scene()
 
 
+## Fast visual review of the hook using the handmade harbor and a visible thrall.
+func _capture_hook_only() -> void:
+	if modal:
+		modal.queue_free()
+		modal = null
+	hints_on = false
+	game.hunter = Vector2i(6, 18)
+	game.facing = Vector2i.RIGHT
+	game.hook_wear = 3
+	game.setting = Fog.Lantern.NORMAL
+	var victim: int = -1
+	for i in game.thralls.size():
+		if game.thralls[i].get("kind", "thrall") == "thrall" and not game.thralls[i].get("lying", false):
+			victim = i
+			break
+	if victim < 0:
+		get_tree().quit(1)
+		return
+	game.thralls[victim].pos = game.hunter + game.facing
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(game.hunter, game.facing), _yaw(game.facing))
+	_refresh()
+	await _shot("fp_hook_rest")
+	await _capture_hook_poses()
+	var turn0: int = game.turn
+	await act("hook")
+	await _shot("fp_hook_after")
+	var ok: bool = game.turn == turn0 + 1 and game.hook_wear == 2 and hook_contact
+	print("HOOK PRESENTATION ", "PASS" if ok else "FAIL")
+	get_tree().quit(0 if ok else 1)
+
+
+func _capture_hook_poses() -> void:
+	# Hold presentation-only poses for consistent screenshots even on slow capture machines.
+	hook_capture_hold = true
+	hook_clock = 0.045
+	hook_contact = false
+	await _shot("fp_hook_windup")
+	hook_clock = 0.115
+	hook_contact = true
+	await _shot("fp_hook_contact")
+	hook_capture_hold = false
+	hook_clock = HOOK_ANIM_TIME
+	hook_contact = false
+
+
 ## Pass 3: pick up the boathook, lay a two-tile oil slick, back off, spark it with a thrall in
 ## it, then hook the next one. Thralls are placed by hand so the shot is the same every run.
 func _capture_trap() -> void:
@@ -3690,6 +3815,7 @@ func _capture_trap() -> void:
 	_refresh()
 	await _shot("fp_thrall")   # art check: a thrall two tiles ahead, in the lantern's reach
 	var glow_on: bool = hook_ready and item_buttons.hook.text.begins_with("HOOK IT!")
+	await _capture_hook_poses()
 	await _press(item_buttons.hook)
 	await _shot("fp_trap_hook")
 	var plate_back: bool = item_buttons.hook.get_theme_color("font_color") == Color("#c9ad78") and item_buttons.hook.has_theme_stylebox_override("normal")
