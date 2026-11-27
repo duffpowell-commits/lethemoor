@@ -1730,7 +1730,7 @@ func _build_hud() -> void:
 	var top := ColorRect.new()
 	top.color = UI.INK
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.size.y = TOP_H
+	top.offset_bottom = TOP_H
 	hud.add_child(top)
 	_wing(top, UI.INK)
 	_rule(top, TOP_H - 1)
