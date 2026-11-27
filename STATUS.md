@@ -24,6 +24,8 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 
 ## In progress
 
+QA reliability branch (Nov 27): expert bot no longer stalls out of oil; HUD anchor warning fixed. 85 tests passed; 500 simulated nights, zero expert stuck runs. Real render and cleanup validation pending. Owner personal playtest waived; volunteer enjoyment data remains pending.
+
 Nov 27: hook presentation polish, with stronger 3D swing, spectral arc, timed contact feedback and original synthesized audio. Rules unchanged; 85 headless tests pass. Phone FPS and audible mix still pending. Release status awaits CI.
 
 Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
