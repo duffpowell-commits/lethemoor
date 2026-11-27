@@ -221,7 +221,7 @@ static func bell_tower() -> MeshInstance3D:
 
 ## Landmarks for the open halls of a ward, so one maze corner doesn't look like the next.
 ## Each stands against a wall (local -z faces the wall), low enough not to hide a horror.
-static func landmark(kind: String) -> MeshInstance3D:
+static func landmark(kind: String, shifted := false) -> MeshInstance3D:
 	var wood := _surface()
 	var mesh: ArrayMesh
 	match kind:
@@ -245,7 +245,7 @@ static func landmark(kind: String) -> MeshInstance3D:
 		_:           # lobster pots and a crate, stacked against the wall
 			_box(wood, Vector3(0.5, 0.42, 0.5), Vector3(-0.22, 0.21, -0.2))
 			_box(wood, Vector3(0.46, 0.4, 0.46), Vector3(0.3, 0.2, -0.22))
-			_box(wood, Vector3(0.44, 0.38, 0.44), Vector3(0.02, 0.61, -0.24), Transform3D(Basis(Vector3.UP, 0.3), Vector3.ZERO))
+			_box(wood, Vector3(0.44, 0.38, 0.44), Vector3(-0.09 if shifted else 0.02, 0.61, -0.24), Transform3D(Basis(Vector3.UP, -0.28 if shifted else 0.3), Vector3.ZERO))
 	mesh = wood.commit()
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color("#2e241b") if kind != "pots" else Color("#33291e")
