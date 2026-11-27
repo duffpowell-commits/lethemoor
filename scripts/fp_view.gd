@@ -3786,6 +3786,11 @@ func _capture_atmosphere() -> void:
 	var ok := fog_ok and not reflection.visible and reflection_seen
 	print("REFLECTION ", "PASS" if ok else "FAIL", " target=", target, " hooded_hidden=", fog_ok)
 	# Test the spatial audio call and caption, using a quiet, scheduled turn.
+	# The opening cue is still audible if the render is fast. Wait for its tail;
+	# the production priority gate must never be bypassed by the capture.
+	var cue_deadline := Time.get_ticks_msec() + 16000
+	while Sound.hook_priority_active() and Time.get_ticks_msec() < cue_deadline:
+		await get_tree().process_frame
 	game.seed = 1
 	game.turn = Atmos.event_turn(game.seed, "sound")
 	game.dread = 0
@@ -3803,8 +3808,9 @@ func _capture_atmosphere() -> void:
 	await _shot("atmosphere_sound_caption")
 	Sound.hook_turn("wait", ["toll"], game, true)
 	var cancel_ok := not Sound.hook_atmosphere_active()
-	ok = ok and cancel_ok
-	print("ATMOSPHERE PRIORITY ", "PASS" if cancel_ok else "FAIL")
+	var toll_blocks := Sound.hook_priority_active() and not Sound.hook_atmosphere(game.hunter)
+	ok = ok and cancel_ok and toll_blocks
+	print("ATMOSPHERE PRIORITY ", "PASS" if cancel_ok and toll_blocks else "FAIL", " ringing_toll_blocks=", toll_blocks)
 	atmosphere_caption = false
 	# A fixture visibly changes only while outside light and view.
 	var pot := Vector2i(-1, -1)

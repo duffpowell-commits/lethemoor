@@ -1320,3 +1320,11 @@ func test_atmosphere_yields_to_gameplay_and_silent_bell() -> void:
 	bride.thralls[0].target = bride.hunter
 	check(sound.stalker_free(bride), "Bride is free to move")
 	check(sound.atmosphere_conflicts(bride, [], bride.positions()), "intentional silence takes priority")
+
+
+func test_atmosphere_yields_to_stationary_hunting_thrall() -> void:
+	var g = Night.start("############\n#H.....T...#\n############")
+	g.facing = Vector2i.LEFT
+	g.thralls[0].target = g.hunter
+	check(Audio.behind(g).is_empty() and Audio.heard(g, g.positions()).is_empty(), "stationary thrall is not a moved or behind cue")
+	check(Audio.atmosphere_conflicts(g, [], g.positions()), "within-earshot pursuing thrall has a shuffle priority even when stationary")

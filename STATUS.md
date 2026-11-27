@@ -25,7 +25,7 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 ## In progress
 
 - **Integrated:** PRs #76, #77, #78, #79 merged after CI and independent fresh-eyes passes. Main `e31f818`; exact merge commits in `docs/BUILD_LOG.md`.
-- **Atmosphere candidate:** `feat/complete-atmosphere` completes approved #74: seeded rare puddle silhouettes, unseen crate shift, original quiet spatial cue (stops for essential feedback), coping patina, prop-linked letters, wrong dawn. No simulation, signing key or approved 3D asset changes. 91 tests pass, 500-night benchmark unchanged, actual Compatibility `ART PASS` and staged HIGH/LOW atmosphere checks. See [verification and real screenshots](docs/ATMOSPHERE_VERIFICATION.md). Final CI and exact-head fresh-eyes still required before merge.
+- **Atmosphere candidate:** `feat/complete-atmosphere` completes approved #74: seeded rare puddle silhouettes, unseen crate shift, original quiet spatial cue (stops for essential feedback), coping patina, prop-linked letters, wrong dawn. No simulation, signing key or approved 3D asset changes. 92 tests pass, 500-night benchmark unchanged, actual Compatibility `ART PASS` and staged HIGH/LOW atmosphere checks. See [verification and real screenshots](docs/ATMOSPHERE_VERIFICATION.md). Final CI and exact-head fresh-eyes still required before merge.
 - One Night remains the slice. The 7% expert no-encounter rate is unchanged. Parked until the separate viability decision: safe room, satchel, revenant corpse and Choir.
 - Old PRs #31 and #36 remain untouched. #74 is the approved design reference.
 

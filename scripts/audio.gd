@@ -51,6 +51,7 @@ var ended := false
 var tweens := {}
 var fires := {}                  # burning tile -> its crackle (AudioStreamPlayer3D)
 var atmosphere_player: AudioStreamPlayer3D
+var priority_spatial: Array[AudioStreamPlayer3D] = []
 var cue_frame := -1
 var log_cues := OS.has_environment("LM_AUDIO_LOG")   # LM_AUDIO_LOG=1: print every sound played
 static var _me: Node               # the autoload instance, once it's ready
@@ -77,11 +78,15 @@ static func hook_sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 
 
 static func hook_atmosphere(tile: Vector2i) -> bool:
-	if _me:
+	if _me and not _me.priority_active():
 		_me.cancel_atmosphere()
 		_me.atmosphere_player = _me.at("harbor_undertone", tile, -18.0)
 		return _me.atmosphere_active()
 	return false
+
+
+static func hook_priority_active() -> bool:
+	return _me != null and _me.priority_active()
 
 
 static func hook_atmosphere_active() -> bool:
@@ -95,6 +100,26 @@ static func hook_cancel_atmosphere() -> void:
 
 func atmosphere_active() -> bool:
 	return is_instance_valid(atmosphere_player) and atmosphere_player.playing
+
+
+## Preserve the full tail of an important cue, not just the turn that started it.
+## Ordinary footfalls, turns and clicks can sit under the low ambient note.
+func priority_active() -> bool:
+	for i in range(priority_spatial.size() - 1, -1, -1):
+		if not is_instance_valid(priority_spatial[i]) or not priority_spatial[i].playing:
+			priority_spatial.remove_at(i)
+	if not priority_spatial.is_empty():
+		return true
+	for player in pool:
+		if player.playing and player.get_meta("atmosphere_priority", false):
+			return true
+	return false
+
+
+func _mark_priority(player: AudioStreamPlayer3D) -> void:
+	# Prune completed spatial voices even in nights with no atmosphere scheduled.
+	priority_active()
+	priority_spatial.append(player)
 
 
 func cancel_atmosphere() -> void:
@@ -183,6 +208,9 @@ func sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 		return
 	if log_cues:
 		print("SOUND ", name)
+	var priority := not name.begins_with("step_") and name not in ["turn", "ui_click"]
+	if priority:
+		cancel_atmosphere()
 	if name != "ui_click":
 		cue_frame = Engine.get_process_frames()
 	var p: AudioStreamPlayer = pool[0]
@@ -193,6 +221,7 @@ func sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 	pool.erase(p)
 	pool.append(p)      # the oldest busy voice is the one stolen next
 	p.stream = streams[name]
+	p.set_meta("atmosphere_priority", priority)
 	p.volume_db = db
 	p.pitch_scale = pitch
 	p.play()
@@ -205,6 +234,9 @@ func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> AudioStreamPla
 		return null
 	if log_cues:
 		print("SOUND3D ", name, " at ", tile)
+	var priority := name != "harbor_undertone"
+	if priority:
+		cancel_atmosphere()
 	var p := AudioStreamPlayer3D.new()
 	p.stream = streams[name]
 	p.volume_db = db
@@ -217,6 +249,8 @@ func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> AudioStreamPla
 	p.finished.connect(p.queue_free)
 	scene.add_child(p)
 	p.play()
+	if priority:
+		_mark_priority(p)
 	return p
 
 
@@ -229,6 +263,7 @@ func _toll(tile: Vector2i) -> void:
 		return
 	if log_cues:
 		print("SOUND3D toll at ", tile)
+	cancel_atmosphere()
 	var p := AudioStreamPlayer3D.new()
 	p.stream = streams["bell"]
 	p.volume_db = TOLL_DB
@@ -241,6 +276,7 @@ func _toll(tile: Vector2i) -> void:
 	p.finished.connect(p.queue_free)
 	scene.add_child(p)
 	p.play()
+	_mark_priority(p)
 
 
 func _fade(p: AudioStreamPlayer, db: float, time: float) -> void:
@@ -261,6 +297,7 @@ func _fade(p: AudioStreamPlayer, db: float, time: float) -> void:
 ## A night begins (first load, or a retry reloads the scene).
 func night() -> void:
 	cancel_atmosphere()
+	priority_spatial.clear()
 	ended = false
 	quiet = false
 	was_flicker = false
@@ -487,7 +524,14 @@ static func atmosphere_conflicts(game, events: Array, before: Array) -> bool:
 	if not heard(game, before).is_empty() or not behind(game).is_empty():
 		return true
 	for th: Dictionary in game.thralls:
-		if not th.get("gone", false) and not th.get("lying", false) and game.in_view(th.pos) and game.fog.get_state(th.pos) == Fog.LIT:
+		if th.get("gone", false) or th.get("lying", false):
+			continue
+		if game.in_view(th.pos) and game.fog.get_state(th.pos) == Fog.LIT:
+			return true
+		# A pursuing thrall sometimes shuffles while stationary. Do not let the
+		# cosmetic cue compete even on a turn when the existing random cue is silent.
+		if th.get("kind", "thrall") != "stalker" and th.get("target") != null \
+				and Vector2(th.pos - game.hunter).length() <= HEAR and not game.silent(th):
 			return true
 	return false
 
