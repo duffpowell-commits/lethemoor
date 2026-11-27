@@ -16,7 +16,7 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 - Web (Safari): https://duffpowell-commits.github.io/lethemoor/
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
-- Public manifest last verified build 213, commit `e31f818` (#79). Atmosphere #80 merged as `ab65ef5`; main build #216 publication pending. Check `version.json` rather than assuming latest main is already live.
+- **Build 216** is live, code commit `ab65ef5` (#80). Verified public APK `version.json` and live web asset suffix. Main CI #216 published with fixed signing key. Live web Chromium mobile-emulated touch smoke passed; exact assets, actual screenshots and zero page errors in verification gallery.
 
 ## Tools
 
@@ -37,9 +37,8 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 
 ## Next
 
-1. Verify main build #216 publication and public APK/web manifest.
-2. If volunteers give genuine feedback, record the Nov 28 viability decision (median fun 6+/10 and voluntary replay). Do not equate bot/engine correctness or synthetic verdict taps with that result; no personal playtest required from Duff.
-3. Do not expand the slice or start parked full-game systems without the viability decision.
+1. If volunteers give genuine feedback, record the Nov 28 viability decision (median fun 6+/10 and voluntary replay). Do not equate bot/engine correctness or synthetic verdict taps with that result; no personal playtest required from Duff.
+2. Do not expand the slice or start parked full-game systems without the viability decision.
 
 ## Key paths
 
