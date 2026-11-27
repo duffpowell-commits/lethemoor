@@ -1236,3 +1236,13 @@ func test_hook_presentation_keyframes() -> void:
 	check(windup[1].z > 0.0 and contact[1].z < 0.0, "clearly opposed windup and sweep poses")
 	check(contact[0].is_equal_approx(View.hook_pose(0.135)[0]) and contact[1].is_equal_approx(View.hook_pose(0.135)[1]), "brief presentation-only contact hold")
 	check(contact[0].z < windup[0].z, "hook moves across the foreground")
+
+
+func test_seeded_atmosphere_is_cosmetic_and_repeatable() -> void:
+	var View = preload("res://scripts/fp_view.gd")
+	var tile := Vector2i(2, 1)
+	check(View.wet_floor_for(tile, 0), "seed zero preserves original wet tile layout")
+	check(not View.wet_floor_for(tile, 1), "seed changes cosmetic texture selection")
+	check(View.wet_floor_for(tile, 11), "repeatable wet tile selection")
+	check(View.dawn_detail(1) == View.dawn_detail(1), "same seed, same dawn")
+	check(View.dawn_detail(1) != View.dawn_detail(2), "different dawn detail")
