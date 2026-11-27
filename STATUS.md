@@ -16,16 +16,16 @@ The live slice is One Night: ring the bell before the oil runs out. Grade is oil
 
 - Web (Safari): https://duffpowell-commits.github.io/lethemoor/
 - APK: https://github.com/duffpowell-commits/lethemoor/releases/tag/dev (`lethemoor.apk`, `version.json`)
-- Public manifest last verified build 211, commit `ff0bd05` (#78); #79 merged afterward and main publication is asynchronous. Check `version.json` rather than assuming the latest main is already live.
+- **Build 216** is live, code commit `ab65ef5` (#80). Verified public APK `version.json` and live web asset suffix. Main CI #216 published with fixed signing key. Live web Chromium mobile-emulated touch smoke passed; exact assets, actual screenshots and zero page errors in verification gallery.
 
 ## Tools
 
 Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, step, read the HUD, screenshot) before calling work done.
 
-## In progress
+## Current state
 
-- **Integrated:** PRs #76, #77, #78, #79 merged after CI and independent fresh-eyes passes. Main `e31f818`; exact merge commits in `docs/BUILD_LOG.md`.
-- **Atmosphere candidate:** `feat/complete-atmosphere` completes approved #74: seeded rare puddle silhouettes, unseen crate shift, original quiet spatial cue (stops for essential feedback), coping patina, prop-linked letters, wrong dawn. No simulation, signing key or approved 3D asset changes. 92 tests pass, 500-night benchmark unchanged, actual Compatibility `ART PASS` and staged HIGH/LOW atmosphere checks. See [verification and real screenshots](docs/ATMOSPHERE_VERIFICATION.md). Final CI and exact-head fresh-eyes still required before merge.
+- **Integrated:** PRs #76, #77, #78, #79 merged after CI and independent fresh-eyes passes. Exact merge commits in `docs/BUILD_LOG.md`.
+- **Atmosphere complete:** PR #80 merged as `ab65ef570a709fd97ff80fa8b9d1304bd2ff6acf` after final exact head `00cb6778` passed all gates; completes approved #74: seeded rare puddle silhouettes, unseen crate shift, original quiet spatial cue (stops for essential feedback), coping patina, prop-linked letters, wrong dawn. No simulation, signing key or approved 3D asset changes. 92 tests pass, 500-night benchmark unchanged, actual Compatibility `ART PASS` and staged HIGH/LOW atmosphere checks. See [verification and real screenshots](docs/ATMOSPHERE_VERIFICATION.md). Build #215, fixed-key Android/web export, gitleaks/rule-lock and independent exact-head fresh-eyes passed before merge.
 - One Night remains the slice. The 7% expert no-encounter rate is unchanged. Parked until the separate viability decision: safe room, satchel, revenant corpse and Choir.
 - Old PRs #31 and #36 remain untouched. #74 is the approved design reference.
 
@@ -37,9 +37,8 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 
 ## Next
 
-1. Complete final candidate CI, exact-head fresh-eyes review and merge only when all gates pass; verify published APK and web manifest.
-2. If volunteers give genuine feedback, record the Nov 28 viability decision (median fun 6+/10 and voluntary replay). Do not equate bot/engine correctness or synthetic verdict taps with that result; no personal playtest required from Duff.
-3. Do not expand the slice or start parked full-game systems without the viability decision.
+1. If volunteers give genuine feedback, record the Nov 28 viability decision (median fun 6+/10 and voluntary replay). Do not equate bot/engine correctness or synthetic verdict taps with that result; no personal playtest required from Duff.
+2. Do not expand the slice or start parked full-game systems without the viability decision.
 
 ## Key paths
 
