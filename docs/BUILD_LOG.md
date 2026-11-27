@@ -79,6 +79,7 @@ Tick each line when it's built, tested and in the branch.
 - Lethemoor keeps its own signing key. Never make or change a key.
 
 ## Log (newest first)
+- 2026-11-27: QA reliability branch `fix/qa-stuck-hud`: expert bot seeds 235/255 oscillated after running out of oil; both now finish (102/121 turns) by resuming routing instead of trying to freeze the Bride without light. Illegal non-turn actions also fall back to waiting; incomplete runs log seed and state. HUD top bar uses anchor offset instead of size setter; startup anchor warning gone. Tests 85/85, newcomer 81/200 wins (unchanged), expert 148/300 wins, 152 deaths, zero stuck (was 144/154/2). Simulation rules unchanged. Dummy renderer material/cleanup warnings remain; real capture blocked by unavailable display. Horror pacing unchanged; next inspect scent events vs actual sightings, then approved atmosphere pass. No human playtest required from owner.
 - 2026-11-26 19:50 UTC: handoff refresh (no code). Main is `48a526d`, live build 199. Noted the two old open PRs; STATUS engine line fixed to 4.7.2.
 - 2026-11-26 13:50 UTC: PR #68 (gap pass) merged as e17a537. Every gap item ticked; no blind review
   (Duff cancelled it). Next for any AI: wait for Duff (game paused, Rush has the focus).
