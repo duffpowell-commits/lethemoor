@@ -16,6 +16,7 @@ const Sound = preload("res://scripts/audio.gd")   # all sound; hooks do nothing 
 const Lessons = preload("res://scripts/lessons.gd")
 const Letters = preload("res://scripts/letters.gd")
 const UI = preload("res://scripts/ui_style.gd")
+const Atmos = preload("res://scripts/atmosphere.gd")
 const Perf = preload("res://scripts/perf.gd")
 
 const Harbor = preload("res://scripts/harbor_geometry.gd")
@@ -134,6 +135,11 @@ var tile_mats := {}                # letters have their own material
 var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
 var lintels := {}
 var bell_tower: MeshInstance3D       # the tower over the bell, seen over the walls (review fix 4)
+var reflection_seen := false
+var reflection: MeshInstance3D
+var reflection_time := 0.0
+var atmosphere_heard := false
+var atmosphere_caption := false
 var landmark_seen := {}
 var landmark_shifted := false
 var landmarks := {}                     # tile -> kind (boat, door, pots) dressed in a ward's open halls
@@ -240,6 +246,8 @@ func _ready() -> void:
 ## A reported night can be replayed: ?night=1234 on the web link, or LM_NIGHT=1234.
 func _pick_night() -> int:
 	if capture_mode:
+		if "--atmosphere-only" in OS.get_cmdline_user_args():
+			return maxi(1, int(OS.get_environment("LM_NIGHT"))) if OS.has_environment("LM_NIGHT") else 3
 		return 0
 	var asked := _asked("LM_NIGHT", "night")
 	if asked.is_valid_int() and int(asked) > 0:
@@ -819,6 +827,7 @@ func _tile_mat(tex: String, base: Color, k: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # painted textures from the mockup
 	m.metallic_specular = 0.25
+	m.vertex_color_use_as_albedo = tex.begins_with("wall")
 	if tex != "deck":
 		m.albedo_texture = _tex(tex)
 	if tex.begins_with("wall"):
@@ -881,7 +890,7 @@ func _place_landmarks() -> void:
 ## One rare, cosmetic change per night. A known landmark stays recognisable, but its
 ## top crate shifts while the player is away. Never modify map, collision or game state.
 static func can_shift_landmark(seed: int, cell: Vector2i, first_seen: int, turn: int, distance: int, visible_now: bool) -> bool:
-	return seed > 0 and posmod(seed + cell.x * 7 + cell.y * 11, 3) == 0 \
+	return seed > 0 and posmod(seed, 4) == 3 and posmod(seed + cell.x * 7 + cell.y * 11, 3) == 0 \
 		and first_seen >= 0 and turn - first_seen >= 8 and distance >= 7 and not visible_now
 
 
@@ -1233,6 +1242,7 @@ func act(kind: String) -> void:
 	var carried := chain_from
 	chain_from = ""
 	last_event = ""
+	atmosphere_caption = false
 	turn_events = []
 	var from_pos := cam.position
 	var from_yaw := cam.rotation.y
@@ -1331,6 +1341,8 @@ func act(kind: String) -> void:
 	if game.dead and ("taken" in events or "grabbed" in events):
 		await _kill_shot()
 	busy = false
+	if game.turn != turn0:
+		_atmosphere_turn(events)
 	if game.rang:
 		await _swing_bell()
 		if not is_inside_tree():
@@ -1469,6 +1481,7 @@ func _process(delta: float) -> void:
 		item_buttons.hook.modulate = Color(1.0, k, k * 0.8)
 	_sway_viewmodel(delta)
 	_haunt(delta)
+	_fade_reflection(delta)
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
 		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
 		if g:
@@ -2407,6 +2420,8 @@ func _refresh_hud() -> void:
 		s = "The flame gutters. Something is near."
 	elif not heard_now.is_empty():
 		s = _heard_line(heard_now)
+	elif atmosphere_caption:
+		s = "A distant, wavering note. Then silence."
 	if game.turn < 3 and extra == "":
 		s = "Swipe up to walk (hold to keep going), down to back away, sideways to turn. Find the bell."
 	status_label.text = s
@@ -3096,6 +3111,62 @@ func _kill_shot_3d(i: int) -> void:
 	kill_shot = null
 
 
+## One brief impossible reflection or distant note, only in a quiet moment. No game state
+## is written. The seed determines eligibility; missed windows are never replayed.
+func _atmosphere_turn(events: Array) -> void:
+	if capture_mode or game.over() or _sheet_up() or game.oil <= 0:
+		return
+	var quiet: bool = events.is_empty() and heard_now.is_empty() and not flicker and not game.hallucinating() \
+		and not _hook_ready() and not _down_ahead()
+	if Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "reflection"), reflection_seen, quiet):
+		for distance in [2, 1, 3]:
+			var p: Vector2i = game.hunter + game.facing * distance
+			if tile_tex.get(p, "") == "floor_wet" and fog.get_state(p) == Fog.LIT \
+					and game.in_view(p) and game.thrall_at(p) < 0 and not game.slicks.has(p):
+				_show_reflection(p)
+				reflection_seen = true
+				return
+	if Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "sound"), atmosphere_heard, quiet):
+		atmosphere_heard = true
+		atmosphere_caption = true
+		var side: Vector2i = Vector2i(-game.facing.y, game.facing.x)
+		if posmod(hash(Vector2i(game.seed, 73)), 2) == 0:
+			side = -side
+		Sound.hook_atmosphere(game.hunter + side * 2 - game.facing * 2)
+		_refresh_hud()
+
+
+func _show_reflection(p: Vector2i) -> void:
+	if reflection == null:
+		reflection = MeshInstance3D.new()
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(0.84, 0.9)
+		reflection.mesh = plane
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_texture = _tex("puddle_reflection")
+		mat.albedo_color = Color(0.86, 0.91, 0.94, 0.0)
+		reflection.material_override = mat
+		reflection.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(reflection)
+	reflection.position = _w(p) + Vector3(0, 0.008, 0)
+	reflection.rotation.y = _yaw(game.facing)
+	reflection_time = 0.85
+	reflection.visible = true
+
+
+func _fade_reflection(delta: float) -> void:
+	if reflection == null or not reflection.visible:
+		return
+	reflection_time = maxf(0.0, reflection_time - delta)
+	if busy or _sheet_up() or game.over() or reflection_time <= 0.0:
+		reflection.visible = false
+		return
+	var mat: StandardMaterial3D = reflection.material_override
+	mat.albedo_color.a = 0.38 * sin(PI * reflection_time / 0.85)
+
+
 ## Dread at or past half: now and then a figure stands at the edge of the light, down the way you
 ## face, black against the fog. Then it isn't there. Look only: it's not in the rules or on the map.
 func _haunt(delta: float) -> void:
@@ -3162,6 +3233,22 @@ func _show_end() -> void:
 		hud.add_child(end_screen)
 		_wing(end_screen, end_screen.color)
 		end_screen.color = Color(0, 0, 0, 0)
+		if game.rang:
+			# A brief, cool false-dawn wash behind the verdict. Replay is immediately available.
+			var wash := TextureRect.new()
+			wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			var gradient := Gradient.new()
+			gradient.colors = PackedColorArray([Color(0.25, 0.34, 0.37, 0.32), Color(0.04, 0.06, 0.09, 0.0)])
+			var texture := GradientTexture2D.new()
+			texture.gradient = gradient
+			texture.fill_from = Vector2(0.5, 0.0)
+			texture.fill_to = Vector2(0.5, 0.78)
+			wash.texture = texture
+			wash.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			wash.modulate.a = 0.0
+			end_screen.add_child(wash)
+			create_tween().tween_property(wash, "modulate:a", 1.0, 0.8)
 		var card := PanelContainer.new()
 		card.name = "Card"
 		card.custom_minimum_size.x = 480
@@ -3211,6 +3298,8 @@ func _show_end() -> void:
 		big.text = "THE BELL RINGS"
 		big.add_theme_color_override("font_color", UI.AMBER)
 		grade.text = game.grade()
+		# A cold dawn wash on the existing card, with all verdict controls unchanged.
+		big.add_theme_color_override("font_color", Color("#c3d0cb"))
 		small.text = "%s\n\n%d oil left  +  %d letters × 5  =  %d\n%d turns\n\n%s" % [dawn_detail(game.seed), game.oil, game.letters_read.size(), game.points(), game.turn, Lessons.GRADE_LINE]
 	elif game.escaped:
 		big.text = "DAWN"
@@ -3620,10 +3709,148 @@ func _mouse(pos: Vector2, down: bool) -> void:
 
 ## Two passes (the scene reloads between them): 0 = controls + walk to the bell and ring it,
 ## 1 = read a letter under BRIGHT, then hood and walk blind into a thrall.
+## Staged engine captures: the actual materials, view and event logic, with controlled
+## turn/seed/position inputs so rare events can be inspected without hundreds of replays.
+func _capture_atmosphere() -> void:
+	if modal != null:
+		modal.queue_free()
+		modal = null
+	game.set_lantern(Fog.Lantern.BRIGHT)
+	var target := Vector2i(-1, -1)
+	var stand := Vector2i.ZERO
+	var facing := Vector2i.ZERO
+	for p: Vector2i in tile_tex:
+		if tile_tex[p] != "floor_wet" or game.thrall_at(p) >= 0:
+			continue
+		for direction: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			var from := p - direction * 2
+			if not room.is_wall(from) and not room.is_wall(p - direction) and game.thrall_at(from) < 0:
+				target = p
+				stand = from
+				facing = direction
+				break
+		if target.x >= 0:
+			break
+	if target.x < 0:
+		print("ATMOSPHERE FAIL no wet corridor")
+		get_tree().quit(1)
+		return
+	game.hunter = stand
+	game.facing = facing
+	game.fog.update(game.lights())
+	_place_cam(_cam_pos(stand, facing), _yaw(facing))
+	_refresh()
+	await _shot("atmosphere_puddle_before")
+	game.seed = 2
+	game.turn = Atmos.event_turn(game.seed, "reflection")
+	game.dread = 0
+	flicker = false
+	heard_now.clear()
+	capture_mode = false
+	_atmosphere_turn([])
+	capture_mode = true
+	if not reflection_seen or reflection == null:
+		print("REFLECTION FAIL scheduled cue not shown")
+		get_tree().quit(1)
+		return
+	reflection_time = 0.425
+	_fade_reflection(0.0)
+	set_process(false)
+	await _shot("atmosphere_puddle_reflection")
+	set_process(true)
+	_fade_reflection(0.9)
+	var ok := not reflection.visible and reflection_seen
+	print("REFLECTION ", "PASS" if ok else "FAIL", " target=", target)
+	# Test the spatial audio call and caption, using a quiet, scheduled turn.
+	game.seed = 1
+	game.turn = Atmos.event_turn(game.seed, "sound")
+	game.dread = 0
+	flicker = false
+	fake_flicker = false
+	heard_now.clear()
+	last_event = ""
+	turn_events.clear()
+	capture_mode = false
+	_atmosphere_turn([])
+	capture_mode = true
+	var sound_ok := atmosphere_heard and "wavering note" in status_label.text
+	ok = ok and sound_ok
+	print("ATMOSPHERE SOUND ", "PASS" if sound_ok else "FAIL")
+	await _shot("atmosphere_sound_caption")
+	atmosphere_caption = false
+	# A fixture visibly changes only while outside light and view.
+	var pot := Vector2i(-1, -1)
+	for p: Vector2i in landmarks:
+		if landmarks[p] == "pots":
+			pot = p
+			break
+	if pot.x >= 0:
+		var prop: MeshInstance3D = harbor_fixtures[pot]
+		var wall_dir := Vector2i(roundi(sin(prop.rotation.y)), roundi(cos(prop.rotation.y)))
+		var near := pot + wall_dir * 2
+		if room.is_wall(near):
+			near = pot + wall_dir
+		game.hunter = near
+		game.facing = -wall_dir
+		game.fog.update(game.lights())
+		_place_cam(_cam_pos(near, game.facing), _yaw(game.facing))
+		_refresh()
+		await _shot("atmosphere_pots_before")
+		var previous := prop.mesh
+		for seed in [3, 7, 11]:
+			if posmod(seed + pot.x * 7 + pot.y * 11, 3) == 0:
+				game.seed = seed
+				break
+		game.turn = 5
+		capture_mode = false
+		_refresh_landmark_memory()
+		capture_mode = true
+		var away := Vector2i(-1, -1)
+		for cell: Vector2i in tile_tex:
+			if not room.is_wall(cell) and absi(cell.x - pot.x) + absi(cell.y - pot.y) >= 9:
+				away = cell
+				break
+		if away.x >= 0:
+			game.hunter = away
+			game.facing = Vector2i.RIGHT if away.x >= pot.x else Vector2i.LEFT
+			game.turn = 13
+			game.fog.update(game.lights())
+			capture_mode = false
+			_refresh_landmark_memory()
+			capture_mode = true
+			game.hunter = near
+			game.facing = -wall_dir
+			game.fog.update(game.lights())
+			_place_cam(_cam_pos(near, game.facing), _yaw(game.facing))
+			_refresh()
+			await _shot("atmosphere_pots_return")
+			var memory_ok := prop.mesh != previous and landmark_shifted
+			print("LANDMARK MEMORY ", "PASS" if memory_ok else "FAIL")
+			ok = ok and memory_ok
+		else:
+			ok = false
+	else:
+		print("LANDMARK MEMORY FAIL no pots in this seed")
+		ok = false
+	game.seed = 3
+	game.rang = true
+	_show_end()
+	await get_tree().create_timer(1.0).timeout
+	await _shot("atmosphere_dawn")
+	var verdict_ok: bool = end_screen.visible and end_screen.get_node("Card/Box/Grade").text == game.grade()
+	print("DAWN ", "PASS" if verdict_ok else "FAIL")
+	ok = ok and verdict_ok
+	print("ATMOSPHERE ", "PASS" if ok else "FAIL")
+	get_tree().quit(0 if ok else 1)
+
+
 func _capture() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://docs/renders/"))
 	for i in 20:
 		await get_tree().process_frame
+	if "--atmosphere-only" in OS.get_cmdline_user_args():
+		await _capture_atmosphere()
+		return
 	if "--hook-only" in OS.get_cmdline_user_args():
 		await _capture_hook_only()
 		return

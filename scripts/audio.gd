@@ -75,6 +75,11 @@ static func hook_sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 		_me.sfx(name, db, pitch)
 
 
+static func hook_atmosphere(tile: Vector2i) -> void:
+	if _me:
+		_me.at("harbor_undertone", tile, -18.0)
+
+
 static func hook_track(game) -> void:
 	if _me:
 		_me.track(game)

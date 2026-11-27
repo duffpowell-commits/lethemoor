@@ -605,7 +605,7 @@ func test_audio_every_cue_has_a_clip() -> void:
 	var names := ["amb_moor", "flame_loop", "heartbeat", "turn", "bump", "oil", "letter", "letter_dim",
 		"sting_horror", "sting_dread", "panic", "out_of_oil", "bell", "death", "night_start", "ui_click",
 		"lantern_hood", "lantern_normal", "lantern_bright", "stalker_silk", "whisper",
-		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek", "heard_turn", "fire_loop", "breath_behind"]
+		"hook_swing", "hook_hit", "hook_broke", "hook_found", "pour", "ignite", "burn_shriek", "heard_turn", "fire_loop", "breath_behind", "harbor_undertone"]
 	for i in 4:
 		names.append("step_%d" % i)
 	for i in 3:
@@ -1253,7 +1253,53 @@ func test_landmark_memory_gates() -> void:
 	var tile := Vector2i(1, 1)
 	check(View.can_shift_landmark(3, tile, 5, 13, 7, false), "eligible unseen return visit")
 	check(not View.can_shift_landmark(0, tile, 5, 13, 7, false), "capture baseline unchanged")
+	check(not View.can_shift_landmark(6, tile, 5, 13, 7, false), "not every seed permits a shift")
 	check(not View.can_shift_landmark(3, tile, -1, 13, 7, false), "must see landmark first")
 	check(not View.can_shift_landmark(3, tile, 5, 12, 7, false), "no immediate change")
 	check(not View.can_shift_landmark(3, tile, 5, 13, 6, false), "player must be away")
 	check(not View.can_shift_landmark(3, tile, 5, 13, 7, true), "never changes within view")
+
+
+func test_rare_atmosphere_schedule() -> void:
+	var path := "res://scripts/atmosphere.gd"
+	check(FileAccess.file_exists(path), "cosmetic scheduler exists")
+	if not FileAccess.file_exists(path):
+		return
+	var Atmos = load(path)
+	var reflections := 0
+	var sounds := 0
+	for seed in range(1, 501):
+		var reflection: int = Atmos.event_turn(seed, "reflection")
+		var sound: int = Atmos.event_turn(seed, "sound")
+		check(reflection == Atmos.event_turn(seed, "reflection"), "repeatable schedule")
+		check(reflection == -1 or reflection >= 18 and reflection <= 50, "reflection late, bounded window")
+		check(sound == -1 or sound >= 25 and sound <= 70, "sound late, bounded window")
+		reflections += int(reflection >= 0)
+		sounds += int(sound >= 0)
+	check(reflections > 0 and reflections <= 100, "reflection scheduled in at most 20% of nights")
+	check(sounds > 0 and sounds <= 125, "sound scheduled in at most 25% of nights")
+	check(Atmos.event_turn(0, "reflection") == -1 and Atmos.event_turn(0, "sound") == -1, "capture baseline is quiet")
+	check(not Atmos.eligible(20, 20, true, true), "one shot only")
+	check(not Atmos.eligible(20, 20, false, false), "no cue over essential feedback")
+	check(Atmos.eligible(22, 20, false, true), "quiet opportunity after scheduled turn")
+	check(not Atmos.eligible(29, 20, false, true), "missed window stays missed")
+
+
+func test_wall_coping_is_weathered_without_geometry_change() -> void:
+	var Harbor = preload("res://scripts/harbor_geometry.gd")
+	var room = Room.parse("#####\n#H..#\n#####")
+	var mesh: ArrayMesh = Harbor.new().wall_for(room, Vector2i(1, 0))
+	var arrays := mesh.surface_get_arrays(0)
+	var colors: PackedColorArray = arrays[Mesh.ARRAY_COLOR] if arrays[Mesh.ARRAY_COLOR] != null else PackedColorArray()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	check(colors.size() == vertices.size(), "wall vertices carry weathering")
+	if colors.size() != vertices.size():
+		return
+	var moss := false
+	var stone := false
+	for i in colors.size():
+		if vertices[i].y > 2.0 and colors[i].g > colors[i].r:
+			moss = true
+		if vertices[i].y < 1.0 and colors[i] == Color.WHITE:
+			stone = true
+	check(moss and stone, "moss concentrated at coping with lower stone preserved")
