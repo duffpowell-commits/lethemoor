@@ -30,7 +30,7 @@ The following PNGs are actual 1080×1920 Godot viewport renders using OpenGL 4.5
 
 Reproduce: `godot --audio-driver Dummy --path . --rendering-driver opengl3 --resolution 1080x1920 res://scenes/fp_room.tscn -- --capture --atmosphere-only` on a real or virtual X display. The staged run logged `REFLECTION PASS hooded_hidden=true`, `ATMOSPHERE SOUND PASS` (active player and caption), `ATMOSPHERE PRIORITY PASS ringing_toll_blocks=true` (toll cancels the player and its active tail blocks restart), `LANDMARK MEMORY PASS`, `DAWN PASS`, `ATMOSPHERE PASS` at seed 3. The actual audio mix was not heard on a phone; the dummy backend validates dispatch and caption, not subjective acoustic quality.
 
-The full after-pass run also finished `ART PASS`, exit 0, without `SCRIPT ERROR`, `FAIL` or renderer `ERROR`. It covered OPEN, FWD, TURN, SWIPE, PAD (tall/plates/slim), QUEUE, HOLD, ABOUT, ROTATE (centered/tap/back), BELL, LETTER/PAGES, KILL3D, DEATH, VERDICT, STALKER, SLICK, HOOK, HARBOR, TOWER, VIEWMODEL, PHANTOM. Only the host VSync warning remained. No physical touch device was attached; the scripted capture sends actual Godot input events.
+The full after-pass runs finished `ART PASS`, exit 0, without `SCRIPT ERROR`, `FAIL` or renderer errors. It covered OPEN, FWD, TURN, SWIPE, PAD (tall/plates/slim), QUEUE, HOLD, ABOUT, ROTATE (centered/tap/back), BELL, LETTER/PAGES, KILL3D, DEATH, VERDICT, STALKER, SLICK, HOOK, HARBOR, TOWER, VIEWMODEL, PHANTOM. An earlier full run had only the host VSync warning; the final exact-head full run also reported 12 ObjectDB instances / 6 resources still in use after `ART PASS` (active OGG teardown, not rendering). No physical touch device was attached; the scripted capture sends actual Godot input events.
 
 LOW graphics staging at 540×960 separately finished `ATMOSPHERE PASS`. Software-only llvmpipe logged 19–30 fps, 34–54 ms mean frame time, 132–225 draws across staged scenes. This is not a phone FPS benchmark.
 
@@ -60,3 +60,18 @@ Commands: `tools/test.sh`; `BOT_GENTLE=1 godot --headless --path . --script tool
 ## Automated quality versus human enjoyment
 
 Engine tests, scripted touch interactions, rendered screenshots, audio dispatch, exports and bots measure correctness, not fun. The old capture's synthetic 7/10 verdict tests the feedback control only. No human enjoyment score, replay intent, actual Android FPS, Safari runtime, or subjective sound mix is asserted from automated evidence. Duff is not required to personally playtest. Volunteer feedback can still inform the separate Nov 28 viability decision.
+
+
+## Integration and final export
+
+| PR | Merged commit |
+|---|---|
+| [#76](https://github.com/duffpowell-commits/lethemoor/pull/76) | `64e27fd214f4bf6c8f3855bd238bb70f82484dc5` |
+| [#77](https://github.com/duffpowell-commits/lethemoor/pull/77) | `a5befeb48348bc6087b1bf5d8652c633b6d8b7b3` |
+| [#78](https://github.com/duffpowell-commits/lethemoor/pull/78) | `ff0bd05d880834f238d40837d16a3f0b310ae9ce` |
+| [#79](https://github.com/duffpowell-commits/lethemoor/pull/79) | `e31f818f66dc49b683ef3358c86807ffca176899` |
+| [#80](https://github.com/duffpowell-commits/lethemoor/pull/80) | `ab65ef570a709fd97ff80fa8b9d1304bd2ff6acf` |
+
+Final exact head `00cb67786ef024025a456f52b1b808b1d746d1bd`: [CI build #215](https://github.com/duffpowell-commits/lethemoor/actions/runs/46038899848) test job `140641265080` logged **92 passed, zero failed** and **ART PASS**; export job `140643928422` produced web and Android artifacts, fixed-key signing and APK update permissions/versionCode 215. Gitleaks, rule-lock and exact-head fresh-eyes all green. The encrypted key blob remains `45e41c5b8b60f90aa70e133f1246b0226b78833d`; existing approved 3D asset files unchanged. The exact-head repeat of the 500-night benchmark matched every table metric above.
+
+Main publication: [build #216](https://github.com/duffpowell-commits/lethemoor/actions/runs/46040084387), in progress at handoff preparation.
