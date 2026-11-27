@@ -53,6 +53,7 @@ func _init() -> void:
 			causes[g.cause.left(28)] = causes.get(g.cause.left(28), 0) + 1
 		else:
 			stuck += 1
+			print("INCOMPLETE seed=%d turn=%d oil=%d hunter=%s facing=%s" % [s, g.turn, g.oil, str(g.hunter), str(g.facing)])
 	print("nights=%d won=%d (%.0f%%) died=%d (%.0f%%) stuck=%d  avg oil at bell=%.1f  avg turns=%.1f" % [
 		count, won, 100.0 * won / count, died, 100.0 * died / count, stuck,
 		float(oil_sum) / maxi(won, 1), float(turns_sum) / maxi(won, 1)])
@@ -91,29 +92,40 @@ func _play(g) -> void:
 					seen_count[i] = true
 		if trace:
 			print(g.turn, " me=", g.hunter, " f=", g.facing, " oil=", g.oil, " lit=", near.map(func(x): return x.pos), " all=", g.thralls.map(func(x): return x.pos))
-		if _face_bride(g):   # the field note's rule: never turn your back on her
-			continue
-		if near.any(func(th): return th.get("kind", "thrall") == "thrall" and _md(th.pos, g.hunter) <= 2):
-			_evade(g, near)
-			continue
-		var path := _safe_path(g, near, true)   # round where you last saw them, if there's a way
-		if path.size() < 2:
-			path = _safe_path(g, near, false)
-		if path.size() < 2:
+		var before: int = g.turn
+		_play_turn(g, near)
+		# An illegal move consumes no turn. Wait rather than retry the identical action forever.
+		if not g.over() and g.turn == before:
 			g.wait()
-			continue
-		var d: Vector2i = path[1] - g.hunter
-		if d == g.facing:
-			g.step_dir(d)
-		elif d == -g.facing:
-			g.step_dir(d)        # back up toward it: keeps your eyes where they were
-		else:
-			g.turn_by(1 if d == Vector2i(-g.facing.y, g.facing.x) else -1)
+
+
+func _play_turn(g, near: Array) -> void:
+	if _face_bride(g):   # the field note's rule: never turn your back on her
+		return
+	if near.any(func(th): return th.get("kind", "thrall") == "thrall" and _md(th.pos, g.hunter) <= 2):
+		_evade(g, near)
+		return
+	var path := _safe_path(g, near, true)   # round where you last saw them, if there's a way
+	if path.size() < 2:
+		path = _safe_path(g, near, false)
+	if path.size() < 2:
+		g.wait()
+		return
+	var d: Vector2i = path[1] - g.hunter
+	if d == g.facing:
+		g.step_dir(d)
+	elif d == -g.facing:
+		g.step_dir(d)        # back up toward it: keeps your eyes where they were
+	else:
+		g.turn_by(1 if d == Vector2i(-g.facing.y, g.facing.x) else -1)
 
 
 ## The bride lit and close: look at her (she freezes), then back away with your eyes on her,
 ## or hook her if she's in reach. False if she isn't a problem this turn.
 func _face_bride(g) -> bool:
+	# Holding a dead lantern on the bride cannot freeze her. Seek a route instead.
+	if g.oil <= 0:
+		return false
 	for th in g.thralls:
 		if th.get("kind", "thrall") != "stalker" or th.get("gone", false):
 			continue
