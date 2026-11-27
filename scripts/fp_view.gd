@@ -134,6 +134,8 @@ var tile_mats := {}                # letters have their own material
 var tile_nodes := {}               # floor/wall tile -> MeshInstance3D
 var lintels := {}
 var bell_tower: MeshInstance3D       # the tower over the bell, seen over the walls (review fix 4)
+var landmark_seen := {}
+var landmark_shifted := false
 var landmarks := {}                     # tile -> kind (boat, door, pots) dressed in a ward's open halls
 var harbor_fixtures := {}
 var tile_tex := {}                 # floor/wall tile -> texture name
@@ -876,7 +878,33 @@ func _place_landmarks() -> void:
 			break
 
 
+## One rare, cosmetic change per night. A known landmark stays recognisable, but its
+## top crate shifts while the player is away. Never modify map, collision or game state.
+static func can_shift_landmark(seed: int, cell: Vector2i, first_seen: int, turn: int, distance: int, visible_now: bool) -> bool:
+	return seed > 0 and posmod(seed + cell.x * 7 + cell.y * 11, 3) == 0 \
+		and first_seen >= 0 and turn - first_seen >= 8 and distance >= 7 and not visible_now
+
+
+func _refresh_landmark_memory() -> void:
+	if landmark_shifted or capture_mode or game.over():
+		return
+	for p: Vector2i in landmarks:
+		if landmarks[p] != "pots":
+			continue
+		if fog.get_state(p) == Fog.LIT and game.in_view(p) and not landmark_seen.has(p):
+			landmark_seen[p] = game.turn
+		var distance: int = absi(p.x - game.hunter.x) + absi(p.y - game.hunter.y)
+		if can_shift_landmark(game.seed, p, landmark_seen.get(p, -1), game.turn, distance, \
+				fog.get_state(p) == Fog.LIT or game.in_view(p)):
+			var variant := Harbor.landmark("pots", true)
+			harbor_fixtures[p].mesh = variant.mesh
+			variant.free()
+			landmark_shifted = true
+			return
+
+
 func _refresh_fog() -> void:
+	_refresh_landmark_memory()
 	for p: Vector2i in tile_nodes:
 		var mat := _tile_mat(tile_tex[p], tile_base[p], SHADE[fog.get_state(p)])
 		if tile_nodes[p].material_override != mat:

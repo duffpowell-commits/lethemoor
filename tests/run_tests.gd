@@ -1246,3 +1246,14 @@ func test_seeded_atmosphere_is_cosmetic_and_repeatable() -> void:
 	check(View.wet_floor_for(tile, 11), "repeatable wet tile selection")
 	check(View.dawn_detail(1) == View.dawn_detail(1), "same seed, same dawn")
 	check(View.dawn_detail(1) != View.dawn_detail(2), "different dawn detail")
+
+
+func test_landmark_memory_gates() -> void:
+	var View = preload("res://scripts/fp_view.gd")
+	var tile := Vector2i(1, 1)
+	check(View.can_shift_landmark(3, tile, 5, 13, 7, false), "eligible unseen return visit")
+	check(not View.can_shift_landmark(0, tile, 5, 13, 7, false), "capture baseline unchanged")
+	check(not View.can_shift_landmark(3, tile, -1, 13, 7, false), "must see landmark first")
+	check(not View.can_shift_landmark(3, tile, 5, 12, 7, false), "no immediate change")
+	check(not View.can_shift_landmark(3, tile, 5, 13, 6, false), "player must be away")
+	check(not View.can_shift_landmark(3, tile, 5, 13, 7, true), "never changes within view")
