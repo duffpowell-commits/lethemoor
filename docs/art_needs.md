@@ -39,7 +39,7 @@ slice passes.
 2. ~~**Sky / ceiling over the alleys**~~ DONE Nov 19 (`sky_night.png`, strip baked into a panorama sky). **Sky / ceiling over the alleys (512×512 seamless, or a 2048×512 strip).** Above the walls
    the view is a flat dark-blue void. It's on screen every second of every run.
    Low fog, a moonless overcast sky, or a dripping stone vault: anything that isn't empty.
-3. **Wall tops (512×512 seamless).** The tops of walls are flat colour. Mossy coping stones or
+3. **Wall tops (512×512 seamless).** Nov 27: existing coping now has procedural olive patina and weathered masonry in the atmosphere pass; a dedicated painted texture is optional future art, not a current blocker. Earlier note: the tops of walls are flat colour. Mossy coping stones or
    broken brick edges. Seen on every screen when walls are low.
 
 ### P1. Makes the slice's systems readable
