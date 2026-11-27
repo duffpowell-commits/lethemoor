@@ -1,0 +1,74 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+CLIP idle duration=4.03333330154419 horizontal hip displacement=(0.0, 0.0)
+idle hips=(1.013872, 100.9769, -6.109587) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.92379735258761 p95=1.10587219206815 max=2.24382984776159
+idle hips=(1.013872, 100.9769, -6.109587) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.80716740330168 p95=1.30335847600466 max=4.10382216848833
+CLIP walk duration=4.86666679382324 horizontal hip displacement=(0.0, 0.0)
+walk hips=(0.540178, 102.0426, -7.151996) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.90161065261423 p95=1.10614978099097 max=2.3812868505446
+walk hips=(0.540178, 102.0426, -7.151996) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.80639629312246 p95=1.26802047426663 max=4.47652096608352
+CLIP crouch duration=2.83333325386047 horizontal hip displacement=(0.0, 0.0)
+crouch hips=(4.84963, 75.47127, -6.441347) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.83667224718949 p95=1.16708891320351 max=2.25861400416821
+crouch hips=(4.84963, 75.47127, -6.441347) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.71337105051661 p95=1.41086349416163 max=5.41010078558661
+CLIP lunge duration=2.83333325386047 horizontal hip displacement=(0.0, 0.0)
+lunge hips=(-3.570761, 69.91798, -6.246535) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.71988382795315 p95=1.21276518960636 max=3.15318632658926
+lunge hips=(-3.570761, 69.91798, -6.246535) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.67456208625029 p95=1.68079906515584 max=6.55627796693593
+CLIP dead duration=3.0 horizontal hip displacement=(20.12063, 75.7679)
+dead hips=(13.60527, 25.18983, 69.52137) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.79532685727368 p95=1.16344385351911 max=2.67527962775166
+dead hips=(13.60527, 25.18983, 69.52137) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.74891342871046 p95=1.895390389087 max=7.15649256337382
+CLIP down duration=3.0 horizontal hip displacement=(20.12063, 75.7679)
+down hips=(13.60527, 25.18983, 69.52137) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.79532685727368 p95=1.16344385351911 max=2.67527962775166
+down hips=(13.60527, 25.18983, 69.52137) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.74891342871046 p95=1.895390389087 max=7.15649256337382
+CLIP rise duration=1.86666655540466 horizontal hip displacement=(14.31051, 44.48452)
+rise hips=(9.838765, 56.76432, 28.60097) actor=(-0.85, 0.0, 0.0)
+STRETCH edges=19092 p05=0.8085309730836 p95=1.18917894812213 max=2.19922178143903
+rise hips=(9.838765, 56.76432, 28.60097) actor=(0.85, 0.0, 0.0)
+STRETCH edges=18986 p05=0.68658598442562 p95=1.48967239466211 max=4.94869068347451
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=false actors=1 elapsed_ms=999.968 frames=60
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=false actors=4 elapsed_ms=1583.964 frames=60
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+Skeleton Meshy bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=false actors=8 elapsed_ms=2523.969 frames=60
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=true actors=1 elapsed_ms=1006.996 frames=60
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=true actors=4 elapsed_ms=1610.467 frames=60
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+Skeleton Foxboard bones=24 path=Armature/Skeleton3D
+BENCHMARK candidate=true actors=8 elapsed_ms=2401.336 frames=60

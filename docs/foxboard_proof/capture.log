@@ -1,0 +1,126 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5728:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2722:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:97)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio/audio_server.cpp:258)
+
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready().
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_hud (res://scripts/fp_view.gd:1662)
+         [1] _ready (res://scripts/fp_view.gd:212)
+saved fp_title (1080, 1920)
+TITLE PASS
+saved fp_hint (1080, 1920)
+HINT PASS
+saved fp_guide (1080, 1920)
+GUIDE PASS
+saved fp_menu (1080, 1920)
+MENU PASS
+saved fp_report (1080, 1920)
+REPORT PASS
+BACK PASS
+saved fp_start (1080, 1920)
+OPEN PASS facing=(1, 0)
+FWD PASS hunter=(7, 19) cam_ok=true
+TURN PASS facing=(0, 1)
+SWIPE PASS facing=(1, 0)
+saved fp_pad (1080, 1920)
+PAD PASS tall=true plates=true slim=true
+QUEUE PASS turns=2
+HOLD PASS steps=2 held=2
+ABOUT PASS facing=(-1, 0) turns=2
+BREATH PASS
+saved fp_sideways (1080, 607)
+ROTATE PASS sideways=(1708.0, 960.0) centred=true tap=true back=true
+saved fp_horror (1080, 1920)
+HORROR PASS
+saved fp_bell (1080, 1920)
+BELL PASS grade=A oil=29 turns=55
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready().
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_hud (res://scripts/fp_view.gd:1662)
+         [1] _ready (res://scripts/fp_view.gd:212)
+saved fp_letter (1080, 1920)
+LETTER PASS at=(10, 10) page=true
+saved fp_letter_2 (1080, 1920)
+saved fp_letter_3 (1080, 1920)
+PAGES PASS
+saved fp_hooded (1080, 1920)
+KILL3D PASS who=thrall
+saved fp_killshot (1080, 1920)
+saved fp_dead (1080, 1920)
+DEATH PASS Something was standing in the dark. It was waiting.
+saved fp_verdict (1080, 1920)
+VERDICT PASS Lethemoor verdict: fun 7/10, play again: yes. Night 0: died:
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready().
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_hud (res://scripts/fp_view.gd:1662)
+         [1] _ready (res://scripts/fp_view.gd:212)
+saved fp_stalker_3d (1080, 1920)
+STALKER MODEL PASS
+STALKER PASS at=(5, 6) dead=false
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready().
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_hud (res://scripts/fp_view.gd:1662)
+         [1] _ready (res://scripts/fp_view.gd:212)
+HOOKFIND PASS
+saved fp_trap_oil (1080, 1920)
+saved fp_trap_fire (1080, 1920)
+SLICK PASS oil=40
+saved fp_thrall (1080, 1920)
+saved fp_trap_hook (1080, 1920)
+HOOK GLOW PASS (lit with it 2 ahead, back on its brass plate once it's knocked to 3)
+HOOK PASS at=(6, 18)
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready().
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_hud (res://scripts/fp_view.gd:1662)
+         [1] _ready (res://scripts/fp_view.gd:212)
+HARBOR PASS
+TOWER PASS
+saved fp_art_bell_map (1080, 1920)
+BELL MAP PASS
+saved fp_flicker_map (1080, 1920)
+FLICKER MAP PASS
+saved fp_art_bell (1080, 1920)
+saved fp_art_flask (1080, 1920)
+saved fp_art_hook (1080, 1920)
+saved fp_art_lamp (1080, 1920)
+saved fp_art_letter (1080, 1920)
+saved fp_art_thrall_a (1080, 1920)
+saved fp_art_thrall_b (1080, 1920)
+saved fp_art_thrall_c (1080, 1920)
+saved fp_art_thrall_3d (1080, 1920)
+saved fp_art_crouch (1080, 1920)
+saved fp_art_lunge (1080, 1920)
+THRALL MODEL PASS
+saved fp_art_corpse (1080, 1920)
+CORPSE PASS
+saved fp_hands (1080, 1920)
+VIEWMODEL PASS
+saved fp_art_bride_face (1080, 1920)
+saved fp_art_bride_head (1080, 1920)
+HEAD LOOK PASS
+saved fp_art_phantom (1080, 1920)
+PHANTOM PASS at=(2, 1) facing=(0, 1)
+ART PASS

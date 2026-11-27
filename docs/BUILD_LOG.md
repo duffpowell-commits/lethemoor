@@ -5,6 +5,12 @@ logs for another ai to build where you stop." Updated as the work goes, not only
 The newest entry is at the top. Rules and commands: `CLAUDE.md` (it applies to every agent).
 Details of each system: `docs/HANDOFF_LOG.md`. Short state: `STATUS.md`.
 
+## Nov 27: isolated Foxboard Thrall proof (not a live swap)
+- Branch `test/foxboard-thrall-proof`, main `88ea9c1`; release manifest and web HTML both verified build 199 `e17a537`.
+- Exact historical rigid Foxboard GLB recovered from `ef7d28d:assets/models/thrall.glb`; 24-bone candidate generated offline using existing Meshy rig/clips. Smoothed weight transfer still fails deformation acceptance; Meshy remains live.
+- Reproduction, actual test/capture/simulation logs, geometry/texture metrics, cloud timings, stills and motion evidence: `docs/foxboard_proof/README.md`. No phone metrics or new player score.
+- P0 wall-top waits for matching painted 512² source. Nov 28 human playtest gate unchanged; One Night only.
+
 ## Studio mascot (Duff, Nov 26)
 - **The three-eyed fox is in every game as a rare cameo, not a pal**: a small event
   that matters but never ruins a run. Duff OKs the fox art on a card before it's built. Rule + this game's idea: `docs/MASCOT.md`.

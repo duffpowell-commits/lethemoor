@@ -1,0 +1,7 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+nights=300 won=144 (48%) died=154 (51%) stuck=2  avg oil at bell=20.8  avg turns=75.5
+causes: { "Cold hands, out of the dark.": 123, "Something was standing in th": 12, "Lace, and a cold breath at y": 19 }
+deaths by turn 20: 0 (0% of nights)  median death turn: 44
+first horror seen: median turn 19, after turn 20 in 44% of nights
+horrors met (came into your light) per night: 1.9, none at all in 7% of nights

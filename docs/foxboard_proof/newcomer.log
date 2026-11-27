@@ -1,0 +1,6 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+FIRST-TIMER nights=200 won=81 (40%) died=106 (53%) lost/out of time=13
+won: avg oil at bell 34.8, avg turns 78.8, grades { "D": 19, "A": 6, "B": 17, "S": 33, "C": 6 }
+deaths by turn 20: 0 (0% of nights)  median death turn: 66
+causes: { "Cold hands, out of the dark.": 90, "Something was standing in th": 7, "Lace, and a cold breath at y": 9 }  died with no oil left: 49 of 106

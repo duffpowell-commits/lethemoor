@@ -24,6 +24,8 @@ Nov 24: Eyes (`docs/EYES.md`). A cloud session can play the night itself (tap, s
 
 ## In progress
 
+Nov 27 isolated Foxboard Thrall proof: `docs/foxboard_proof/README.md`. Candidate skinning and cloud A/B measured, but distortion persists; no live asset swap. Build 199 remains live; playtest and matching wall-top source still needed.
+
 Playtest round 1. Duff on the Android APK. iPhone testers on the web link. Collect fun 1-10, play again yes/no, FPS (MENU shows it), and sound notes.
 
 The slice is built: bell and grade, Stalker, boathook, oil-slick trap, noise, letters, sound, shuffled nights, verdict card, corpses, painted art, in-app APK update.
