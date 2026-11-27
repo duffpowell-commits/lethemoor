@@ -687,3 +687,7 @@ The blind first-timer scored the 8.5 pass (build 196) 6.4. Duff: build all the g
 - **Lessons**: the death tip only says HOOK IT! if you hold a hook; the OIL SLICK card waits for a standing thrall.
 - Newcomer bot (200): first nights 40% won (was 41%), nights 4-6 29% (they were 11%), later nights 8%.
 
+
+## Nov 27: Foxboard replacement proof (test branch only)
+
+See `docs/foxboard_proof/README.md`: exact historical source recovered, offline candidate bound to existing 24 bones with existing clips, same-light A/B and cloud benchmark. Deformation gate FAIL (shoulder/coat/rope); fallback unchanged. 84 tests pass, baseline ART PASS, real-phone/player gate pending. No paid generation.
