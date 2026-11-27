@@ -137,6 +137,7 @@ var lintels := {}
 var bell_tower: MeshInstance3D       # the tower over the bell, seen over the walls (review fix 4)
 var reflection_seen := false
 var reflection: MeshInstance3D
+var reflection_cell := Vector2i(-1, -1)
 var reflection_time := 0.0
 var atmosphere_heard := false
 var atmosphere_caption := false
@@ -813,6 +814,7 @@ func _refresh() -> void:
 	fake_flicker = game.hallucinating() and not flicker and randf() < 0.35
 	_refresh_fog()
 	Sound.hook_track(game)
+	atmosphere_caption = Sound.hook_atmosphere_active()
 	for i in thrall_nodes.size():
 		thrall_nodes[i].position = _w(game.thralls[i].pos)
 	_refresh_hud()
@@ -913,6 +915,8 @@ func _refresh_landmark_memory() -> void:
 
 
 func _refresh_fog() -> void:
+	if reflection != null and reflection.visible and fog.get_state(reflection_cell) != Fog.LIT:
+		reflection.visible = false
 	_refresh_landmark_memory()
 	for p: Vector2i in tile_nodes:
 		var mat := _tile_mat(tile_tex[p], tile_base[p], SHADE[fog.get_state(p)])
@@ -1242,7 +1246,6 @@ func act(kind: String) -> void:
 	var carried := chain_from
 	chain_from = ""
 	last_event = ""
-	atmosphere_caption = false
 	turn_events = []
 	var from_pos := cam.position
 	var from_yaw := cam.rotation.y
@@ -1482,6 +1485,13 @@ func _process(delta: float) -> void:
 	_sway_viewmodel(delta)
 	_haunt(delta)
 	_fade_reflection(delta)
+	if atmosphere_caption:
+		if _sheet_up() or game.over():
+			Sound.hook_cancel_atmosphere()
+		if not Sound.hook_atmosphere_active():
+			atmosphere_caption = false
+			if not busy and not _sheet_up() and not game.over():
+				_refresh_hud()
 	for fp: Vector2i in flask_nodes:   # each flask glints on its own beat
 		var g: Sprite3D = flask_nodes[fp].get_node_or_null("Glint")
 		if g:
@@ -3116,23 +3126,28 @@ func _kill_shot_3d(i: int) -> void:
 func _atmosphere_turn(events: Array) -> void:
 	if capture_mode or game.over() or _sheet_up() or game.oil <= 0:
 		return
-	var quiet: bool = events.is_empty() and heard_now.is_empty() and not flicker and not game.hallucinating() \
-		and not _hook_ready() and not _down_ahead()
-	if Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "reflection"), reflection_seen, quiet):
+	var reflection_due := Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "reflection"), reflection_seen, true)
+	var sound_due := Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "sound"), atmosphere_heard, true)
+	if not reflection_due and not sound_due:
+		return
+	if not heard_now.is_empty() or _hook_ready() or _down_ahead() or Sound.atmosphere_conflicts(game, events, game.positions()):
+		return
+	if reflection_due:
 		for distance in [2, 1, 3]:
 			var p: Vector2i = game.hunter + game.facing * distance
 			if tile_tex.get(p, "") == "floor_wet" and fog.get_state(p) == Fog.LIT \
-					and game.in_view(p) and game.thrall_at(p) < 0 and not game.slicks.has(p):
+					and game.in_view(p) and game.thrall_at(p) < 0 and not game.slicks.has(p) \
+					and not harbor_fixtures.has(p) and not chalk_nodes.has(p) and not room.letters.has(p) \
+					and not hook_nodes.has(p) and not flask_nodes.has(p):
 				_show_reflection(p)
 				reflection_seen = true
 				return
-	if Atmos.eligible(game.turn, Atmos.event_turn(game.seed, "sound"), atmosphere_heard, quiet):
-		atmosphere_heard = true
-		atmosphere_caption = true
+	if sound_due:
 		var side: Vector2i = Vector2i(-game.facing.y, game.facing.x)
 		if posmod(hash(Vector2i(game.seed, 73)), 2) == 0:
 			side = -side
-		Sound.hook_atmosphere(game.hunter + side * 2 - game.facing * 2)
+		atmosphere_caption = Sound.hook_atmosphere(game.hunter + side * 2 - game.facing * 2)
+		atmosphere_heard = atmosphere_caption
 		_refresh_hud()
 
 
@@ -3150,6 +3165,7 @@ func _show_reflection(p: Vector2i) -> void:
 		reflection.material_override = mat
 		reflection.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(reflection)
+	reflection_cell = p
 	reflection.position = _w(p) + Vector3(0, 0.008, 0)
 	reflection.rotation.y = _yaw(game.facing)
 	reflection_time = 0.85
@@ -3160,7 +3176,8 @@ func _fade_reflection(delta: float) -> void:
 	if reflection == null or not reflection.visible:
 		return
 	reflection_time = maxf(0.0, reflection_time - delta)
-	if busy or _sheet_up() or game.over() or reflection_time <= 0.0:
+	if busy or _sheet_up() or game.over() or reflection_time <= 0.0 \
+			or fog.get_state(reflection_cell) != Fog.LIT or not game.in_view(reflection_cell):
 		reflection.visible = false
 		return
 	var mat: StandardMaterial3D = reflection.material_override
@@ -3758,9 +3775,16 @@ func _capture_atmosphere() -> void:
 	set_process(false)
 	await _shot("atmosphere_puddle_reflection")
 	set_process(true)
-	_fade_reflection(0.9)
-	var ok := not reflection.visible and reflection_seen
-	print("REFLECTION ", "PASS" if ok else "FAIL", " target=", target)
+	game.set_lantern(Fog.Lantern.HOODED)
+	_refresh()
+	var fog_ok := not reflection.visible
+	game.set_lantern(Fog.Lantern.BRIGHT)
+	_refresh()
+	capture_mode = false
+	_atmosphere_turn([])
+	capture_mode = true
+	var ok := fog_ok and not reflection.visible and reflection_seen
+	print("REFLECTION ", "PASS" if ok else "FAIL", " target=", target, " hooded_hidden=", fog_ok)
 	# Test the spatial audio call and caption, using a quiet, scheduled turn.
 	game.seed = 1
 	game.turn = Atmos.event_turn(game.seed, "sound")
@@ -3773,10 +3797,14 @@ func _capture_atmosphere() -> void:
 	capture_mode = false
 	_atmosphere_turn([])
 	capture_mode = true
-	var sound_ok := atmosphere_heard and "wavering note" in status_label.text
+	var sound_ok := atmosphere_heard and Sound.hook_atmosphere_active() and "wavering note" in status_label.text
 	ok = ok and sound_ok
 	print("ATMOSPHERE SOUND ", "PASS" if sound_ok else "FAIL")
 	await _shot("atmosphere_sound_caption")
+	Sound.hook_turn("wait", ["toll"], game, true)
+	var cancel_ok := not Sound.hook_atmosphere_active()
+	ok = ok and cancel_ok
+	print("ATMOSPHERE PRIORITY ", "PASS" if cancel_ok else "FAIL")
 	atmosphere_caption = false
 	# A fixture visibly changes only while outside light and view.
 	var pot := Vector2i(-1, -1)

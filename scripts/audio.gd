@@ -50,6 +50,7 @@ var was_haunted := false
 var ended := false
 var tweens := {}
 var fires := {}                  # burning tile -> its crackle (AudioStreamPlayer3D)
+var atmosphere_player: AudioStreamPlayer3D
 var cue_frame := -1
 var log_cues := OS.has_environment("LM_AUDIO_LOG")   # LM_AUDIO_LOG=1: print every sound played
 static var _me: Node               # the autoload instance, once it's ready
@@ -75,9 +76,32 @@ static func hook_sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 		_me.sfx(name, db, pitch)
 
 
-static func hook_atmosphere(tile: Vector2i) -> void:
+static func hook_atmosphere(tile: Vector2i) -> bool:
 	if _me:
-		_me.at("harbor_undertone", tile, -18.0)
+		_me.cancel_atmosphere()
+		_me.atmosphere_player = _me.at("harbor_undertone", tile, -18.0)
+		return _me.atmosphere_active()
+	return false
+
+
+static func hook_atmosphere_active() -> bool:
+	return _me != null and _me.atmosphere_active()
+
+
+static func hook_cancel_atmosphere() -> void:
+	if _me:
+		_me.cancel_atmosphere()
+
+
+func atmosphere_active() -> bool:
+	return is_instance_valid(atmosphere_player) and atmosphere_player.playing
+
+
+func cancel_atmosphere() -> void:
+	if is_instance_valid(atmosphere_player):
+		atmosphere_player.stop()
+		atmosphere_player.queue_free()
+	atmosphere_player = null
 
 
 static func hook_track(game) -> void:
@@ -175,10 +199,10 @@ func sfx(name: String, db := 0.0, pitch := 1.0) -> void:
 
 
 ## A one-shot out in the world at grid tile `tile` (the camera is the ears).
-func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> void:
+func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> AudioStreamPlayer3D:
 	var scene := get_tree().current_scene
 	if not streams.has(name) or not (scene is Node3D):
-		return
+		return null
 	if log_cues:
 		print("SOUND3D ", name, " at ", tile)
 	var p := AudioStreamPlayer3D.new()
@@ -193,6 +217,7 @@ func at(name: String, tile: Vector2i, db := 0.0, pitch := 1.0) -> void:
 	p.finished.connect(p.queue_free)
 	scene.add_child(p)
 	p.play()
+	return p
 
 
 ## The bell tolling by itself, from where it hangs: carries the whole ward, softer with distance,
@@ -235,6 +260,7 @@ func _fade(p: AudioStreamPlayer, db: float, time: float) -> void:
 
 ## A night begins (first load, or a retry reloads the scene).
 func night() -> void:
+	cancel_atmosphere()
 	ended = false
 	quiet = false
 	was_flicker = false
@@ -249,6 +275,8 @@ func night() -> void:
 
 ## The sim's verdict on one action -> what you hear. `spent` = the action cost a turn.
 func on_turn(kind: String, events: Array, game, spent: bool) -> void:
+	if atmosphere_active() and (atmosphere_conflicts(game, events, prev_pos) or not spent and kind in ["forward", "back"]):
+		cancel_atmosphere()
 	for c in cues(kind, events, spent):
 		match c:
 			"step":
@@ -419,6 +447,8 @@ func _later(delay: float, name: String, db: float, pitch: float) -> void:
 ## After every refresh: the heartbeat follows dread, the flame follows the lantern, the bed
 ## falls silent when the Stalker is free to move, the flame's gutter whispers.
 func track(game) -> void:
+	if atmosphere_active() and atmosphere_conflicts(game, [], prev_pos):
+		cancel_atmosphere()
 	prev_pos = game.positions()
 	if ended or game.over():
 		return   # _end() already silenced the fires
@@ -449,6 +479,19 @@ func track(game) -> void:
 	was_haunted = haunted
 
 
+## Cosmetic sound yields to every gameplay cue, including the deliberate silence before
+## the Bride moves. Also avoid visible or near horrors even if no event was emitted.
+static func atmosphere_conflicts(game, events: Array, before: Array) -> bool:
+	if game.over() or not events.is_empty() or game.oil <= 0 or game.flickers() or game.hallucinating() or stalker_free(game):
+		return true
+	if not heard(game, before).is_empty() or not behind(game).is_empty():
+		return true
+	for th: Dictionary in game.thralls:
+		if not th.get("gone", false) and not th.get("lying", false) and game.in_view(th.pos) and game.fog.get_state(th.pos) == Fog.LIT:
+			return true
+	return false
+
+
 ## Will a Stalker move on the next turn if nothing changes? (Not watched, and she's hunting
 ## or can see your light.)
 static func stalker_free(game) -> bool:
@@ -465,6 +508,7 @@ static func stalker_free(game) -> bool:
 
 
 func on_lantern(setting: int) -> void:
+	cancel_atmosphere()
 	match setting:
 		Fog.Lantern.HOODED: sfx("lantern_hood", -3.0)
 		Fog.Lantern.NORMAL: sfx("lantern_normal", -4.0)
@@ -472,6 +516,7 @@ func on_lantern(setting: int) -> void:
 
 
 func _end(bed_db: float) -> void:
+	cancel_atmosphere()
 	ended = true
 	quiet = false
 	_fade(bed, bed_db, 2.0)

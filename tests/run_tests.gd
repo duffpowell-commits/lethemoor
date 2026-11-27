@@ -1303,3 +1303,20 @@ func test_wall_coping_is_weathered_without_geometry_change() -> void:
 		if vertices[i].y < 1.0 and colors[i] == Color.WHITE:
 			stone = true
 	check(moss and stone, "moss concentrated at coping with lower stone preserved")
+
+
+func test_atmosphere_yields_to_gameplay_and_silent_bell() -> void:
+	var sound = load("res://scripts/audio.gd")
+	check(sound.has_method("atmosphere_conflicts"), "ambient cue has a gameplay priority gate")
+	if not sound.has_method("atmosphere_conflicts"):
+		return
+	var calm = Night.start("###########\n#H........#\n###########")
+	check(not sound.atmosphere_conflicts(calm, [], calm.positions()), "quiet turn permits atmosphere")
+	check(sound.atmosphere_conflicts(calm, ["toll"], calm.positions()), "bell cue takes priority")
+	calm.dread = 50
+	check(sound.atmosphere_conflicts(calm, [], calm.positions()), "high dread takes priority")
+	var bride = Night.start("#######\n#H....#\n#.....#\n#....S#\n#######")
+	bride.facing = Vector2i.LEFT
+	bride.thralls[0].target = bride.hunter
+	check(sound.stalker_free(bride), "Bride is free to move")
+	check(sound.atmosphere_conflicts(bride, [], bride.positions()), "intentional silence takes priority")
