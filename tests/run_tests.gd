@@ -304,6 +304,24 @@ func test_every_night_gets_a_scare() -> void:
 		check(not th.is_empty(), "and it's coming for you")
 
 
+func test_scent_retries_when_no_safe_spawn() -> void:
+	var n = Night.start("###############\n#H..........T.#\n###############")
+	n.turn = Night.BEAT_TURN
+	var ev: Array = []
+	# Temporarily block every candidate with a burning slick.
+	for x in range(7, 11):
+		n.slicks[Vector2i(x, 1)] = 3
+	n._beat(ev)
+	check(not n.beat_sent and not ev.has("scent"), "no safe spot does not spend scent beat")
+	n.slicks.clear()
+	n.turn += 1
+	n._beat(ev)
+	check(n.beat_sent and ev.has("scent"), "later safe spot triggers scent")
+	var count := ev.count("scent")
+	n._beat(ev)
+	check(ev.count("scent") == count, "successful beat only fires once")
+
+
 func test_letter_needs_bright() -> void:
 	var n = Night.start("#####\n#HNN#\n#...#\n#####")
 	var ev: Array = n.step(Vector2i(2, 1))

@@ -634,7 +634,6 @@ func _horrors(events: Array) -> void:
 func _beat(events: Array) -> void:
 	if met or beat_sent or turn < BEAT_TURN:
 		return
-	beat_sent = true
 	var near: Dictionary = room.reachable(hunter, BEAT_FROM.y)
 	var spots: Array[Vector2i] = []
 	for q: Vector2i in near:
@@ -653,6 +652,8 @@ func _beat(events: Array) -> void:
 			k = i
 	if k < 0 or spots.is_empty():
 		return
+	# Only mark the beat sent once a safe spawn actually exists; retry on a later turn.
+	beat_sent = true
 	spots.sort()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed * 31 + turn
