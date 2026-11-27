@@ -330,6 +330,21 @@ func _buried(p: Vector2i) -> bool:
 	return true
 
 
+## Cosmetic-only variation: stable for a seed and independent of the simulation RNG.
+static func wet_floor_for(cell: Vector2i, night_seed: int) -> bool:
+	return posmod(cell.x * 5 + cell.y + posmod(night_seed, 11), 11) == 0
+
+
+static func dawn_detail(night_seed: int) -> String:
+	var lines := [
+		"It rolls out over the drowned quay, and every door in the town hears it.",
+		"Dawn breaks over the quay. Every window is dark except your own.",
+		"The bell falls silent. A second shadow trails yours across the quay.",
+		"The sky turns grey, but the water still reflects the night.",
+	]
+	return lines[posmod(night_seed, lines.size())]
+
+
 func _build_world() -> void:
 	var env := Environment.new()
 	# night sky over the alleys (painted strip baked into a panorama): only seen looking up past the walls
@@ -392,7 +407,7 @@ func _build_world() -> void:
 					tile_tex[p] = "deck"
 				elif p in room.exits:
 					tile_tex[p] = "exit"
-				elif (x * 5 + y) % 11 == 0:
+				elif wet_floor_for(p, game.seed):
 					tile_tex[p] = "floor_wet"
 				tile_base[p] = Color(0.31, 0.25, 0.20) if decking else Color(0.58, 0.58, 0.62)
 				var across: bool = room.is_wall(p + Vector2i.LEFT) and room.is_wall(p + Vector2i.RIGHT)
@@ -3168,7 +3183,7 @@ func _show_end() -> void:
 		big.text = "THE BELL RINGS"
 		big.add_theme_color_override("font_color", UI.AMBER)
 		grade.text = game.grade()
-		small.text = "It rolls out over the drowned quay, and every door in the town hears it.\n\n%d oil left  +  %d letters × 5  =  %d\n%d turns\n\n%s" % [game.oil, game.letters_read.size(), game.points(), game.turn, Lessons.GRADE_LINE]
+		small.text = "%s\n\n%d oil left  +  %d letters × 5  =  %d\n%d turns\n\n%s" % [dawn_detail(game.seed), game.oil, game.letters_read.size(), game.points(), game.turn, Lessons.GRADE_LINE]
 	elif game.escaped:
 		big.text = "DAWN"
 		big.add_theme_color_override("font_color", UI.AMBER)
